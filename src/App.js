@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './AuthContext';
 import Dashboard from './Dashboard';
 import BookList from './components/BookList';
+import Calendar from './components/Calendar';
 import Login from './Login';
 import { CircularProgress, Box } from '@mui/material';
 
@@ -33,6 +34,7 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/books" element={<BookList />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

@@ -17,10 +17,8 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
     { name: 'Dashboard', path: '/' },
     { name: 'Book List', path: '/books' },
     { name: 'Calendar', path: '/calendar' },
-    { name: 'Book Club', path: '/club' },
-    { name: 'Suggestions', path: '/suggestions' },
-    { name: 'Feed', path: '/feed' },
-    { name: 'Goals', path: '/goals' },
+    { name: 'Feed - (Coming Soon)', path: '/feed', disabled: true },
+    { name: 'Goals - (Coming Soon)', path: '/goals', disabled: true },
     { name: 'Profile', path: '/profile' },
   ];
 
@@ -40,12 +38,13 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
               key={item.name}
               onClick={() => handleNavigation(item.path)}
               selected={location.pathname === item.path}
+              disabled={item.disabled}
             >
-              <ListItemText primary={item.name} />
+              <ListItemText primary={item.name} sx={{ color: item.disabled ? 'text.secondary' : 'inherit' }} />
             </ListItem>
           ))}
           <ListItem button onClick={onLogout}>
-            <ListItemText primary="Sign Out" />
+            <ListItemText primary="Sign Out" sx={{ color: 'text.secondary' }} />
           </ListItem>
         </List>
       </Box>
