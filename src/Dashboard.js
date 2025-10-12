@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Avatar,
   AppBar,
@@ -10,20 +10,22 @@ import {
   Checkbox,
   Chip,
   CssBaseline,
-  Divider,
   Drawer,
   IconButton,
   List,
   ListItem,
-  ListItemAvatar,
   ListItemText,
   Paper,
+  TextField,
   ThemeProvider,
   Toolbar,
   Typography,
   createTheme,
+  CircularProgress,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import GoalsLeaderboard from './GoalsLeaderboard';
+import { getPosts, addPost } from './firebase';
 
 const theme = createTheme({
   palette: {
@@ -44,10 +46,51 @@ const theme = createTheme({
 
 const Dashboard = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [posts, setPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [errorPosts, setErrorPosts] = useState(null);
+  const [newPostText, setNewPostText] = useState('');
 
   const user = {
     name: 'Caillou',
     profilePic: '',
+    id: 'caillou-test-id' // Hardcoded user ID for testing
+  };
+
+  const fetchPosts = async () => {
+    try {
+      setLoadingPosts(true);
+      const snapshot = await getPosts();
+      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPosts(postsData);
+    } catch (err) {
+      setErrorPosts('Failed to fetch posts.');
+      console.error(err);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const handleCreatePost = async () => {
+    if (!newPostText.trim()) return;
+
+    try {
+      const newPost = {
+        authorId: user.id,
+        text: newPostText,
+        createdAt: new Date(),
+        reactionCounts: { thumbsUp: 0, thumbsDown: 0, heart: 0, laugh: 0 },
+      };
+      await addPost(newPost);
+      setNewPostText('');
+      fetchPosts();
+    } catch (err) {
+      console.error("Error adding post: ", err);
+    }
   };
 
   const currentBooks = [
@@ -58,59 +101,12 @@ const Dashboard = () => {
       theme: 'Creative',
       cover: 'https://images.penguinrandomhouse.com/cover/9780593652886',
     },
-    {
-      title: "Ender's Game",
-      author: 'Orson Scott Card',
-      discussionDate: 'May 31, 2025',
-      theme: 'Curious',
-      cover: 'https://m.media-amazon.com/images/I/81+IUsYtGTL._AC_UF1000,1000_QL80_.jpg',
-    },
-    {
-      title: 'Happy Lies',
-      author: 'Melissa Dougherty',
-      discussionDate: 'July 5, 2025',
-      theme: 'Classy',
-      cover: 'https://m.media-amazon.com/images/I/81X47xoPLQL._UF1000,1000_QL80_.jpg',
-    },
-    {
-      title: 'Lonesome Dove',
-      author: 'Larry McMurtry',
-      discussionDate: 'August 2, 2025',
-      theme: 'Creative',
-      cover: 'https://m.media-amazon.com/images/I/71JXquqq54L.jpg',
-    },
   ];
 
   const goals = [
     { id: 1, text: 'Read 20 minutes today', completed: false },
     { id: 2, text: 'Finish Chapter 3', completed: true },
   ];
-
-  const initialFeedPosts = [
-    { id: 1, user: 'Jabo', avatar: '', text: "It's so good! I'll be re-reading it soon.", reactions: { '👍': 2, '👎': 0, '❤️': 1, '😂': 0 }, reacted: {} },
-    { id: 2, user: 'Isaac', avatar: '', text: "Finished Lonesome Dove. Just so good. So freaking good. definitely the best book I ever read.", reactions: { '👍': 1, '👎': 0, '❤️': 0, '😂': 1 }, reacted: {} },
-    { id: 3, user: 'Blake', avatar: '', text: "Check it out, goatse! (•)", reactions: { '👍': 0, '👎': 1, '❤️': 0, '😂': 1 }, reacted: {} },
-  ];
-
-  const [feedPosts, setFeedPosts] = useState(initialFeedPosts);
-
-  const handleReact = (postId, emoji) => {
-    setFeedPosts((prevPosts) =>
-      prevPosts.map((post) => {
-        if (post.id !== postId) return post;
-        const alreadyReacted = post.reacted[emoji];
-        const newReactions = {
-          ...post.reactions,
-          [emoji]: post.reactions[emoji] + (alreadyReacted ? -1 : 1),
-        };
-        const newReacted = {
-          ...post.reacted,
-          [emoji]: !alreadyReacted,
-        };
-        return { ...post, reactions: newReactions, reacted: newReacted };
-      })
-    );
-  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -143,7 +139,7 @@ const Dashboard = () => {
       </Drawer>
 
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {/* Next Meeting Info */}
+        <GoalsLeaderboard />
         <Card>
           <CardContent sx={{ py: 1 }}>
             <Typography variant="h6">Next Meeting</Typography>
@@ -153,7 +149,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Current Books Carousel */}
         <Box>
           <Typography variant="h6" gutterBottom>Current Books</Typography>
           <Box sx={{ display: 'flex', overflowX: 'auto', gap: 2 }}>
@@ -181,7 +176,6 @@ const Dashboard = () => {
           </Box>
         </Box>
 
-        {/* Goals Section */}
         <Card>
           <CardContent>
             <Typography variant="h6">Today's Goals</Typography>
@@ -194,35 +188,34 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Quick Feed Preview */}
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>Recent Posts</Typography>
+            <Typography variant="h6" gutterBottom>Feed</Typography>
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                fullWidth
+                label="What's on your mind?"
+                value={newPostText}
+                onChange={(e) => setNewPostText(e.target.value)}
+                variant="outlined"
+              />
+              <Button onClick={handleCreatePost} variant="contained" sx={{ mt: 1 }}>
+                Post
+              </Button>
+            </Box>
+            {loadingPosts && <CircularProgress />}
+            {errorPosts && <Typography color="error">{errorPosts}</Typography>}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {feedPosts.map((post) => (
+              {posts.sort((a,b) => b.createdAt.toDate() - a.createdAt.toDate()).map((post) => (
                 <Paper key={post.id} elevation={1} sx={{ p: 1.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar src={post.avatar} alt={post.user} sx={{ width: 30, height: 30 }} />
-                    <Typography variant="subtitle2">{post.user}</Typography>
+                    <Avatar src={post.avatar} alt={post.authorId} sx={{ width: 30, height: 30 }} />
+                    <Typography variant="subtitle2">{post.authorId}</Typography>
                   </Box>
                   <Typography variant="body2" sx={{ mt: 0.5, mb: 1 }}>{post.text}</Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {['👍', '👎', '❤️', '😂'].map((emoji) => (
-                      <Chip
-                        key={emoji}
-                        size="small"
-                        label={`${emoji} ${post.reactions[emoji]}`}
-                        color={post.reacted[emoji] ? 'secondary' : 'default'}
-                        onClick={() => handleReact(post.id, emoji)}
-                        variant={post.reacted[emoji] ? 'filled' : 'outlined'}
-                        sx={{ px: 0.5, py: 0 }}
-                      />
-                    ))}
-                  </Box>
                 </Paper>
               ))}
             </Box>
-            <Button size="small" sx={{ mt: 2 }}>View All</Button>
           </CardContent>
         </Card>
       </Box>
@@ -231,4 +224,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

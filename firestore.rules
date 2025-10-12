@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+
+    // Books
+    match /books/{bookId} {
+      allow read: if request.auth != null;
+      // Add write rules for admins if necessary
+    }
+
+    // Meetings
+    match /meetings/{meetingId} {
+      allow read: if request.auth != null;
+      // Add write rules for admins if necessary
+    }
+
+    // User Goals
+    match /user_goals/{goalId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Goal Checks
+    match /goal_checks/{checkId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Posts
+    match /posts/{postId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+    }
+
+    // Post Reactions
+    match /post_reactions/{reactionId} {
+      allow read: if request.auth != null;
+      allow create, delete: if request.auth != null;
+      // Unique reaction check should be handled in application logic or more complex rules
+    }
+  }
+}
