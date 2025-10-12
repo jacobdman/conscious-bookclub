@@ -1,58 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Avatar,
-  AppBar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CardMedia,
-  Checkbox,
-  CssBaseline,
-  Drawer,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
-  TextField,
-  ThemeProvider,
-  Toolbar,
-  Typography,
-  createTheme,
-  CircularProgress,
-} from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import LogoutIcon from '@mui/icons-material/Logout';
+import { Box, Button, Typography } from '@mui/material';
 import { getPosts, addPost, getBooks } from './services/firestoreService';
 import { useAuth } from './AuthContext';
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#5D473A',
-    },
-    secondary: {
-      main: '#BFA480',
-    },
-    background: {
-      default: '#F5F1EA',
-    },
-  },
-  typography: {
-    fontFamily: 'Georgia, serif',
-  },
-});
+import Layout from './components/Layout';
+import NextMeetingCard from './components/NextMeetingCard';
+import CurrentBooksSection from './components/CurrentBooksSection';
+import GoalsCard from './components/GoalsCard';
+import FeedSection from './components/FeedSection';
+import SeedBooksButton from './components/SeedBooksButton';
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { user } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [errorPosts, setErrorPosts] = useState(null);
   const [newPostText, setNewPostText] = useState('');
   const [currentBooks, setCurrentBooks] = useState([]);
-  const [goals, setGoals] = useState([]);
+  const [goals] = useState([]);
 
   const fetchPosts = async () => {
     try {
@@ -68,21 +32,48 @@ const Dashboard = () => {
     }
   };
 
-  const fetchBooks = async () => {
+  const fetchBooks = useCallback(async () => {
     try {
+      console.log("Fetching books from Firestore...");
+      console.log("Current user:", user);
+      console.log("User authenticated:", !!user);
+      
+      if (!user) {
+        console.log("No user authenticated, skipping books fetch");
+        return;
+      }
+      
       const snapshot = await getBooks();
-      const booksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log("Books snapshot:", snapshot);
+      console.log("Number of books found:", snapshot.docs.length);
+      
+      const booksData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log("Book data:", { id: doc.id, ...data });
+        return { id: doc.id, ...data };
+      });
+      
+      console.log("Final books data:", booksData);
       setCurrentBooks(booksData);
     } catch (err) {
       console.error("Error fetching books: ", err);
+      console.error("Error details:", err.code, err.message);
     }
-  };
+  }, [user]);
 
 
   useEffect(() => {
-    fetchPosts();
+    if (user) {
+      fetchPosts();
+      fetchBooks();
+    }
+  }, [user, fetchBooks]);
+
+  // Add a manual refresh button for testing
+  const handleRefreshBooks = () => {
+    console.log("Manually refreshing books...");
     fetchBooks();
-  }, [user]);
+  };
 
   const handleCreatePost = async () => {
     if (!newPostText.trim() || !user) return;
@@ -103,129 +94,36 @@ const Dashboard = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AppBar position="static" color="primary">
-        <Toolbar>
-          <IconButton edge="start" color="inherit" onClick={() => setDrawerOpen(true)}>
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" sx={{ flexGrow: 1, textAlign: 'center' }}>
-            Welcome, {user?.displayName || user?.email || 'User'}!
-          </Typography>
-          <IconButton color="inherit" onClick={handleLogout} sx={{ mr: 1 }}>
-            <LogoutIcon />
-          </IconButton>
-          <Avatar src={user?.photoURL} alt={user?.displayName || user?.email} />
-        </Toolbar>
-      </AppBar>
-
-      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <Box sx={{ width: 250, p: 2 }} role="presentation">
-          <Typography variant="h6" sx={{ mb: 2 }}>Navigation</Typography>
-          <List>
-            <ListItem button><ListItemText primary="Dashboard" /></ListItem>
-            <ListItem button><ListItemText primary="Calendar" /></ListItem>
-            <ListItem button><ListItemText primary="Book Club" /></ListItem>
-            <ListItem button><ListItemText primary="Suggestions" /></ListItem>
-            <ListItem button><ListItemText primary="Feed" /></ListItem>
-            <ListItem button><ListItemText primary="Goals" /></ListItem>
-            <ListItem button><ListItemText primary="Profile" /></ListItem>
-            <ListItem button onClick={handleLogout}><ListItemText primary="Sign Out" /></ListItem>
-          </List>
-        </Box>
-      </Drawer>
-
+    <Layout>
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Card>
-          <CardContent sx={{ py: 1 }}>
-            <Typography variant="h6">Next Meeting</Typography>
-            <Typography variant="body2">Theme: Creative (Mind)</Typography>
-            <Typography variant="body2">Date: May 3, 2025</Typography>
-            <Typography variant="body2">Notes: Read/Review other members creative works before the meeting!</Typography>
-          </CardContent>
-        </Card>
-
-        <Box>
-          <Typography variant="h6" gutterBottom>Current Books</Typography>
-          <Box sx={{ display: 'flex', overflowX: 'auto', gap: 2 }}>
-            {currentBooks.map((book, index) => (
-              <Card key={index} sx={{ minWidth: 200 }}>
-                <CardMedia
-                  component="img"
-                  height="300"
-                  image={book.cover}
-                  alt={book.title}
-                />
-                <CardContent>
-                  <Typography variant="subtitle1">{book.title}</Typography>
-                  <Typography variant="body2" color="text.secondary">{book.author}</Typography>
-                  <Typography variant="caption" display="block">
-                    Discussion: {book.discussionDate}
-                  </Typography>
-                  <Typography variant="caption" display="block" gutterBottom>
-                    Theme: {book.theme}
-                  </Typography>
-                  <Button variant="outlined" size="small">Mark as Read</Button>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
+        <NextMeetingCard />
+        
+        <SeedBooksButton />
+        
+        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+          <Button variant="outlined" onClick={handleRefreshBooks} size="small">
+            Refresh Books
+          </Button>
+          <Typography variant="caption" sx={{ alignSelf: 'center' }}>
+            Books count: {currentBooks.length}
+          </Typography>
         </Box>
-
-        <Card>
-          <CardContent>
-            <Typography variant="h6">Today's Goals</Typography>
-            {goals.map((goal) => (
-              <Box key={goal.id} sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                <Checkbox checked={goal.completed} />
-                <Typography variant="body2">{goal.text}</Typography>
-              </Box>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>Feed</Typography>
-            <Box sx={{ mb: 2 }}>
-              <TextField
-                fullWidth
-                label="What's on your mind?"
-                value={newPostText}
-                onChange={(e) => setNewPostText(e.target.value)}
-                variant="outlined"
-              />
-              <Button onClick={handleCreatePost} variant="contained" sx={{ mt: 1 }}>
-                Post
-              </Button>
-            </Box>
-            {loadingPosts && <CircularProgress />}
-            {errorPosts && <Typography color="error">{errorPosts}</Typography>}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {posts.sort((a,b) => b.createdAt.toDate() - a.createdAt.toDate()).map((post) => (
-                <Paper key={post.id} elevation={1} sx={{ p: 1.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar src={post.avatar} alt={post.authorName || post.authorId} sx={{ width: 30, height: 30 }} />
-                    <Typography variant="subtitle2">{post.authorName || post.authorId}</Typography>
-                  </Box>
-                  <Typography variant="body2" sx={{ mt: 0.5, mb: 1 }}>{post.text}</Typography>
-                </Paper>
-              ))}
-            </Box>
-          </CardContent>
-        </Card>
+        
+        <CurrentBooksSection books={currentBooks} />
+        
+        <GoalsCard goals={goals} />
+        
+        <FeedSection 
+          posts={posts}
+          newPostText={newPostText}
+          onNewPostTextChange={setNewPostText}
+          onCreatePost={handleCreatePost}
+          loadingPosts={loadingPosts}
+          errorPosts={errorPosts}
+        />
       </Box>
-    </ThemeProvider>
+    </Layout>
   );
 };
 
