@@ -1,5 +1,15 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged, 
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile
+} from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
 
@@ -18,9 +28,17 @@ const functions = getFunctions(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-export const signInWithGoogle = () => signInWithPopup(auth, provider);
+export const signInWithGoogle = () => signInWithRedirect(auth, provider);
 
-export { auth, onAuthStateChanged, signOut, db };
+export const signUpWithEmail = async (email, password, displayName) => {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  await updateProfile(userCredential.user, { displayName });
+  return userCredential;
+};
+
+export const signInWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
+
+export { auth, onAuthStateChanged, signOut, db, getRedirectResult };
 
 export const getLeaderboard = httpsCallable(functions, 'getLeaderboard');
 
