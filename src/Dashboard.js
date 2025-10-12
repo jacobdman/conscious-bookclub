@@ -8,7 +8,6 @@ import {
   CardContent,
   CardMedia,
   Checkbox,
-  Chip,
   CssBaseline,
   Drawer,
   IconButton,
@@ -25,7 +24,7 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import GoalsLeaderboard from './GoalsLeaderboard';
-import { getPosts, addPost } from './firebase';
+import { getPosts, addPost, getBooks, getUserGoals, getGoalChecks, signOut, auth } from './firebase';
 
 const theme = createTheme({
   palette: {
@@ -44,18 +43,14 @@ const theme = createTheme({
   },
 });
 
-const Dashboard = () => {
+const Dashboard = ({ user }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [errorPosts, setErrorPosts] = useState(null);
   const [newPostText, setNewPostText] = useState('');
-
-  const user = {
-    name: 'Caillou',
-    profilePic: '',
-    id: 'caillou-test-id' // Hardcoded user ID for testing
-  };
+  const [currentBooks, setCurrentBooks] = useState([]);
+  const [goals, setGoals] = useState([]);
 
   const fetchPosts = async () => {
     try {
@@ -71,16 +66,46 @@ const Dashboard = () => {
     }
   };
 
+  const fetchBooks = async () => {
+    try {
+      const snapshot = await getBooks();
+      const booksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCurrentBooks(booksData);
+    } catch (err) {
+      console.error("Error fetching books: ", err);
+    }
+  };
+
+  const fetchGoals = async () => {
+    try {
+      const goalsSnapshot = await getUserGoals(user.uid);
+      const goalsData = await Promise.all(goalsSnapshot.docs.map(async (doc) => {
+        const goal = { id: doc.id, ...doc.data() };
+        const checksSnapshot = await getGoalChecks(user.uid, doc.id);
+        goal.completed = !checksSnapshot.empty;
+        return goal;
+      }));
+      setGoals(goalsData);
+    } catch (err) {
+      console.error("Error fetching goals: ", err);
+    }
+  };
+
+
   useEffect(() => {
     fetchPosts();
-  }, []);
+    fetchBooks();
+    if (user) {
+      fetchGoals();
+    }
+  }, [user]);
 
   const handleCreatePost = async () => {
     if (!newPostText.trim()) return;
 
     try {
       const newPost = {
-        authorId: user.id,
+        authorId: user.uid,
         text: newPostText,
         createdAt: new Date(),
         reactionCounts: { thumbsUp: 0, thumbsDown: 0, heart: 0, laugh: 0 },
@@ -93,21 +118,6 @@ const Dashboard = () => {
     }
   };
 
-  const currentBooks = [
-    {
-      title: 'The Creative Act: A Way Of Being',
-      author: 'Rick Rubin',
-      discussionDate: 'May 3, 2025',
-      theme: 'Creative',
-      cover: 'https://images.penguinrandomhouse.com/cover/9780593652886',
-    },
-  ];
-
-  const goals = [
-    { id: 1, text: 'Read 20 minutes today', completed: false },
-    { id: 2, text: 'Finish Chapter 3', completed: true },
-  ];
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -117,9 +127,9 @@ const Dashboard = () => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1, textAlign: 'center' }}>
-            Welcome, {user.name}!
+            Welcome, {user.displayName}!
           </Typography>
-          <Avatar src={user.profilePic} alt={user.name} />
+          <Avatar src={user.photoURL} alt={user.displayName} />
         </Toolbar>
       </AppBar>
 
@@ -134,6 +144,7 @@ const Dashboard = () => {
             <ListItem button><ListItemText primary="Feed" /></ListItem>
             <ListItem button><ListItemText primary="Goals" /></ListItem>
             <ListItem button><ListItemText primary="Profile" /></ListItem>
+            <ListItem button onClick={() => signOut(auth)}><ListItemText primary="Sign Out" /></ListItem>
           </List>
         </Box>
       </Drawer>

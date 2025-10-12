@@ -1,20 +1,26 @@
 import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
 
-// TODO: Replace with your app's Firebase project configuration
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-auth-domain",
-  projectId: "your-project-id",
-  storageBucket: "your-storage-bucket",
-  messagingSenderId: "your-messaging-sender-id",
-  appId: "your-app-id"
+  apiKey: "AIzaSyBmG4u5Kv4nt-5F5XfZhKNsyg9MJ-h96Qo",
+  authDomain: "conscious-bookclub-87073-9eb71.firebaseapp.com",
+  projectId: "conscious-bookclub-87073-9eb71",
+  storageBucket: "conscious-bookclub-87073-9eb71.appspot.com",
+  messagingSenderId: "499467823747",
+  appId: "1:499467823747:web:4146c4e1a9e368c83549b6"
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const functions = getFunctions(app);
 const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+export const signInWithGoogle = () => signInWithPopup(auth, provider);
+
+export { auth, onAuthStateChanged, signOut, db };
 
 export const getLeaderboard = httpsCallable(functions, 'getLeaderboard');
 
@@ -26,5 +32,3 @@ export const getBooks = () => getDocs(collection(db, "books"));
 export const getMeetings = () => getDocs(collection(db, "meetings"));
 export const getUserGoals = (userId) => getDocs(collection(db, `users/${userId}/user_goals`));
 export const getGoalChecks = (userId, goalId) => getDocs(collection(db, `users/${userId}/user_goals/${goalId}/goal_checks`));
-
-export { db };
