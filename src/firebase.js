@@ -26,9 +26,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const functions = getFunctions(app);
 const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
+const googleProvider = new GoogleAuthProvider();
 
-export const signInWithGoogle = () => signInWithRedirect(auth, provider);
+export const signInWithGoogle = () => signInWithRedirect(auth, googleProvider);
 
 export const signUpWithEmail = async (email, password, displayName) => {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -38,7 +38,7 @@ export const signUpWithEmail = async (email, password, displayName) => {
 
 export const signInWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-export { auth, onAuthStateChanged, signOut, db, getRedirectResult };
+export { auth, onAuthStateChanged, signOut, db, getRedirectResult, googleProvider };
 
 export const getLeaderboard = httpsCallable(functions, 'getLeaderboard');
 

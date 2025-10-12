@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Avatar,
   AppBar,
@@ -23,8 +23,10 @@ import {
   CircularProgress,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import LogoutIcon from '@mui/icons-material/Logout';
 import GoalsLeaderboard from './GoalsLeaderboard';
-import { getPosts, addPost, getBooks, getUserGoals, getGoalChecks, signOut, auth } from './firebase';
+import { getPosts, addPost, getBooks, getUserGoals, getGoalChecks } from './firebase';
+import { useAuth } from './AuthContext';
 
 const theme = createTheme({
   palette: {
@@ -43,7 +45,8 @@ const theme = createTheme({
   },
 });
 
-const Dashboard = ({ user }) => {
+const Dashboard = () => {
+  const { user, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
@@ -76,7 +79,7 @@ const Dashboard = ({ user }) => {
     }
   };
 
-  const fetchGoals = async () => {
+  const fetchGoals = useCallback(async () => {
     try {
       const goalsSnapshot = await getUserGoals(user.uid);
       const goalsData = await Promise.all(goalsSnapshot.docs.map(async (doc) => {
@@ -89,7 +92,7 @@ const Dashboard = ({ user }) => {
     } catch (err) {
       console.error("Error fetching goals: ", err);
     }
-  };
+  }, [user]);
 
 
   useEffect(() => {
@@ -98,14 +101,15 @@ const Dashboard = ({ user }) => {
     if (user) {
       fetchGoals();
     }
-  }, [user]);
+  }, [user, fetchGoals]);
 
   const handleCreatePost = async () => {
-    if (!newPostText.trim()) return;
+    if (!newPostText.trim() || !user) return;
 
     try {
       const newPost = {
         authorId: user.uid,
+        authorName: user.displayName || user.email,
         text: newPostText,
         createdAt: new Date(),
         reactionCounts: { thumbsUp: 0, thumbsDown: 0, heart: 0, laugh: 0 },
@@ -118,6 +122,14 @@ const Dashboard = ({ user }) => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -127,9 +139,12 @@ const Dashboard = ({ user }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1, textAlign: 'center' }}>
-            Welcome, {user.displayName}!
+            Welcome, {user?.displayName || user?.email || 'User'}!
           </Typography>
-          <Avatar src={user.photoURL} alt={user.displayName} />
+          <IconButton color="inherit" onClick={handleLogout} sx={{ mr: 1 }}>
+            <LogoutIcon />
+          </IconButton>
+          <Avatar src={user?.photoURL} alt={user?.displayName || user?.email} />
         </Toolbar>
       </AppBar>
 
@@ -144,7 +159,7 @@ const Dashboard = ({ user }) => {
             <ListItem button><ListItemText primary="Feed" /></ListItem>
             <ListItem button><ListItemText primary="Goals" /></ListItem>
             <ListItem button><ListItemText primary="Profile" /></ListItem>
-            <ListItem button onClick={() => signOut(auth)}><ListItemText primary="Sign Out" /></ListItem>
+            <ListItem button onClick={handleLogout}><ListItemText primary="Sign Out" /></ListItem>
           </List>
         </Box>
       </Drawer>
@@ -220,8 +235,8 @@ const Dashboard = ({ user }) => {
               {posts.sort((a,b) => b.createdAt.toDate() - a.createdAt.toDate()).map((post) => (
                 <Paper key={post.id} elevation={1} sx={{ p: 1.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar src={post.avatar} alt={post.authorId} sx={{ width: 30, height: 30 }} />
-                    <Typography variant="subtitle2">{post.authorId}</Typography>
+                    <Avatar src={post.avatar} alt={post.authorName || post.authorId} sx={{ width: 30, height: 30 }} />
+                    <Typography variant="subtitle2">{post.authorName || post.authorId}</Typography>
                   </Box>
                   <Typography variant="body2" sx={{ mt: 0.5, mb: 1 }}>{post.text}</Typography>
                 </Paper>

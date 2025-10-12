@@ -1,44 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { auth, onAuthStateChanged, getRedirectResult } from './firebase';
+import React from 'react';
+import { AuthProvider, useAuth } from './AuthContext';
 import Dashboard from './Dashboard';
 import Login from './Login';
 import { CircularProgress, Box } from '@mui/material';
 
-function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const handleRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          // User is signed in.
-        }
-      } catch (error) {
-        console.error("Authentication error:", error);
-      }
-    };
-
-    handleRedirect();
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+function AppContent() {
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+        }}
+      >
         <CircularProgress />
       </Box>
     );
   }
 
-  return user ? <Dashboard user={user} /> : <Login />;
+  return user ? <Dashboard /> : <Login />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
 
 export default App;

@@ -1,97 +1,102 @@
 import React, { useState } from 'react';
-import { signInWithGoogle, signUpWithEmail, signInWithEmail } from './firebase';
-import { Button, Box, Typography, Paper, TextField, Link } from '@mui/material';
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Typography,
+  CircularProgress,
+  Alert,
+  ThemeProvider,
+  createTheme,
+  CssBaseline,
+} from '@mui/material';
+import GoogleIcon from '@mui/icons-material/Google';
+import { useAuth } from './AuthContext';
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#5D473A',
+    },
+    secondary: {
+      main: '#BFA480',
+    },
+    background: {
+      default: '#F5F1EA',
+    },
+  },
+  typography: {
+    fontFamily: 'Georgia, serif',
+  },
+});
 
 const Login = () => {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const { signInWithGoogle } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleAuthAction = async () => {
-    setError(null);
+  const handleGoogleSignIn = async () => {
     try {
-      if (isSignUp) {
-        await signUpWithEmail(email, password, displayName);
-      } else {
-        await signInWithEmail(email, password);
-      }
-    } catch (err) {
-      setError(err.message);
+      setLoading(true);
+      setError(null);
+      await signInWithGoogle();
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setError('Failed to sign in. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        backgroundColor: '#F5F1EA',
-      }}
-    >
-      <Paper elevation={3} sx={{ padding: 4, textAlign: 'center', width: '100%', maxWidth: 400 }}>
-        <Typography variant="h4" gutterBottom>
-          {isSignUp ? 'Create an Account' : 'Welcome Back'}
-        </Typography>
-        <Typography variant="subtitle1" sx={{ mb: 3 }}>
-          Please {isSignUp ? 'sign up' : 'sign in'} to continue
-        </Typography>
-
-        <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {isSignUp && (
-            <TextField
-              label="Display Name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              variant="outlined"
-            />
-          )}
-          <TextField
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            variant="outlined"
-          />
-          <TextField
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            variant="outlined"
-          />
-
-          {error && (
-            <Typography color="error" variant="body2">
-              {error}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #F5F1EA 0%, #BFA480 100%)',
+          p: 2,
+        }}
+      >
+        <Card sx={{ maxWidth: 400, width: '100%' }}>
+          <CardContent sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h4" component="h1" gutterBottom color="primary">
+              Conscious Book Club
             </Typography>
-          )}
-
-          <Button variant="contained" onClick={handleAuthAction}>
-            {isSignUp ? 'Sign Up' : 'Sign In'}
-          </Button>
-        </Box>
-
-        <Typography variant="body2" sx={{ mt: 2 }}>
-          {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-          <Link component="button" variant="body2" onClick={() => { setIsSignUp(!isSignUp); setError(null); }}>
-            {isSignUp ? ' Sign In' : ' Sign Up'}
-          </Link>
-        </Typography>
-
-        <Typography variant="body2" sx={{ my: 2 }}>
-          OR
-        </Typography>
-
-        <Button variant="outlined" onClick={signInWithGoogle}>
-          Sign in with Google
-        </Button>
-      </Paper>
-    </Box>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+              Sign in to access your reading goals and connect with fellow book lovers
+            </Typography>
+            
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+            
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} /> : <GoogleIcon />}
+              sx={{
+                py: 1.5,
+                fontSize: '1.1rem',
+                textTransform: 'none',
+                borderRadius: 2,
+              }}
+            >
+              {loading ? 'Signing in...' : 'Sign in with Google'}
+            </Button>
+          </CardContent>
+        </Card>
+      </Box>
+    </ThemeProvider>
   );
 };
 
