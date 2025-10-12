@@ -12,7 +12,8 @@ service cloud.firestore {
     // Books
     match /books/{bookId} {
       allow read: if request.auth != null;
-      // Add write rules for admins if necessary
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
     }
 
     // Meetings

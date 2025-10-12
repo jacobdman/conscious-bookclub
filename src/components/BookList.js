@@ -13,15 +13,19 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Button
+  Button,
+  Fab
 } from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { getBooks } from '../services/firestoreService';
 import Layout from './Layout';
+import AddBookForm from './AddBookForm';
 
 const BookList = () => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [addBookOpen, setAddBookOpen] = useState(false);
 
   const fetchBooks = async () => {
     try {
@@ -45,6 +49,10 @@ const BookList = () => {
   const formatDate = (date) => {
     if (!date) return 'TBD';
     return new Date(date.seconds ? date.seconds * 1000 : date).toLocaleDateString();
+  };
+
+  const handleBookAdded = () => {
+    fetchBooks(); // Refresh the book list
   };
 
   if (loading) {
@@ -72,12 +80,27 @@ const BookList = () => {
   return (
     <Layout>
       <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Book List
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          All books in our collection ({books.length} total)
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              Book List
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              All books in our collection ({books.length} total)
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setAddBookOpen(true)}
+            sx={{ 
+              minWidth: 140,
+              display: { xs: 'none', md: 'flex' }
+            }}
+          >
+            Add Book
+          </Button>
+        </Box>
 
         <TableContainer component={Paper}>
           <Table sx={{ minWidth: 650 }} aria-label="books table">
@@ -87,6 +110,7 @@ const BookList = () => {
                 <TableCell>Title</TableCell>
                 <TableCell>Author</TableCell>
                 <TableCell>Theme</TableCell>
+                <TableCell>Genre</TableCell>
                 <TableCell>Discussion Date</TableCell>
                 <TableCell>Added</TableCell>
               </TableRow>
@@ -116,12 +140,22 @@ const BookList = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip 
-                      label={book.theme || 'General'} 
-                      size="small" 
-                      color="primary" 
-                      variant="outlined"
-                    />
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {(Array.isArray(book.theme) ? book.theme : [book.theme]).map((theme, index) => (
+                        <Chip 
+                          key={index}
+                          label={theme} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined"
+                        />
+                      ))}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {book.genre || 'N/A'}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
@@ -149,7 +183,28 @@ const BookList = () => {
             </Typography>
           </Box>
         )}
+
+        {/* Floating Action Button for mobile */}
+        <Fab
+          color="primary"
+          aria-label="add book"
+          onClick={() => setAddBookOpen(true)}
+          sx={{
+            position: 'fixed',
+            bottom: 16,
+            right: 16,
+            display: { xs: 'flex', md: 'none' }
+          }}
+        >
+          <AddIcon />
+        </Fab>
       </Box>
+
+      <AddBookForm
+        open={addBookOpen}
+        onClose={() => setAddBookOpen(false)}
+        onBookAdded={handleBookAdded}
+      />
     </Layout>
   );
 };
