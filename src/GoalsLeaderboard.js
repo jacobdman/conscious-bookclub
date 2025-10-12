@@ -17,11 +17,15 @@ const GoalsLeaderboard = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
+        console.log('Fetching leaderboard...');
         const result = await getLeaderboard();
-        setLeaderboardData(result.data);
+        console.log('Leaderboard result:', result);
+        setLeaderboardData(result.data || []);
       } catch (err) {
+        console.error('Leaderboard error:', err);
         setError('Failed to fetch leaderboard data.');
-        console.error(err);
+        // Set empty data as fallback
+        setLeaderboardData([]);
       } finally {
         setLoading(false);
       }
@@ -57,18 +61,24 @@ const GoalsLeaderboard = () => {
           Goals Leaderboard
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {leaderboardData
-            .sort((a, b) => b.progress - a.progress)
-            .map((user) => (
-              <Box key={user.name}>
-                <Typography variant="body2">{user.name}</Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={user.progress}
-                  sx={{ height: 10, borderRadius: 5 }}
-                />
-              </Box>
-            ))}
+          {leaderboardData.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No leaderboard data available yet. Start setting goals to see your progress!
+            </Typography>
+          ) : (
+            leaderboardData
+              .sort((a, b) => b.progress - a.progress)
+              .map((user) => (
+                <Box key={user.name}>
+                  <Typography variant="body2">{user.name}</Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={user.progress}
+                    sx={{ height: 10, borderRadius: 5 }}
+                  />
+                </Box>
+              ))
+          )}
         </Box>
       </CardContent>
     </Card>
