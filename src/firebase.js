@@ -2,16 +2,12 @@ import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithRedirect,
   getRedirectResult,
   onAuthStateChanged, 
-  signOut,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  updateProfile
+  signOut
 } from "firebase/auth";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBmG4u5Kv4nt-5F5XfZhKNsyg9MJ-h96Qo",
@@ -28,25 +24,5 @@ const functions = getFunctions(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-export const signInWithGoogle = () => signInWithRedirect(auth, googleProvider);
-
-export const signUpWithEmail = async (email, password, displayName) => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(userCredential.user, { displayName });
-  return userCredential;
-};
-
-export const signInWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
-
-export { auth, onAuthStateChanged, signOut, db, getRedirectResult, googleProvider };
-
-export const getLeaderboard = httpsCallable(functions, 'getLeaderboard');
-
-// Functions to interact with Firestore
-export const getPosts = () => getDocs(collection(db, "posts"));
-export const addPost = (post) => addDoc(collection(db, "posts"), post);
-
-export const getBooks = () => getDocs(collection(db, "books"));
-export const getMeetings = () => getDocs(collection(db, "meetings"));
-export const getUserGoals = (userId) => getDocs(collection(db, `users/${userId}/user_goals`));
-export const getGoalChecks = (userId, goalId) => getDocs(collection(db, `users/${userId}/user_goals/${goalId}/goal_checks`));
+// Export Firebase instances and utilities
+export { auth, onAuthStateChanged, signOut, db, getRedirectResult, googleProvider, functions };

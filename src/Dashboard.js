@@ -24,8 +24,7 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
-import GoalsLeaderboard from './GoalsLeaderboard';
-import { getPosts, addPost, getBooks, getUserGoals, getGoalChecks } from './firebase';
+import { getPosts, addPost, getBooks } from './services/firestoreService';
 import { useAuth } from './AuthContext';
 
 const theme = createTheme({
@@ -79,29 +78,11 @@ const Dashboard = () => {
     }
   };
 
-  const fetchGoals = useCallback(async () => {
-    try {
-      const goalsSnapshot = await getUserGoals(user.uid);
-      const goalsData = await Promise.all(goalsSnapshot.docs.map(async (doc) => {
-        const goal = { id: doc.id, ...doc.data() };
-        const checksSnapshot = await getGoalChecks(user.uid, doc.id);
-        goal.completed = !checksSnapshot.empty;
-        return goal;
-      }));
-      setGoals(goalsData);
-    } catch (err) {
-      console.error("Error fetching goals: ", err);
-    }
-  }, [user]);
-
 
   useEffect(() => {
     fetchPosts();
     fetchBooks();
-    if (user) {
-      fetchGoals();
-    }
-  }, [user, fetchGoals]);
+  }, [user]);
 
   const handleCreatePost = async () => {
     if (!newPostText.trim() || !user) return;
@@ -165,7 +146,6 @@ const Dashboard = () => {
       </Drawer>
 
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <GoalsLeaderboard />
         <Card>
           <CardContent sx={{ py: 1 }}>
             <Typography variant="h6">Next Meeting</Typography>
