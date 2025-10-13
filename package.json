@@ -30,7 +30,8 @@
     "deploy": "npm run build && firebase deploy",
     "emulators": "firebase emulators:start",
     "emulators:ui": "firebase emulators:start --only ui",
-    "dev": "concurrently \"npm start\" \"firebase emulators:start\""
+    "dev": "concurrently \"npm start\" \"firebase emulators:start\"",
+    "seed": "node src/utils/seedBooksFromCSV.js"
   },
   "eslintConfig": {
     "extends": [

@@ -16,7 +16,7 @@ import {
   Button,
   Fab
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
 import { getBooks } from '../services/firestoreService';
 import Layout from './Layout';
 import AddBookForm from './AddBookForm';
@@ -26,6 +26,7 @@ const BookList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [addBookOpen, setAddBookOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState(null);
 
   const fetchBooks = async () => {
     try {
@@ -53,6 +54,17 @@ const BookList = () => {
 
   const handleBookAdded = () => {
     fetchBooks(); // Refresh the book list
+    setEditingBook(null); // Clear editing state
+  };
+
+  const handleEditBook = (book) => {
+    setEditingBook(book);
+    setAddBookOpen(true);
+  };
+
+  const handleCloseForm = () => {
+    setAddBookOpen(false);
+    setEditingBook(null);
   };
 
   if (loading) {
@@ -113,6 +125,7 @@ const BookList = () => {
                 <TableCell>Genre</TableCell>
                 <TableCell>Discussion Date</TableCell>
                 <TableCell>Added</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -167,6 +180,17 @@ const BookList = () => {
                       {formatDate(book.createdAt)}
                     </Typography>
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<EditIcon />}
+                      onClick={() => handleEditBook(book)}
+                      sx={{ minWidth: 80 }}
+                    >
+                      Edit
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -202,8 +226,9 @@ const BookList = () => {
 
       <AddBookForm
         open={addBookOpen}
-        onClose={() => setAddBookOpen(false)}
+        onClose={handleCloseForm}
         onBookAdded={handleBookAdded}
+        editingBook={editingBook}
       />
     </Layout>
   );

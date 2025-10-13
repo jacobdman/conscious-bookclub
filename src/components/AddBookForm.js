@@ -14,11 +14,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Alert
+  Alert,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
-import { addBook } from '../services/firestoreService';
+import { addBook, updateBook } from '../services/firestoreService';
 
-const AddBookForm = ({ open, onClose, onBookAdded }) => {
+const AddBookForm = ({ open, onClose, onBookAdded, editingBook = null }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -27,8 +29,47 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
     author: '',
     theme: [],
     genre: '',
-    coverUrl: ''
+    coverUrl: '',
+    fiction: false,
+    discussionDate: ''
   });
+
+  // Update form data when editingBook changes
+  React.useEffect(() => {
+    if (editingBook) {
+      // Format discussion date for input field (YYYY-MM-DD)
+      let formattedDate = '';
+      if (editingBook.discussionDate) {
+        let discussionDate;
+        if (editingBook.discussionDate.seconds) {
+          discussionDate = new Date(editingBook.discussionDate.seconds * 1000);
+        } else {
+          discussionDate = new Date(editingBook.discussionDate);
+        }
+        formattedDate = discussionDate.toISOString().split('T')[0];
+      }
+
+      setFormData({
+        title: editingBook.title || '',
+        author: editingBook.author || '',
+        theme: Array.isArray(editingBook.theme) ? editingBook.theme : (editingBook.theme ? [editingBook.theme] : []),
+        genre: editingBook.genre || '',
+        coverUrl: editingBook.coverUrl || '',
+        fiction: Boolean(editingBook.fiction),
+        discussionDate: formattedDate
+      });
+    } else {
+      setFormData({
+        title: '',
+        author: '',
+        theme: [],
+        genre: '',
+        coverUrl: '',
+        fiction: false,
+        discussionDate: ''
+      });
+    }
+  }, [editingBook]);
   
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -71,6 +112,10 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
     }
   };
 
+  const handleCheckboxChange = (field) => (event) => {
+    setFormData(prev => ({ ...prev, [field]: event.target.checked }));
+  };
+
   const validateForm = () => {
     const newErrors = {};
     
@@ -106,10 +151,18 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
         author: formData.author.trim(),
         theme: formData.theme,
         genre: formData.genre || null,
-        coverUrl: formData.coverUrl.trim() || null
+        coverUrl: formData.coverUrl.trim() || null,
+        fiction: formData.fiction || false, // Ensure it's always a boolean
+        discussionDate: formData.discussionDate ? new Date(formData.discussionDate) : null
       };
 
-      await addBook(bookData);
+      if (editingBook) {
+        // Update existing book
+        await updateBook(editingBook.id, bookData);
+      } else {
+        // Add new book
+        await addBook(bookData);
+      }
       
       // Reset form
       setFormData({
@@ -117,7 +170,9 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
         author: '',
         theme: [],
         genre: '',
-        coverUrl: ''
+        coverUrl: '',
+        fiction: false,
+        discussionDate: ''
       });
       
       onBookAdded();
@@ -137,7 +192,9 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
         author: '',
         theme: [],
         genre: '',
-        coverUrl: ''
+        coverUrl: '',
+        fiction: false,
+        discussionDate: ''
       });
       setErrors({});
       setSubmitError('');
@@ -153,15 +210,15 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
       fullWidth
       fullScreen={isMobile}
       PaperProps={{
-        sx: isMobile ? {} : { minHeight: '600px' }
+        sx: isMobile ? {} : { minHeight: '700px' }
       }}
     >
       <DialogTitle>
         <Typography variant="h5" component="div">
-          Add New Book
+          {editingBook ? 'Edit Book' : 'Add New Book'}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Add a new book to the club's collection
+          {editingBook ? 'Update the book information' : 'Add a new book to the club\'s collection'}
         </Typography>
       </DialogTitle>
 
@@ -242,6 +299,30 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
               disabled={loading}
               helperText="Optional: URL to the book's cover image"
             />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.fiction}
+                  onChange={handleCheckboxChange('fiction')}
+                  disabled={loading}
+                />
+              }
+              label="Fiction"
+            />
+
+            <TextField
+              label="Discussion Date"
+              type="date"
+              value={formData.discussionDate}
+              onChange={handleChange('discussionDate')}
+              fullWidth
+              disabled={loading}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              helperText="Optional: When will this book be discussed?"
+            />
           </Box>
         </DialogContent>
 
@@ -259,7 +340,7 @@ const AddBookForm = ({ open, onClose, onBookAdded }) => {
             disabled={loading}
             sx={{ minWidth: 100 }}
           >
-            {loading ? 'Adding...' : 'Add Book'}
+            {loading ? (editingBook ? 'Updating...' : 'Adding...') : (editingBook ? 'Update Book' : 'Add Book')}
           </Button>
         </DialogActions>
       </form>

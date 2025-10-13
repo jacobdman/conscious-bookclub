@@ -23,7 +23,8 @@ const FeedSection = ({
     <Card>
       <CardContent>
         <Typography variant="h6" gutterBottom>Feed</Typography>
-        <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" gutterBottom>Coming soon</Typography>
+        {/* <Box sx={{ mb: 2 }}>
           <TextField
             fullWidth
             label="What's on your mind?"
@@ -47,7 +48,7 @@ const FeedSection = ({
               <Typography variant="body2" sx={{ mt: 0.5, mb: 1 }}>{post.text}</Typography>
             </Paper>
           ))}
-        </Box>
+        </Box> */}
       </CardContent>
     </Card>
   );

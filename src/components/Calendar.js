@@ -183,8 +183,13 @@ const CalendarComponent = () => {
           </ToggleButtonGroup>
         </Box>
 
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Typography variant="body2" gutterBottom>View the full calendar here:</Typography>
+          <Button variant="outlined" href="https://calendar.google.com/calendar/embed?src=99d5640c339ece5cf6b5abb26854d93f2cf4b8fc4b87e4a5aa0ca6bb4bc49020%40group.calendar.google.com&ctz=America%2FDenver" target="_blank" size="small">Full Calendar</Button>
+        </Box>
+
         {view === 'month' ? (
-          <Paper sx={{ p: 2, height: isMobile ? '400px' : '600px' }}>
+          <Paper sx={{ p: 2, height: isMobile ? '600px' : '600px' }}>
             <Calendar
               localizer={localizer}
               events={events}
@@ -259,7 +264,7 @@ const CalendarComponent = () => {
                           )}
                           {event.resource.description && (
                             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                              {event.resource.description}
+                              {event.resource.description.replace(/\n/g, '<br />').replace(/<[^>]*>?/g, '')}
                             </Typography>
                           )}
                         </Box>

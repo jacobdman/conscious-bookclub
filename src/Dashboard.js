@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Button, Typography } from '@mui/material';
+import { Box } from '@mui/material';
 import { getPosts, addPost, getBooks } from './services/firestoreService';
 import { useAuth } from './AuthContext';
 import Layout from './components/Layout';
@@ -7,7 +7,6 @@ import NextMeetingCard from './components/NextMeetingCard';
 import CurrentBooksSection from './components/CurrentBooksSection';
 import GoalsCard from './components/GoalsCard';
 import FeedSection from './components/FeedSection';
-import SeedBooksButton from './components/SeedBooksButton';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -47,14 +46,56 @@ const Dashboard = () => {
       console.log("Books snapshot:", snapshot);
       console.log("Number of books found:", snapshot.docs.length);
       
-      const booksData = snapshot.docs.map(doc => {
+      const allBooksData = snapshot.docs.map(doc => {
         const data = doc.data();
         console.log("Book data:", { id: doc.id, ...data });
         return { id: doc.id, ...data };
       });
       
-      console.log("Final books data:", booksData);
-      setCurrentBooks(booksData);
+      // Filter books that have discussion dates and are today or in the future
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+      
+      const upcomingBooks = allBooksData.filter(book => {
+        if (!book.discussionDate) {
+          return false; // Skip books without discussion dates
+        }
+        
+        // Convert Firestore timestamp to Date if needed
+        let discussionDate;
+        if (book.discussionDate.seconds) {
+          discussionDate = new Date(book.discussionDate.seconds * 1000);
+        } else {
+          discussionDate = new Date(book.discussionDate);
+        }
+        
+        // Set time to start of day for comparison
+        discussionDate.setHours(0, 0, 0, 0);
+        
+        return discussionDate >= today;
+      });
+      
+      // Sort by discussion date (earliest first)
+      upcomingBooks.sort((a, b) => {
+        let dateA, dateB;
+        
+        if (a.discussionDate.seconds) {
+          dateA = new Date(a.discussionDate.seconds * 1000);
+        } else {
+          dateA = new Date(a.discussionDate);
+        }
+        
+        if (b.discussionDate.seconds) {
+          dateB = new Date(b.discussionDate.seconds * 1000);
+        } else {
+          dateB = new Date(b.discussionDate);
+        }
+        
+        return dateA - dateB;
+      });
+      
+      console.log("Upcoming books data:", upcomingBooks);
+      setCurrentBooks(upcomingBooks);
     } catch (err) {
       console.error("Error fetching books: ", err);
       console.error("Error details:", err.code, err.message);
@@ -68,12 +109,6 @@ const Dashboard = () => {
       fetchBooks();
     }
   }, [user, fetchBooks]);
-
-  // Add a manual refresh button for testing
-  const handleRefreshBooks = () => {
-    console.log("Manually refreshing books...");
-    fetchBooks();
-  };
 
   const handleCreatePost = async () => {
     if (!newPostText.trim() || !user) return;
@@ -98,17 +133,6 @@ const Dashboard = () => {
     <Layout>
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <NextMeetingCard />
-        
-        <SeedBooksButton />
-        
-        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-          <Button variant="outlined" onClick={handleRefreshBooks} size="small">
-            Refresh Books
-          </Button>
-          <Typography variant="caption" sx={{ alignSelf: 'center' }}>
-            Books count: {currentBooks.length}
-          </Typography>
-        </Box>
         
         <CurrentBooksSection books={currentBooks} />
         
