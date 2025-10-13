@@ -5,6 +5,7 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
+import { createUserDocument } from './services/firestoreService';
 
 const AuthContext = createContext();
 
@@ -40,7 +41,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Create or update user document in Firestore
+        try {
+          await createUserDocument(user);
+        } catch (error) {
+          console.error('Error creating user document:', error);
+        }
+      }
       setUser(user);
       setLoading(false);
     });

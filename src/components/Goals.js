@@ -21,6 +21,7 @@ import { Edit, Delete, Add } from '@mui/icons-material';
 import { useAuth } from '../AuthContext';
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../services/firestoreService';
 import GoalFormModal from './GoalFormModal';
+import QuickGoalCompletion from './QuickGoalCompletion';
 import Layout from './Layout';
 
 const Goals = () => {
@@ -162,6 +163,10 @@ const Goals = () => {
           >
             Create Goal
           </Button>
+        </Box>
+
+        <Box sx={{ mb: 3 }}>
+          <QuickGoalCompletion onGoalUpdate={fetchGoals} />
         </Box>
 
         <Box sx={{ mb: 2 }}>

@@ -42,7 +42,12 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         description: editingGoal.description || '',
         trackingType: editingGoal.trackingType || 'one-time',
         dueDate: editingGoal.dueDate ? new Date(editingGoal.dueDate.seconds * 1000) : null,
-        milestones: editingGoal.milestones || [],
+        milestones: editingGoal.milestones ? editingGoal.milestones.map(milestone => ({
+          ...milestone,
+          dueDate: milestone.dueDate ? 
+            (milestone.dueDate.seconds ? new Date(milestone.dueDate.seconds * 1000) : milestone.dueDate) 
+            : null
+        })) : [],
         startDate: editingGoal.startDate ? new Date(editingGoal.startDate.seconds * 1000) : null,
         endDate: editingGoal.endDate ? new Date(editingGoal.endDate.seconds * 1000) : null,
       });
@@ -140,7 +145,11 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
                   deleteIcon={<DeleteIcon />}
                 />
                 <Typography variant="caption" color="text.secondary">
-                  Due: {milestone.dueDate ? milestone.dueDate.toLocaleDateString() : 'No date'}
+                  Due: {milestone.dueDate ? 
+                    (milestone.dueDate.seconds ? 
+                      new Date(milestone.dueDate.seconds * 1000).toLocaleDateString() : 
+                      milestone.dueDate.toLocaleDateString()
+                    ) : 'No date'}
                 </Typography>
               </Box>
             ))}

@@ -68,7 +68,8 @@ const Login = () => {
               Conscious Book Club
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Sign in to access your reading goals and connect with fellow book lovers
+              Sign in with Google to access your reading goals and connect with fellow book lovers. 
+              New users will be automatically registered.
             </Typography>
             
             {error && (
@@ -91,7 +92,7 @@ const Login = () => {
                 borderRadius: 2,
               }}
             >
-              {loading ? 'Signing in...' : 'Sign in with Google'}
+              {loading ? 'Signing in...' : 'Continue with Google'}
             </Button>
           </CardContent>
         </Card>

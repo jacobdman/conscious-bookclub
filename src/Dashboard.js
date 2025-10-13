@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import NextMeetingCard from './components/NextMeetingCard';
 import CurrentBooksSection from './components/CurrentBooksSection';
 import GoalsCard from './components/GoalsCard';
+import QuickGoalCompletion from './components/QuickGoalCompletion';
 import FeedSection from './components/FeedSection';
 
 const Dashboard = () => {
@@ -133,6 +134,8 @@ const Dashboard = () => {
     <Layout>
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <NextMeetingCard />
+        
+        <QuickGoalCompletion />
         
         <CurrentBooksSection books={currentBooks} />
         
