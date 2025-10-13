@@ -18,3 +18,19 @@ export const deleteBook = (bookId) => deleteDoc(doc(db, "books", bookId));
 export const getMeetings = () => getDocs(collection(db, "meetings"));
 export const getUserGoals = (userId) => getDocs(collection(db, `users/${userId}/user_goals`));
 export const getGoalChecks = (userId, goalId) => getDocs(collection(db, `users/${userId}/user_goals/${goalId}/goal_checks`));
+
+// Goals management functions
+export const getGoals = (userId) => getDocs(collection(db, `users/${userId}/goals`));
+export const addGoal = (userId, goal) => addDoc(collection(db, `users/${userId}/goals`), {
+  ...goal,
+  createdAt: new Date()
+});
+export const updateGoal = (userId, goalId, updates) => updateDoc(doc(db, `users/${userId}/goals`, goalId), updates);
+export const deleteGoal = (userId, goalId) => deleteDoc(doc(db, `users/${userId}/goals`, goalId));
+
+// Goal progress tracking functions
+export const getGoalProgress = (userId, goalId) => getDocs(collection(db, `users/${userId}/goals/${goalId}/progress`));
+export const addGoalProgress = (userId, goalId, progress) => addDoc(collection(db, `users/${userId}/goals/${goalId}/progress`), {
+  ...progress,
+  createdAt: new Date()
+});

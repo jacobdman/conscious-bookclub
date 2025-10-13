@@ -17,8 +17,8 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
     { name: 'Dashboard', path: '/' },
     { name: 'Book List', path: '/books' },
     { name: 'Calendar', path: '/calendar' },
+    { name: 'Goals', path: '/goals' },
     { name: 'Feed - (Coming Soon)', path: '/feed', disabled: true },
-    { name: 'Goals - (Coming Soon)', path: '/goals', disabled: true },
     { name: 'Profile', path: '/profile' },
   ];
 

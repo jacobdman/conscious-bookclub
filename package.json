@@ -7,10 +7,12 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
+    "@mui/x-date-pickers": "^8.14.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "date-fns": "^4.1.0",
     "firebase": "^12.4.0",
     "firebase-admin": "^13.5.0",
     "firebase-functions": "^6.5.0",
@@ -30,8 +32,7 @@
     "deploy": "npm run build && firebase deploy",
     "emulators": "firebase emulators:start",
     "emulators:ui": "firebase emulators:start --only ui",
-    "dev": "concurrently \"npm start\" \"firebase emulators:start\"",
-    "seed": "node src/utils/seedBooksFromCSV.js"
+    "dev": "concurrently \"npm start\" \"firebase emulators:start\""
   },
   "eslintConfig": {
     "extends": [

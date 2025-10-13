@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import Dashboard from './Dashboard';
 import BookList from './components/BookList';
 import Calendar from './components/Calendar';
+import Goals from './components/Goals';
 import Login from './Login';
 import { CircularProgress, Box } from '@mui/material';
 
@@ -35,6 +36,7 @@ function AppContent() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/books" element={<BookList />} />
         <Route path="/calendar" element={<Calendar />} />
+        <Route path="/goals" element={<Goals />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
