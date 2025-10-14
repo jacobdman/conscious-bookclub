@@ -19,30 +19,131 @@ const mapCategoryToGenre = (categories) => {
   if (!categories || !Array.isArray(categories)) return '';
   
   const categoryMap = {
+    // Personal Development & Self-Help
     'self-help': 'Personal Development',
+    'self help': 'Personal Development',
+    'personal development': 'Personal Development',
+    'motivation': 'Personal Development',
+    'success': 'Personal Development',
+    
+    // Psychology & Decision Making
     'psychology': 'Psychology & Decision Making',
+    'behavioral': 'Psychology & Decision Making',
+    'cognitive': 'Psychology & Decision Making',
+    'decision making': 'Psychology & Decision Making',
+    'behavior': 'Psychology & Decision Making',
+    
+    // Business & Entrepreneurship
     'business': 'Business & Entrepreneurship',
+    'entrepreneurship': 'Business & Entrepreneurship',
+    'management': 'Business & Entrepreneurship',
+    'marketing': 'Business & Entrepreneurship',
+    'finance': 'Business & Entrepreneurship',
+    'economics': 'Business & Entrepreneurship',
+    
+    // Health & Wellness
     'health': 'Health & Wellness',
+    'wellness': 'Health & Wellness',
+    'fitness': 'Health & Wellness',
+    'nutrition': 'Health & Wellness',
+    'medical': 'Health & Wellness',
+    'medicine': 'Health & Wellness',
+    
+    // Mindfulness & Spirituality
     'religion': 'Mindfulness & Spirituality',
+    'spirituality': 'Mindfulness & Spirituality',
+    'mindfulness': 'Mindfulness & Spirituality',
+    'meditation': 'Mindfulness & Spirituality',
+    'buddhism': 'Mindfulness & Spirituality',
+    'christianity': 'Mindfulness & Spirituality',
+    'islam': 'Mindfulness & Spirituality',
+    'hinduism': 'Mindfulness & Spirituality',
+    'judaism': 'Mindfulness & Spirituality',
+    
+    // Philosophy & Resilience
     'philosophy': 'Philosophy & Resilience',
-    'biography': 'History & Biography',
-    'science': 'Science & Technology',
-    'technology': 'Science & Technology',
+    'ethics': 'Philosophy & Resilience',
+    'resilience': 'Philosophy & Resilience',
+    'stoicism': 'Philosophy & Resilience',
+    'existentialism': 'Philosophy & Resilience',
+    
+    // Leadership & Productivity
     'leadership': 'Leadership & Productivity',
     'productivity': 'Leadership & Productivity',
-    'mindfulness': 'Mindfulness & Spirituality',
-    'spirituality': 'Mindfulness & Spirituality',
+    'time management': 'Leadership & Productivity',
+    'organization': 'Leadership & Productivity',
+    'efficiency': 'Leadership & Productivity',
+    
+    // History & Biography
+    'biography': 'History & Biography',
+    'autobiography': 'History & Biography',
+    'history': 'History & Biography',
+    'memoir': 'History & Biography',
+    'historical': 'History & Biography',
+    
+    // Science & Technology
+    'science': 'Science & Technology',
+    'technology': 'Science & Technology',
+    'engineering': 'Science & Technology',
+    'computer': 'Science & Technology',
+    'programming': 'Science & Technology',
+    'artificial intelligence': 'Science & Technology',
+    'ai': 'Science & Technology',
+    
+    // Relationships & Communication
+    'relationships': 'Relationships & Communication',
+    'communication': 'Relationships & Communication',
+    'social': 'Relationships & Communication',
+    'family': 'Relationships & Communication',
+    'marriage': 'Relationships & Communication',
+    'dating': 'Relationships & Communication',
+    
+    // Creativity & Innovation
     'creativity': 'Creativity & Innovation',
     'innovation': 'Creativity & Innovation',
-    'relationships': 'Relationships & Communication',
-    'communication': 'Relationships & Communication'
+    'design': 'Creativity & Innovation',
+    'art': 'Creativity & Innovation',
+    'music': 'Creativity & Innovation',
+    'writing': 'Creativity & Innovation',
+    
+    // Literature & Fiction
+    'fiction': 'Literature & Fiction',
+    'literature': 'Literature & Fiction',
+    'literary criticism': 'Literature & Fiction',
+    'poetry': 'Literature & Fiction',
+    'drama': 'Literature & Fiction',
+    'classic': 'Literature & Fiction',
+    'novel': 'Literature & Fiction',
+    'short story': 'Literature & Fiction',
+    'romance': 'Literature & Fiction',
+    'mystery': 'Literature & Fiction',
+    'thriller': 'Literature & Fiction',
+    'fantasy': 'Literature & Fiction',
+    'science fiction': 'Literature & Fiction',
+    'horror': 'Literature & Fiction',
+    'courtship': 'Literature & Fiction',
+    'adventure': 'Literature & Fiction',
+    'humor': 'Literature & Fiction',
+    'comedy': 'Literature & Fiction',
+    'tragedy': 'Literature & Fiction',
+    'epic': 'Literature & Fiction',
+    'satire': 'Literature & Fiction',
+    
+    // Education & Reference
+    'education': 'Education & Reference',
+    'reference': 'Education & Reference',
+    'textbook': 'Education & Reference',
+    'academic': 'Education & Reference',
+    'study': 'Education & Reference',
+    'learning': 'Education & Reference'
   };
 
   // Find the first matching category
   for (const category of categories) {
     const lowerCategory = category.toLowerCase();
     for (const [key, value] of Object.entries(categoryMap)) {
-      if (lowerCategory.includes(key)) {
+      // Check for exact match first, then partial match
+      if (lowerCategory === key || lowerCategory.includes(key)) {
         return value;
       }
     }
@@ -124,8 +225,10 @@ export const getBookById = async (bookId) => {
   }
 };
 
-export default {
+const googleBooksService = {
   searchBooks,
   debouncedSearchBooks,
   getBookById
 };
+
+export default googleBooksService;

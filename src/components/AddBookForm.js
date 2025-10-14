@@ -102,6 +102,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     'Creativity & Innovation',
     'History & Biography',
     'Science & Technology',
+    'Literature & Fiction',
+    'Education & Reference',
     'General'
   ];
 
