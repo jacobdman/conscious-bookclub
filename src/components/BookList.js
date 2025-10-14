@@ -52,8 +52,20 @@ const BookList = () => {
     return new Date(date.seconds ? date.seconds * 1000 : date).toLocaleDateString();
   };
 
-  const handleBookAdded = () => {
-    fetchBooks(); // Refresh the book list
+  const handleBookAdded = (newBook) => {
+    if (newBook) {
+      // Add the new book to the existing list instead of refetching
+      setBooks(prevBooks => [...prevBooks, newBook]);
+    } else {
+      // If no newBook provided, refetch (for updates)
+      fetchBooks();
+    }
+    setEditingBook(null); // Clear editing state
+  };
+
+  const handleBookDeleted = (deletedBookId) => {
+    // Remove the deleted book from the list instead of refetching
+    setBooks(prevBooks => prevBooks.filter(book => book.id !== deletedBookId));
     setEditingBook(null); // Clear editing state
   };
 
@@ -228,6 +240,7 @@ const BookList = () => {
         open={addBookOpen}
         onClose={handleCloseForm}
         onBookAdded={handleBookAdded}
+        onBookDeleted={handleBookDeleted}
         editingBook={editingBook}
       />
     </Layout>
