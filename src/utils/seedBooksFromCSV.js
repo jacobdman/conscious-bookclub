@@ -74,7 +74,7 @@ function transformBookData(csvBook) {
         discussionDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       }
     } catch (error) {
-      console.warn(`Failed to parse date: ${csvBook.discussionDate} for book: ${csvBook.title}`);
+      // Failed to parse date
     }
   }
   
@@ -94,10 +94,8 @@ function transformBookData(csvBook) {
 async function addBookToFirestore(bookData) {
   try {
     const docRef = await addDoc(collection(db, "books"), bookData);
-    console.log(`✅ Added book: "${bookData.title}" by ${bookData.author} (ID: ${docRef.id})`);
     return docRef.id;
   } catch (error) {
-    console.error(`❌ Error adding book "${bookData.title}":`, error);
     throw error;
   }
 }
@@ -105,11 +103,8 @@ async function addBookToFirestore(bookData) {
 // Main seed function
 async function seedBooks() {
   try {
-    console.log('🌱 Starting book seeding process...');
-    
     // Read CSV file
     const csvPath = path.join(__dirname, '../../book_list.csv');
-    console.log(`📖 Reading CSV from: ${csvPath}`);
     
     if (!fs.existsSync(csvPath)) {
       throw new Error(`CSV file not found at: ${csvPath}`);
@@ -117,8 +112,6 @@ async function seedBooks() {
     
     const csvContent = fs.readFileSync(csvPath, 'utf8');
     const csvBooks = parseCSV(csvContent);
-    
-    console.log(`📚 Found ${csvBooks.length} books to process`);
     
     // Transform and add books to Firestore
     let successCount = 0;
@@ -130,21 +123,12 @@ async function seedBooks() {
         await addBookToFirestore(bookData);
         successCount++;
       } catch (error) {
-        console.error(`Failed to process book: ${csvBook.title}`, error);
         errorCount++;
       }
     }
     
-    console.log('\n🎉 Seeding completed!');
-    console.log(`✅ Successfully added: ${successCount} books`);
-    console.log(`❌ Failed to add: ${errorCount} books`);
-    
-    if (errorCount > 0) {
-      console.log('\n⚠️  Some books failed to be added. Check the errors above.');
-    }
     
   } catch (error) {
-    console.error('💥 Seeding failed:', error);
     process.exit(1);
   }
 }
@@ -152,10 +136,8 @@ async function seedBooks() {
 // Run the seed function
 seedBooks()
   .then(() => {
-    console.log('\n🏁 Script completed successfully!');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('\n💥 Script failed:', error);
     process.exit(1);
   });

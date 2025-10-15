@@ -29,22 +29,18 @@ const FinishedBooksLeaderboard = () => {
         
         // Get top 10 users
         const topUsers = await getTopFinishedBooksUsers(10);
-        console.log('Top users from leaderboard:', topUsers);
         setLeaderboard(topUsers);
         
         // Get current user's stats if they're not in top 10
         if (user) {
-          console.log('Current user ID:', user.uid);
           const currentUserInTop = topUsers.find(u => u.userId === user.uid);
-          console.log('Current user in top:', currentUserInTop);
           if (!currentUserInTop) {
             const userStats = await getUserStats(user.uid);
-            console.log('Current user stats:', userStats);
             setCurrentUserStats(userStats);
           }
         }
       } catch (error) {
-        console.error('Error fetching leaderboard:', error);
+        // Error fetching leaderboard
       } finally {
         setLoading(false);
       }
@@ -62,14 +58,6 @@ const FinishedBooksLeaderboard = () => {
     }
   };
 
-  const getRankColor = (index) => {
-    switch (index) {
-      case 0: return 'warning';
-      case 1: return 'default';
-      case 2: return 'secondary';
-      default: return 'default';
-    }
-  };
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -17,7 +17,7 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { Edit, Delete, Add } from '@mui/icons-material';
+import { Edit, Add } from '@mui/icons-material';
 import { useAuth } from '../AuthContext';
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../services/firestoreService';
 import GoalFormModal from './GoalFormModal';
@@ -33,7 +33,7 @@ const Goals = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
 
-  const fetchGoals = async () => {
+  const fetchGoals = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -46,15 +46,14 @@ const Goals = () => {
       setGoals(goalsData);
     } catch (err) {
       setError('Failed to fetch goals');
-      console.error('Error fetching goals:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchGoals();
-  }, [user]);
+  }, [user, fetchGoals]);
 
   const handleCreateGoal = () => {
     setEditingGoal(null);
@@ -78,7 +77,6 @@ const Goals = () => {
       fetchGoals();
     } catch (err) {
       setError('Failed to save goal');
-      console.error('Error saving goal:', err);
     }
   };
 
@@ -90,7 +88,6 @@ const Goals = () => {
       fetchGoals();
     } catch (err) {
       setError('Failed to archive goal');
-      console.error('Error archiving goal:', err);
     }
   };
 

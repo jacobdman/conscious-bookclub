@@ -6,16 +6,10 @@ import FinishedBooksLeaderboard from './FinishedBooksLeaderboard';
 
 const ClubBooksTab = () => {
   const [inFlightBooks, setInFlightBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   const fetchInFlightBooks = useCallback(async () => {
     try {
-      setLoading(true);
-      console.log("Fetching books for club view...");
-      
       const snapshot = await getBooks();
-      console.log("Books snapshot:", snapshot);
-      console.log("Number of books found:", snapshot.docs.length);
       
       const allBooksData = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -64,13 +58,9 @@ const ClubBooksTab = () => {
         return dateA - dateB;
       });
       
-      console.log("In flight books data:", upcomingBooks);
       setInFlightBooks(upcomingBooks);
     } catch (err) {
-      console.error("Error fetching books: ", err);
-      console.error("Error details:", err.code, err.message);
-    } finally {
-      setLoading(false);
+      // Error fetching books
     }
   }, []);
 

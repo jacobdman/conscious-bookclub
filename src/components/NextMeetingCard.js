@@ -8,7 +8,7 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { AccessTime, LocationOn } from '@mui/icons-material';
+import { LocationOn } from '@mui/icons-material';
 import { fetchCalendarEvents } from '../services/calendarService';
 import moment from 'moment';
 
@@ -38,7 +38,6 @@ const NextMeetingCard = () => {
         }
       } catch (err) {
         setError('Failed to fetch next meeting');
-        console.error('Error fetching next event:', err);
       } finally {
         setLoading(false);
       }

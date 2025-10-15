@@ -19,7 +19,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Divider,
   useMediaQuery,
   useTheme
 } from '@mui/material';
@@ -67,7 +66,6 @@ const CalendarComponent = () => {
       setEvents(transformedEvents);
     } catch (err) {
       setError('Failed to fetch calendar events');
-      console.error('Error fetching events:', err);
     } finally {
       setLoading(false);
     }

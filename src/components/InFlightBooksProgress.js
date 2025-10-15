@@ -58,7 +58,7 @@ const InFlightBooksProgress = ({ books }) => {
         setBookProgressData(progressData);
         setBookStatsData(statsData);
       } catch (error) {
-        console.error('Error fetching progress data:', error);
+        // Error fetching progress data
       } finally {
         setLoading(false);
       }

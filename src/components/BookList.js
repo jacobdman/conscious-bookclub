@@ -54,7 +54,6 @@ const BookList = () => {
   };
 
   const clearCache = () => {
-    console.log('🗑️ Clearing page cache');
     setPageCache({});
   };
 
@@ -67,7 +66,7 @@ const BookList = () => {
         const progress = await getUserBookProgress(user.uid, book.id);
         return { bookId: book.id, progress };
       } catch (error) {
-        console.error(`Error loading progress for book ${book.id}:`, error);
+        // Error loading progress for book
         return { bookId: book.id, progress: null };
       }
     });
@@ -88,14 +87,13 @@ const BookList = () => {
       
       // If metadata shows 0 but we might have books, initialize it
       if (totalCount === 0) {
-        console.log('Metadata shows 0 books, initializing...');
         totalCount = await initializeBookMetadata();
       }
       
       setTotalBookCount(totalCount);
       setTotalPages(Math.ceil(totalCount / pageSize));
     } catch (err) {
-      console.error('Error loading metadata:', err);
+      // Error loading metadata
     }
   }, [pageSize]);
 
@@ -110,7 +108,6 @@ const BookList = () => {
       const cached = pageCache[cacheKey];
       
       if (cached) {
-        console.log('✅ Cache hit - 0 Firestore reads');
         setBooks(cached.books);
         setTotalBookCount(cached.totalCount);
         setFilteredCount(cached.totalCount);
@@ -162,7 +159,6 @@ const BookList = () => {
       
     } catch (err) {
       setError('Failed to fetch books');
-      console.error('Error fetching books:', err);
     } finally {
       setLoading(false);
     }
@@ -247,7 +243,7 @@ const BookList = () => {
         }
       }));
     } catch (error) {
-      console.error('Error updating book progress:', error);
+      // Error updating book progress
     } finally {
       setLoadingProgress(prev => ({ ...prev, [bookId]: false }));
     }
@@ -279,7 +275,6 @@ const BookList = () => {
   };
 
   const handleBookAdded = (newBook) => {
-    console.log('📚 Book added/edited, reloading data...', newBook ? 'New book' : 'Book edited');
     // Always clear cache and reload data for both new books and edits
     clearCache(); // Invalidate cache
     loadMetadata();

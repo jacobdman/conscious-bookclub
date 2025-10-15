@@ -103,8 +103,6 @@ export const fetchCalendarEvents = async () => {
     const icalUrl = `https://calendar.google.com/calendar/ical/${encodeURIComponent(GOOGLE_CALENDAR_ID)}/public/basic.ics`;
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(icalUrl)}`;
     
-    console.log('Fetching calendar events from iCal feed via CORS proxy:', proxyUrl);
-    
     const response = await fetch(proxyUrl);
     
     if (!response.ok) {
@@ -114,14 +112,10 @@ export const fetchCalendarEvents = async () => {
     const icalText = await response.text();
     const events = parseICalFeed(icalText);
     
-    console.log(`Successfully fetched ${events.length} calendar events`);
     return events;
     
   } catch (error) {
-    console.error('Error fetching calendar events:', error);
-    
     // Return mock data as fallback if RSS feed fails
-    console.log('Falling back to mock events due to error');
     return [
       {
         id: 'mock-1',

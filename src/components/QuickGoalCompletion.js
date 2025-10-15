@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -35,7 +35,7 @@ const QuickGoalCompletion = ({ onGoalUpdate }) => {
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState({});
 
-  const fetchGoalsAndCompletions = async () => {
+  const fetchGoalsAndCompletions = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -79,15 +79,14 @@ const QuickGoalCompletion = ({ onGoalUpdate }) => {
       setCompletionStates(completionStates);
     } catch (err) {
       setError('Failed to fetch goals');
-      console.error('Error fetching goals:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchGoalsAndCompletions();
-  }, [user]);
+  }, [user, fetchGoalsAndCompletions]);
 
   const handleGoalToggle = async (goal) => {
     if (!user) return;
@@ -152,7 +151,6 @@ const QuickGoalCompletion = ({ onGoalUpdate }) => {
       }
     } catch (err) {
       setError('Failed to update goal');
-      console.error('Error updating goal:', err);
     } finally {
       setUpdating(prev => ({ ...prev, [goalId]: false }));
     }

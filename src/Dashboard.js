@@ -26,7 +26,6 @@ const Dashboard = () => {
       setPosts(postsData);
     } catch (err) {
       setErrorPosts('Failed to fetch posts.');
-      console.error(err);
     } finally {
       setLoadingPosts(false);
     }
@@ -34,22 +33,14 @@ const Dashboard = () => {
 
   const fetchBooks = useCallback(async () => {
     try {
-      console.log("Fetching books from Firestore...");
-      console.log("Current user:", user);
-      console.log("User authenticated:", !!user);
-      
       if (!user) {
-        console.log("No user authenticated, skipping books fetch");
         return;
       }
       
       const snapshot = await getBooks();
-      console.log("Books snapshot:", snapshot);
-      console.log("Number of books found:", snapshot.docs.length);
       
       const allBooksData = snapshot.docs.map(doc => {
         const data = doc.data();
-        console.log("Book data:", { id: doc.id, ...data });
         return { id: doc.id, ...data };
       });
       
@@ -95,11 +86,9 @@ const Dashboard = () => {
         return dateA - dateB;
       });
       
-      console.log("Upcoming books data:", upcomingBooks);
       setCurrentBooks(upcomingBooks);
     } catch (err) {
-      console.error("Error fetching books: ", err);
-      console.error("Error details:", err.code, err.message);
+      // Error fetching books
     }
   }, [user]);
 
@@ -126,7 +115,7 @@ const Dashboard = () => {
       setNewPostText('');
       fetchPosts();
     } catch (err) {
-      console.error("Error adding post: ", err);
+      // Error adding post
     }
   };
 

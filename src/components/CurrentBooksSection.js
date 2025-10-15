@@ -18,8 +18,6 @@ const CurrentBooksSection = ({ books }) => {
   const [loadingProgress, setLoadingProgress] = useState({});
   const [percentInputs, setPercentInputs] = useState({});
 
-  console.log("CurrentBooksSection received books:", books);
-  console.log("Books length:", books?.length);
   
   // Load progress for all books when component mounts or books change
   useEffect(() => {
@@ -31,7 +29,6 @@ const CurrentBooksSection = ({ books }) => {
           const progress = await getUserBookProgress(user.uid, book.id);
           return { bookId: book.id, progress };
         } catch (error) {
-          console.error(`Error loading progress for book ${book.id}:`, error);
           return { bookId: book.id, progress: null };
         }
       });
@@ -136,7 +133,7 @@ const CurrentBooksSection = ({ books }) => {
         }
       }));
     } catch (error) {
-      console.error('Error updating book progress:', error);
+      // Error updating book progress
     } finally {
       setLoadingProgress(prev => ({ ...prev, [bookId]: false }));
     }
@@ -182,7 +179,7 @@ const CurrentBooksSection = ({ books }) => {
         }
       }));
     } catch (error) {
-      console.error('Error updating percent progress:', error);
+      // Error updating percent progress
     } finally {
       setLoadingProgress(prev => ({ ...prev, [bookId]: false }));
     }

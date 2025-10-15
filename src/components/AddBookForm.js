@@ -266,7 +266,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       
       onClose();
     } catch (error) {
-      console.error('Error adding book:', error);
       setSubmitError('Failed to add book. Please try again.');
     } finally {
       setLoading(false);
@@ -293,7 +292,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         onBookDeleted(editingBook.id);
         onClose();
       } catch (error) {
-        console.error('Error deleting book:', error);
         setSubmitError('Failed to delete book. Please try again.');
       } finally {
         setLoading(false);
