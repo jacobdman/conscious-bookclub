@@ -55,16 +55,42 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         formattedDate = discussionDate.toISOString().split('T')[0];
       }
 
-      setFormData({
+      // Clean up theme data - remove any escaped quotes or malformed entries
+      let cleanTheme = [];
+      if (Array.isArray(editingBook.theme)) {
+        cleanTheme = editingBook.theme
+          .map(t => typeof t === 'string' ? t.replace(/^["']|["']$/g, '') : t) // Remove surrounding quotes
+          .filter(t => t && t.trim() !== '') // Remove empty entries
+          .filter(t => ['Creative', 'Curious', 'Classy'].includes(t)); // Only allow valid themes
+      } else if (editingBook.theme) {
+        const cleaned = editingBook.theme.replace(/^["']|["']$/g, '');
+        if (['Creative', 'Curious', 'Classy'].includes(cleaned)) {
+          cleanTheme = [cleaned];
+        }
+      }
+
+      const newFormData = {
         title: editingBook.title || '',
         author: editingBook.author || '',
-        theme: Array.isArray(editingBook.theme) ? editingBook.theme : (editingBook.theme ? [editingBook.theme] : []),
+        theme: cleanTheme,
         genre: editingBook.genre || '',
         coverUrl: editingBook.coverUrl || '',
         fiction: Boolean(editingBook.fiction),
         discussionDate: formattedDate,
         description: editingBook.description || ''
-      });
+      };
+      setFormData(newFormData);
+      
+      // Set selectedBook for Autocomplete when editing
+      if (editingBook.title) {
+        setSelectedBook({
+          title: editingBook.title,
+          author: editingBook.author,
+          coverUrl: editingBook.coverUrl,
+          genre: editingBook.genre,
+          description: editingBook.description
+        });
+      }
     } else {
       setFormData({
         title: '',
@@ -76,6 +102,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         discussionDate: '',
         description: ''
       });
+      setSelectedBook(null);
     }
   }, [editingBook]);
   
