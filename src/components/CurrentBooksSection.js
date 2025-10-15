@@ -99,7 +99,7 @@ const CurrentBooksSection = ({ books }) => {
       let newStatus;
       let updateData = {};
 
-      if (!currentProgress || currentProgress.status === 'not-started') {
+      if (!currentProgress || currentProgress.status === 'not_started') {
         newStatus = 'reading';
         updateData = {
           status: newStatus,
