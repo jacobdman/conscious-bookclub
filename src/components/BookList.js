@@ -22,16 +22,19 @@ import {
   MenuItem
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
-import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata } from '../services/firestoreService';
+import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata, getUserBookProgress, updateUserBookProgress } from '../services/firestoreService';
+import { useAuth } from '../AuthContext';
 import Layout from './Layout';
 import AddBookForm from './AddBookForm';
 
 const BookList = () => {
+  const { user } = useAuth();
   const [books, setBooks] = useState([]);           // Current page books only
   const [currentPage, setCurrentPage] = useState(1);
   const [totalBookCount, setTotalBookCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [selectedTheme, setSelectedTheme] = useState('all');
+  const [selectedFilter, setSelectedFilter] = useState('all'); // New filter for discussed books
   const [pageSize, setPageSize] = useState(10);
   const [pageCache, setPageCache] = useState({});
   const [filteredCount, setFilteredCount] = useState(0);
@@ -40,16 +43,42 @@ const BookList = () => {
   const [error, setError] = useState(null);
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
+  
+  // Progress tracking state
+  const [bookProgress, setBookProgress] = useState({});
+  const [loadingProgress, setLoadingProgress] = useState({});
 
   // Cache helper functions
-  const getCacheKey = (page, theme, size) => {
-    return `page_${page}_${theme}_${size}`;
+  const getCacheKey = (page, theme, filter, size) => {
+    return `page_${page}_${theme}_${filter}_${size}`;
   };
 
   const clearCache = () => {
     console.log('🗑️ Clearing page cache');
     setPageCache({});
   };
+
+  // Load progress for all books on current page
+  const loadProgressForBooks = useCallback(async (booksList) => {
+    if (!user || !booksList || booksList.length === 0) return;
+
+    const progressPromises = booksList.map(async (book) => {
+      try {
+        const progress = await getUserBookProgress(user.uid, book.id);
+        return { bookId: book.id, progress };
+      } catch (error) {
+        console.error(`Error loading progress for book ${book.id}:`, error);
+        return { bookId: book.id, progress: null };
+      }
+    });
+
+    const results = await Promise.all(progressPromises);
+    const progressMap = {};
+    results.forEach(({ bookId, progress }) => {
+      progressMap[bookId] = progress;
+    });
+    setBookProgress(progressMap);
+  }, [user]);
 
   // Load metadata (total count)
   const loadMetadata = useCallback(async () => {
@@ -71,13 +100,13 @@ const BookList = () => {
   }, [pageSize]);
 
   // Load a specific page
-  const loadPage = useCallback(async (pageNumber, theme = 'all', size = pageSize) => {
+  const loadPage = useCallback(async (pageNumber, theme = 'all', filter = 'all', size = pageSize) => {
     try {
       setLoading(true);
       setError(null);
       
       // Check cache first
-      const cacheKey = getCacheKey(pageNumber, theme, size);
+      const cacheKey = getCacheKey(pageNumber, theme, filter, size);
       const cached = pageCache[cacheKey];
       
       if (cached) {
@@ -87,19 +116,29 @@ const BookList = () => {
         setFilteredCount(cached.totalCount);
         setTotalPages(Math.ceil(cached.totalCount / size));
         setLoading(false);
+        // Load progress for cached books
+        loadProgressForBooks(cached.books);
         return;
       }
       
       // Fetch from Firestore
       let result;
-      if (theme === 'all') {
+      if (theme === 'all' && filter === 'all') {
         // Regular pagination (no filter)
         result = await getBooksPage(pageNumber, size, 'createdAt', 'desc');
         setFilteredCount(0); // Not filtering
-      } else {
+      } else if (theme !== 'all') {
         // Theme-filtered pagination
         result = await getBooksPageFiltered(theme, pageNumber, size, 'createdAt', 'desc');
         setFilteredCount(result.totalCount);
+      } else {
+        // Filter by discussed books (books with discussion dates)
+        result = await getBooksPage(pageNumber, size, 'createdAt', 'desc');
+        // Filter client-side for discussed books
+        const discussedBooks = result.books.filter(book => book.discussionDate);
+        result.books = discussedBooks;
+        result.totalCount = discussedBooks.length;
+        setFilteredCount(discussedBooks.length);
       }
       
       setBooks(result.books);
@@ -112,18 +151,21 @@ const BookList = () => {
         [cacheKey]: { books: result.books, totalCount: result.totalCount }
       }));
       
+      // Load progress for the books
+      loadProgressForBooks(result.books);
+      
     } catch (err) {
       setError('Failed to fetch books');
       console.error('Error fetching books:', err);
     } finally {
       setLoading(false);
     }
-  }, [pageSize, pageCache]);
+  }, [pageSize, pageCache, loadProgressForBooks]);
 
   // Pagination handler
   const handlePageChange = (event, page) => {
     setCurrentPage(page);
-    loadPage(page, selectedTheme, pageSize);
+    loadPage(page, selectedTheme, selectedFilter, pageSize);
   };
 
   // Theme filter handler
@@ -131,7 +173,15 @@ const BookList = () => {
     const theme = event.target.value;
     setSelectedTheme(theme);
     setCurrentPage(1);
-    loadPage(1, theme, pageSize);
+    loadPage(1, theme, selectedFilter, pageSize);
+  };
+
+  // Filter handler for discussed books
+  const handleFilterChange = (event) => {
+    const filter = event.target.value;
+    setSelectedFilter(filter);
+    setCurrentPage(1);
+    loadPage(1, selectedTheme, filter, pageSize);
   };
 
   // Page size handler
@@ -140,16 +190,82 @@ const BookList = () => {
     setPageSize(newSize);
     setCurrentPage(1);
     clearCache(); // Clear cache since page size changed
-    loadPage(1, selectedTheme, newSize);
+    loadPage(1, selectedTheme, selectedFilter, newSize);
+  };
+
+  // Progress update handler
+  const handleProgressUpdate = async (bookId) => {
+    if (!user) return;
+
+    setLoadingProgress(prev => ({ ...prev, [bookId]: true }));
+
+    try {
+      const currentProgress = bookProgress[bookId];
+      let newStatus;
+      let updateData = {};
+
+      if (!currentProgress || currentProgress.status === 'not_started') {
+        newStatus = 'reading';
+        updateData = {
+          status: newStatus,
+          startedAt: new Date(),
+          privacy: 'public'
+        };
+      } else if (currentProgress.status === 'reading') {
+        newStatus = 'finished';
+        updateData = {
+          status: newStatus,
+          finishedAt: new Date(),
+          percentComplete: 100,
+          privacy: 'public'
+        };
+      } else if (currentProgress.status === 'finished') {
+        newStatus = 'reading';
+        updateData = {
+          status: newStatus,
+          startedAt: new Date(),
+          finishedAt: null,
+          percentComplete: null,
+          privacy: 'public'
+        };
+      }
+
+      await updateUserBookProgress(user.uid, bookId, updateData);
+      
+      // Update local state
+      setBookProgress(prev => ({
+        ...prev,
+        [bookId]: {
+          ...prev[bookId],
+          ...updateData
+        }
+      }));
+    } catch (error) {
+      console.error('Error updating book progress:', error);
+    } finally {
+      setLoadingProgress(prev => ({ ...prev, [bookId]: false }));
+    }
+  };
+
+  const getButtonText = (bookId) => {
+    const progress = bookProgress[bookId];
+    if (!progress || progress.status === 'not_started') {
+      return 'Mark as Started';
+    } else if (progress.status === 'reading') {
+      return 'Mark as Finished';
+    } else if (progress.status === 'finished') {
+      return 'Mark as Reading';
+    }
+    return 'Mark as Started';
   };
 
   useEffect(() => {
     const initializeData = async () => {
       await loadMetadata();
-      await loadPage(1, selectedTheme, pageSize);
+      await loadPage(1, selectedTheme, selectedFilter, pageSize);
     };
     initializeData();
-  }, [selectedTheme, pageSize, loadMetadata, loadPage]);
+  }, [selectedTheme, selectedFilter, pageSize, loadMetadata, loadPage]);
 
   const formatDate = (date) => {
     if (!date) return 'TBD';
@@ -161,14 +277,14 @@ const BookList = () => {
     // Always clear cache and reload data for both new books and edits
     clearCache(); // Invalidate cache
     loadMetadata();
-    loadPage(currentPage, selectedTheme, pageSize);
+    loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
     setEditingBook(null); // Clear editing state
   };
 
   const handleBookDeleted = (deletedBookId) => {
     clearCache(); // Invalidate cache
     loadMetadata();
-    loadPage(currentPage, selectedTheme, pageSize);
+    loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
     setEditingBook(null); // Clear editing state
   };
 
@@ -246,6 +362,18 @@ const BookList = () => {
             </Select>
           </FormControl>
           
+          <FormControl sx={{ minWidth: 150 }}>
+            <InputLabel>Book Filter</InputLabel>
+            <Select
+              value={selectedFilter}
+              onChange={handleFilterChange}
+              label="Book Filter"
+            >
+              <MenuItem value="all">All Books</MenuItem>
+              <MenuItem value="discussed">Discussed Books</MenuItem>
+            </Select>
+          </FormControl>
+          
           <FormControl sx={{ minWidth: 120 }}>
             <InputLabel>Per Page</InputLabel>
             <Select
@@ -282,6 +410,7 @@ const BookList = () => {
                 <TableCell>Theme</TableCell>
                 <TableCell>Genre</TableCell>
                 <TableCell>Discussion Date</TableCell>
+                <TableCell>My Progress</TableCell>
                 <TableCell>Added</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -332,6 +461,33 @@ const BookList = () => {
                     <Typography variant="body2">
                       {formatDate(book.discussionDate)}
                     </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 120 }}>
+                      <Chip
+                        label={bookProgress[book.id]?.status === 'finished' ? 'Finished' : 
+                               bookProgress[book.id]?.status === 'reading' ? 'Reading' : 
+                               'Not Started'}
+                        size="small"
+                        color={bookProgress[book.id]?.status === 'finished' ? 'success' : 
+                               bookProgress[book.id]?.status === 'reading' ? 'primary' : 
+                               'default'}
+                        variant="outlined"
+                      />
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleProgressUpdate(book.id)}
+                        disabled={loadingProgress[book.id]}
+                        sx={{ minWidth: 100 }}
+                      >
+                        {loadingProgress[book.id] ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          getButtonText(book.id)
+                        )}
+                      </Button>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Typography variant="caption" color="text.secondary">

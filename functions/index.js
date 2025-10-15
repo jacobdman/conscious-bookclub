@@ -59,7 +59,8 @@ async function handleProgressDeletion(progressData) {
 
   // Decrement counters based on the status being deleted
   if (status === "finished") {
-    await db.collection("userStats").doc(userId).update({
+    const userStatsRef = db.collection("userStats").doc(userId);
+    await userStatsRef.update({
       finishedCount: FieldValue.increment(-1),
     });
   }
@@ -81,12 +82,14 @@ async function handleStatusTransition(before, after) {
   // Update user stats for finished count
   if (beforeStatus === "finished" && afterStatus !== "finished") {
     // Moving away from finished
-    await db.collection("userStats").doc(userId).update({
+    const userStatsRef = db.collection("userStats").doc(userId);
+    await userStatsRef.update({
       finishedCount: FieldValue.increment(-1),
     });
   } else if (beforeStatus !== "finished" && afterStatus === "finished") {
     // Moving to finished
-    await db.collection("userStats").doc(userId).update({
+    const userStatsRef = db.collection("userStats").doc(userId);
+    await userStatsRef.update({
       finishedCount: FieldValue.increment(1),
       lastFinishedAt: FieldValue.serverTimestamp(),
     });
@@ -108,7 +111,8 @@ async function updateStatsForProgress(progressData) {
 
   // Update user stats based on status
   if (status === "finished") {
-    await db.collection("userStats").doc(userId).update({
+    const userStatsRef = db.collection("userStats").doc(userId);
+    await userStatsRef.update({
       finishedCount: FieldValue.increment(1),
       lastFinishedAt: FieldValue.serverTimestamp(),
     });

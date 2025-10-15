@@ -19,7 +19,6 @@ const ClubBooksTab = () => {
       
       const allBooksData = snapshot.docs.map(doc => {
         const data = doc.data();
-        console.log("Book data:", { id: doc.id, ...data });
         return { id: doc.id, ...data };
       });
       

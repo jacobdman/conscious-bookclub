@@ -29,13 +29,17 @@ const FinishedBooksLeaderboard = () => {
         
         // Get top 10 users
         const topUsers = await getTopFinishedBooksUsers(10);
+        console.log('Top users from leaderboard:', topUsers);
         setLeaderboard(topUsers);
         
         // Get current user's stats if they're not in top 10
         if (user) {
+          console.log('Current user ID:', user.uid);
           const currentUserInTop = topUsers.find(u => u.userId === user.uid);
+          console.log('Current user in top:', currentUserInTop);
           if (!currentUserInTop) {
             const userStats = await getUserStats(user.uid);
+            console.log('Current user stats:', userStats);
             setCurrentUserStats(userStats);
           }
         }

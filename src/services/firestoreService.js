@@ -335,32 +335,44 @@ export const deleteUserBookProgress = async (userId, bookId) => {
 // User Stats Functions
 export const getUserStats = async (userId) => {
   try {
+    console.log('🔍 Getting user stats for:', userId);
     const userStatsRef = doc(db, 'userStats', userId);
     const userStatsSnap = await getDoc(userStatsRef);
+    
+    console.log('📊 User stats result:', {
+      exists: userStatsSnap.exists(),
+      data: userStatsSnap.exists() ? { id: userStatsSnap.id, ...userStatsSnap.data() } : null
+    });
     
     if (userStatsSnap.exists()) {
       return { id: userStatsSnap.id, ...userStatsSnap.data() };
     }
     return null;
   } catch (error) {
-    console.error('Error getting user stats:', error);
+    console.error('❌ Error getting user stats:', error);
     return null;
   }
 };
 
-export const getTopFinishedBooksUsers = async (limit = 10) => {
+export const getTopFinishedBooksUsers = async (limitCount = 10) => {
   try {
+    console.log('🔍 Querying userStats collection...');
     const userStatsRef = collection(db, 'userStats');
     const q = query(
       userStatsRef,
       orderBy('finishedCount', 'desc'),
-      limit(limit)
+      limit(limitCount)
     );
     const snapshot = await getDocs(q);
     
+    console.log('📊 Query result:', {
+      docsCount: snapshot.docs.length,
+      docs: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    });
+    
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Error getting top finished books users:', error);
+    console.error('❌ Error getting top finished books users:', error);
     return [];
   }
 };
