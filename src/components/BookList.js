@@ -22,7 +22,7 @@ import {
   MenuItem
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
-import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata, getUserBookProgress, updateUserBookProgress } from '../services/firestoreService';
+import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata, getUserBookProgress, updateUserBookProgress, getAllDiscussedBooks } from '../services/firestoreService';
 import { useAuth } from '../AuthContext';
 import Layout from './Layout';
 import AddBookForm from './AddBookForm';
@@ -123,22 +123,28 @@ const BookList = () => {
       
       // Fetch from Firestore
       let result;
-      if (theme === 'all' && filter === 'all') {
-        // Regular pagination (no filter)
-        result = await getBooksPage(pageNumber, size, 'createdAt', 'desc');
-        setFilteredCount(0); // Not filtering
-      } else if (theme !== 'all') {
+      if (theme !== 'all') {
         // Theme-filtered pagination
         result = await getBooksPageFiltered(theme, pageNumber, size, 'createdAt', 'desc');
         setFilteredCount(result.totalCount);
+      } else if (filter === 'discussed') {
+        // Filter by discussed books - get ALL discussed books first
+        const allDiscussedBooks = await getAllDiscussedBooks();
+        setFilteredCount(allDiscussedBooks.length);
+        
+        // Then paginate the results
+        const startIndex = (pageNumber - 1) * size;
+        const endIndex = startIndex + size;
+        const paginatedBooks = allDiscussedBooks.slice(startIndex, endIndex);
+        
+        result = {
+          books: paginatedBooks,
+          totalCount: allDiscussedBooks.length
+        };
       } else {
-        // Filter by discussed books (books with discussion dates)
+        // Regular pagination (no filter)
         result = await getBooksPage(pageNumber, size, 'createdAt', 'desc');
-        // Filter client-side for discussed books
-        const discussedBooks = result.books.filter(book => book.discussionDate);
-        result.books = discussedBooks;
-        result.totalCount = discussedBooks.length;
-        setFilteredCount(discussedBooks.length);
+        setFilteredCount(0); // Not filtering
       }
       
       setBooks(result.books);

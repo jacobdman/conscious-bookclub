@@ -405,3 +405,19 @@ export const getAllUsers = async () => {
     return [];
   }
 };
+
+// Get all books with discussion dates (for "discussed" filter)
+export const getAllDiscussedBooks = async () => {
+  try {
+    const booksRef = collection(db, 'books');
+    const snapshot = await getDocs(booksRef);
+    
+    const allBooks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const discussedBooks = allBooks.filter(book => book.discussionDate);
+    
+    return discussedBooks;
+  } catch (error) {
+    console.error('Error getting discussed books:', error);
+    return [];
+  }
+};
