@@ -13,7 +13,7 @@ const Layout = ({ children }) => {
     try {
       await logout();
     } catch (error) {
-      console.error('Error logging out:', error);
+      // Error logging out
     }
   };
 

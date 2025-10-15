@@ -88,8 +88,6 @@ export const isTodayOrOverdue = (date) => {
  * @returns {Array} - Sorted goals array
  */
 export const sortGoalsByPriority = (goals) => {
-  const today = new Date();
-  
   return goals.sort((a, b) => {
     // Daily goals first
     if (a.trackingType === 'daily' && b.trackingType !== 'daily') return -1;
@@ -120,8 +118,6 @@ export const sortGoalsByPriority = (goals) => {
  * @returns {Array} - Filtered goals that need attention
  */
 export const filterGoalsForQuickCompletion = (goals) => {
-  const today = new Date();
-  
   return goals.filter(goal => {
     // Skip completed goals
     if (goal.completed) return false;

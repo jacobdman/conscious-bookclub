@@ -1,4 +1,4 @@
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, query, orderBy, limit, startAfter, increment, where } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, setDoc, getDoc, query, orderBy, limit, increment, where } from "firebase/firestore";
 import { db } from '../firebase';
 
 // Functions to interact with Firestore
@@ -135,7 +135,6 @@ export const getBookMetadata = async () => {
       return initialMetadata;
     }
   } catch (error) {
-    console.error('Error getting book metadata:', error);
     return { totalCount: 0, lastUpdated: new Date() };
   }
 };
@@ -148,7 +147,7 @@ export const updateBookMetadata = async (incrementBy = 1) => {
       lastUpdated: new Date()
     });
   } catch (error) {
-    console.error('Error updating book metadata:', error);
+    // Error updating book metadata
   }
 };
 
@@ -167,7 +166,6 @@ export const initializeBookMetadata = async () => {
     
     return actualCount;
   } catch (error) {
-    console.error('Error initializing book metadata:', error);
     return 0;
   }
 };
@@ -204,7 +202,6 @@ export const getBooksPage = async (pageNumber = 1, pageSize = 10, orderByField =
       totalCount: totalCount
     };
   } catch (error) {
-    console.error('Error fetching books page:', error);
     return { books: [], totalCount: 0 };
   }
 };
@@ -244,7 +241,6 @@ export const getBooksPageFiltered = async (theme, pageNumber = 1, pageSize = 10,
       return { books: pageBooks, totalCount };
     }
   } catch (error) {
-    console.error('Error fetching filtered books:', error);
     return { books: [], totalCount: 0 };
   }
 };
@@ -260,7 +256,6 @@ export const getUserBookProgress = async (userId, bookId) => {
     }
     return null;
   } catch (error) {
-    console.error('Error getting user book progress:', error);
     return null;
   }
 };
@@ -273,7 +268,6 @@ export const getAllUserBookProgress = async (userId) => {
     
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Error getting all user book progress:', error);
     return [];
   }
 };
@@ -300,7 +294,6 @@ export const updateUserBookProgress = async (userId, bookId, progressData) => {
     
     return { id: progressRef.id, ...updateData };
   } catch (error) {
-    console.error('Error updating user book progress:', error);
     throw error;
   }
 };
@@ -317,7 +310,6 @@ export const getAllUsersProgressForBook = async (bookId) => {
     
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Error getting all users progress for book:', error);
     return [];
   }
 };
@@ -327,7 +319,6 @@ export const deleteUserBookProgress = async (userId, bookId) => {
     const progressRef = doc(db, 'bookProgress', `${userId}_${bookId}`);
     await deleteDoc(progressRef);
   } catch (error) {
-    console.error('Error deleting user book progress:', error);
     throw error;
   }
 };
@@ -335,28 +326,20 @@ export const deleteUserBookProgress = async (userId, bookId) => {
 // User Stats Functions
 export const getUserStats = async (userId) => {
   try {
-    console.log('🔍 Getting user stats for:', userId);
     const userStatsRef = doc(db, 'userStats', userId);
     const userStatsSnap = await getDoc(userStatsRef);
-    
-    console.log('📊 User stats result:', {
-      exists: userStatsSnap.exists(),
-      data: userStatsSnap.exists() ? { id: userStatsSnap.id, ...userStatsSnap.data() } : null
-    });
     
     if (userStatsSnap.exists()) {
       return { id: userStatsSnap.id, ...userStatsSnap.data() };
     }
     return null;
   } catch (error) {
-    console.error('❌ Error getting user stats:', error);
     return null;
   }
 };
 
 export const getTopFinishedBooksUsers = async (limitCount = 10) => {
   try {
-    console.log('🔍 Querying userStats collection...');
     const userStatsRef = collection(db, 'userStats');
     const q = query(
       userStatsRef,
@@ -365,14 +348,8 @@ export const getTopFinishedBooksUsers = async (limitCount = 10) => {
     );
     const snapshot = await getDocs(q);
     
-    console.log('📊 Query result:', {
-      docsCount: snapshot.docs.length,
-      docs: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-    });
-    
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('❌ Error getting top finished books users:', error);
     return [];
   }
 };
@@ -388,7 +365,6 @@ export const getBookStats = async (bookId) => {
     }
     return null;
   } catch (error) {
-    console.error('Error getting book stats:', error);
     return null;
   }
 };
@@ -401,7 +377,6 @@ export const getAllUsers = async () => {
     
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Error getting all users:', error);
     return [];
   }
 };
@@ -417,7 +392,6 @@ export const getAllDiscussedBooks = async () => {
     
     return discussedBooks;
   } catch (error) {
-    console.error('Error getting discussed books:', error);
     return [];
   }
 };

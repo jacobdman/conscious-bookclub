@@ -196,7 +196,6 @@ export const searchBooks = async (query, maxResults = 10) => {
     
     return data.items.map(parseBookData);
   } catch (error) {
-    console.error('Error searching books:', error);
     return [];
   }
 };
@@ -220,7 +219,6 @@ export const getBookById = async (bookId) => {
     const data = await response.json();
     return parseBookData(data);
   } catch (error) {
-    console.error('Error fetching book details:', error);
     return null;
   }
 };

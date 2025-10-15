@@ -42,7 +42,6 @@ const Login = () => {
       setError(null);
       await signInWithGoogle();
     } catch (error) {
-      console.error('Sign in error:', error);
       setError('Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
