@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Dashboard from './Dashboard';
+import ClubView from './ClubView';
 import BookList from './components/BookList';
 import Calendar from './components/Calendar';
 import Goals from './components/Goals';
@@ -34,6 +35,7 @@ function AppContent() {
     <Router>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/club" element={<ClubView />} />
         <Route path="/books" element={<BookList />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/goals" element={<Goals />} />

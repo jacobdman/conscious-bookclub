@@ -15,6 +15,7 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
 
   const menuItems = [
     { name: 'Dashboard', path: '/' },
+    { name: 'Club', path: '/club' },
     { name: 'Book List', path: '/books' },
     { name: 'Calendar', path: '/calendar' },
     { name: 'Goals', path: '/goals' },
