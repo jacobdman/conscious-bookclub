@@ -23,14 +23,29 @@ service cloud.firestore {
       // Add write rules for admins if necessary
     }
 
-    // User Goals
+    // User Goals (legacy structure)
     match /user_goals/{goalId} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Goal Checks
+    // Goal Checks (legacy structure)
     match /goal_checks/{checkId} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // User Goals (new structure)
+    match /users/{userId}/goals/{goalId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Goal Progress
+    match /users/{userId}/goals/{goalId}/progress/{progressId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Goal Completions
+    match /users/{userId}/goals/{goalId}/completions/{completionId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Posts
