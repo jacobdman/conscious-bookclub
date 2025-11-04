@@ -22,11 +22,8 @@ import {
 } from '@mui/material';
 import { Edit, Add, ExpandMore, ExpandLess, Delete } from '@mui/icons-material';
 import { useAuth } from '../AuthContext';
+import { useGoalsContext } from '../contexts/Goals/GoalsProvider';
 import { 
-  getGoals, 
-  addGoal, 
-  updateGoal, 
-  deleteGoal,
   getGoalEntries,
   getGoalProgress,
   createGoalEntry,
@@ -43,9 +40,8 @@ import { getPeriodBoundaries, getProgressText } from '../utils/goalHelpers';
 
 const Goals = () => {
   const { user } = useAuth();
-  const [goals, setGoals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { goals, loading, error, addGoal, updateGoal, deleteGoal } = useGoalsContext();
+  const [localError, setLocalError] = useState(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
@@ -54,55 +50,6 @@ const Goals = () => {
   const [goalProgress, setGoalProgress] = useState({});
   const [entriesLoading, setEntriesLoading] = useState({});
   const [entryDialog, setEntryDialog] = useState({ open: false, goal: null, entry: null });
-
-  const fetchGoals = useCallback(async (isInitialLoad = false) => {
-    if (!user) return;
-
-    try {
-      if (isInitialLoad) {
-        setLoading(true);
-      }
-      const snapshot = await getGoals(user.uid);
-      const goalsData = snapshot.docs.map(doc => {
-        const goalData = doc.data();
-        // Ensure milestones array is properly set and is always an array
-        if (!goalData.milestones && goalData.Milestones) {
-          goalData.milestones = goalData.Milestones;
-        }
-        if (!goalData.milestones) {
-          goalData.milestones = [];
-        }
-        // Ensure milestones have required properties
-        if (Array.isArray(goalData.milestones)) {
-          goalData.milestones = goalData.milestones.map(m => ({
-            ...m,
-            id: m.id || m.ID,
-            done: m.done || false,
-            title: m.title || 'Untitled milestone'
-          }));
-        }
-        // Normalize goal type
-        if (goalData.type === 'one-time') {
-          goalData.type = 'one_time';
-        }
-        return {
-          id: doc.id,
-          ...goalData
-        };
-      });
-      setGoals(goalsData);
-    } catch (err) {
-      setError('Failed to fetch goals');
-    } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-      }
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchGoals(true); // Initial load
-  }, [user, fetchGoals]);
 
   const fetchGoalDetails = async (goal) => {
     if (!user) return;
@@ -165,13 +112,13 @@ const Goals = () => {
 
     try {
       if (editingGoal) {
-        await updateGoal(user.uid, editingGoal.id, goalData);
+        await updateGoal(editingGoal.id, goalData);
       } else {
-        await addGoal(user.uid, goalData);
+        await addGoal(goalData);
       }
-      fetchGoals();
+      setModalOpen(false);
     } catch (err) {
-      setError('Failed to save goal');
+      setLocalError('Failed to save goal');
     }
   };
 
@@ -179,45 +126,9 @@ const Goals = () => {
     if (!user || !window.confirm('Are you sure you want to delete this goal?')) return;
 
     try {
-      // If this is a one-time goal that was COMPLETED today (not just deleted),
-      // store it in localStorage so it continues to show in Today's Goals
-      const goalToDelete = goals.find(g => g.id === goalId);
-      if (goalToDelete && (goalToDelete.type === 'one_time' || goalToDelete.type === 'one-time')) {
-        // Only store if the goal was actually completed (not just deleted)
-        const isCompleted = goalToDelete.completed || false;
-        const completedAt = goalToDelete.completedAt || goalToDelete.completed_at;
-        
-        if (isCompleted && completedAt) {
-          const { getTodayBoundaries } = require('../utils/goalHelpers');
-          const todayBoundaries = getTodayBoundaries();
-          const completedDate = new Date(completedAt);
-          
-          // Only store if completed today (not just deleted today)
-          if (completedDate >= todayBoundaries.start && completedDate < todayBoundaries.end) {
-            try {
-              const key = `deletedGoals_${user.uid}`;
-              const stored = localStorage.getItem(key);
-              const deletedGoals = stored ? JSON.parse(stored) : [];
-              
-              // Add this goal to deleted goals (avoid duplicates)
-              if (!deletedGoals.find(g => g.id === goalId)) {
-                deletedGoals.push({
-                  ...goalToDelete,
-                  deletedAt: new Date().toISOString(),
-                });
-                localStorage.setItem(key, JSON.stringify(deletedGoals));
-              }
-            } catch (err) {
-              console.error('Error storing deleted goal in localStorage:', err);
-            }
-          }
-        }
-      }
-      
-      await deleteGoal(user.uid, goalId);
-      fetchGoals();
+      await deleteGoal(goalId);
     } catch (err) {
-      setError('Failed to delete goal');
+      setLocalError('Failed to delete goal');
     }
   };
 
@@ -237,7 +148,7 @@ const Goals = () => {
       // Refresh entries
       await fetchGoalDetails(goal);
     } catch (err) {
-      setError('Failed to delete entry');
+      setLocalError('Failed to delete entry');
     }
   };
 
@@ -257,37 +168,24 @@ const Goals = () => {
       await fetchGoalDetails(entryDialog.goal);
       setEntryDialog({ open: false, goal: null, entry: null });
     } catch (err) {
-      setError('Failed to save entry');
+      setLocalError('Failed to save entry');
     }
   };
 
   const handleToggleMilestone = async (goal, milestone) => {
     if (!user) return;
 
-    // Optimistically update local state
-    const updatedGoals = goals.map(g => {
-      if (g.id === goal.id && g.milestones) {
-        return {
-          ...g,
-          milestones: g.milestones.map(m => 
-            m.id === milestone.id 
-              ? { ...m, done: !m.done, doneAt: !m.done ? new Date().toISOString() : null }
-              : m
-          )
-        };
-      }
-      return g;
-    });
-    setGoals(updatedGoals);
-
     try {
       await updateMilestone(user.uid, goal.id, milestone.id, { done: !milestone.done });
-      // Refresh goals to ensure we have the latest data from server (not initial load, so don't show spinner)
-      fetchGoals(false);
+      // Update the goal in context to reflect milestone change
+      const updatedMilestones = goal.milestones.map(m => 
+        m.id === milestone.id 
+          ? { ...m, done: !m.done, doneAt: !m.done ? new Date().toISOString() : null }
+          : m
+      );
+      await updateGoal(goal.id, { milestones: updatedMilestones });
     } catch (err) {
-      setError('Failed to update milestone');
-      // Revert on error (not initial load, so don't show spinner)
-      fetchGoals(false);
+      setLocalError('Failed to update milestone');
     }
   };
 
@@ -295,32 +193,15 @@ const Goals = () => {
     if (!user) return;
 
     const newCompleted = !goal.completed;
-    
-    // Optimistically update local state
-    const updatedGoals = goals.map(g => {
-      if (g.id === goal.id) {
-        return {
-          ...g,
-          completed: newCompleted,
-          completedAt: newCompleted ? new Date().toISOString() : null,
-        };
-      }
-      return g;
-    });
-    setGoals(updatedGoals);
 
     try {
       // Update goal with new completion status
-      await updateGoal(user.uid, goal.id, {
+      await updateGoal(goal.id, {
         completed: newCompleted,
         completedAt: newCompleted ? new Date().toISOString() : null,
       });
-      // Refresh goals to ensure we have the latest data from server
-      fetchGoals(false);
     } catch (err) {
-      setError('Failed to update goal');
-      // Revert on error
-      fetchGoals(false);
+      setLocalError('Failed to update goal');
     }
   };
 
@@ -554,7 +435,7 @@ const Goals = () => {
         </Box>
 
         <Box sx={{ mb: 3 }}>
-          <TodaysGoals onGoalUpdate={fetchGoals} />
+          <TodaysGoals />
         </Box>
 
         <Box sx={{ mb: 2 }}>
@@ -569,9 +450,9 @@ const Goals = () => {
           />
         </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
+        {(error || localError) && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError(null)}>
+            {error || localError}
           </Alert>
         )}
 

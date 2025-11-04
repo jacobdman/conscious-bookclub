@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   Card,
@@ -18,7 +18,8 @@ import {
   TextField,
 } from '@mui/material';
 import { useAuth } from '../AuthContext';
-import { getGoals, getGoalEntries, getGoalProgress, createGoalEntry, markOneTimeGoalComplete, updateMilestone } from '../services/dataService';
+import { useGoalsContext } from '../contexts/Goals/GoalsProvider';
+import { getGoalEntries, getGoalProgress, createGoalEntry, updateMilestone } from '../services/dataService';
 import {
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
@@ -28,86 +29,30 @@ import {
   formatMilestoneDisplay,
 } from '../utils/goalHelpers';
 
-const TodaysGoals = ({ onGoalUpdate }) => {
+const TodaysGoals = () => {
   const { user } = useAuth();
-  const [goals, setGoals] = useState([]);
+  const { goals: allGoals, updateGoal } = useGoalsContext();
   const [completionStates, setCompletionStates] = useState({});
   const [progressData, setProgressData] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState({});
   const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null });
   
-  const fetchGoalsAndCompletions = useCallback(async () => {
-    if (!user) return;
+  const fetchCompletions = useCallback(async (goalsToCheck) => {
+    if (!user || !goalsToCheck || goalsToCheck.length === 0) return;
 
     try {
       setLoading(true);
       setError(null);
-      
-      // Fetch all goals
-      const snapshot = await getGoals(user.uid);
-      const allGoals = snapshot.docs.map(doc => {
-        const goalData = doc.data();
-        // Ensure milestones array is properly set (handle Sequelize capitalization)
-        if (!goalData.milestones && goalData.Milestones) {
-          goalData.milestones = goalData.Milestones;
-        }
-        // Normalize goal type (handle any variations)
-        if (goalData.type === 'one-time') {
-          goalData.type = 'one_time';
-        }
-        return {
-          id: doc.id,
-          ...goalData
-        };
-      });
-
-      // Filter and sort goals for quick completion
-      const filteredGoals = filterGoalsForQuickCompletion(allGoals);
-      
-      // Add deleted goals that were COMPLETED today from localStorage
-      // Only show goals that were actually completed (not just deleted)
-      let deletedGoalsForToday = [];
-      try {
-        const key = `deletedGoals_${user.uid}`;
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const deletedGoals = JSON.parse(stored);
-          const todayBoundaries = getTodayBoundaries();
-          const today = todayBoundaries.start.toISOString().split('T')[0]; // Get today's date string
-          
-          // Filter to only include goals that were COMPLETED today (not just deleted)
-          deletedGoalsForToday = deletedGoals.filter(goal => {
-            // Must be completed
-            const isCompleted = goal.completed || false;
-            if (!isCompleted) return false;
-            
-            // Must have been completed today
-            const completedDate = goal.completedAt || goal.completed_at;
-            if (!completedDate) return false;
-            const completedDateStr = new Date(completedDate).toISOString().split('T')[0];
-            return completedDateStr === today;
-          });
-        }
-      } catch (err) {
-        console.error('Error reading deleted goals from localStorage:', err);
-      }
-      
-      const allFilteredGoals = [...filteredGoals, ...deletedGoalsForToday];
-      
-      const sortedGoals = sortGoalsByPriority(allFilteredGoals);
-      const topGoals = sortedGoals.slice(0, 5); // Limit to top 5
-
-      setGoals(topGoals);
 
       // Check completion states and fetch data for each goal
       const completionStates = {};
       const progressData = {};
       const todayBoundaries = getTodayBoundaries();
 
-      // Process both active goals and deleted goals (deleted goals are already included in topGoals)
-      for (const goal of topGoals) {
+      // Process both active goals and deleted goals
+      for (const goal of goalsToCheck) {
         // Check if this is a deleted goal (stored in localStorage)
         const isDeleted = goal.deletedAt !== undefined;
         
@@ -161,18 +106,73 @@ const TodaysGoals = ({ onGoalUpdate }) => {
         }
       }
 
-      setCompletionStates(completionStates);
-      setProgressData(progressData);
+      // Merge completion states and progress data instead of replacing
+      setCompletionStates(prev => ({ ...prev, ...completionStates }));
+      setProgressData(prev => ({ ...prev, ...progressData }));
     } catch (err) {
-      setError('Failed to fetch goals');
+      setError('Failed to fetch completion data');
     } finally {
       setLoading(false);
     }
   }, [user]);
 
+  // Get filtered and sorted goals whenever allGoals changes
+  const filteredGoals = useMemo(() => {
+    const filtered = filterGoalsForQuickCompletion(allGoals);
+    
+    // Add deleted goals that were COMPLETED today from localStorage
+    let deletedGoalsForToday = [];
+    try {
+      const key = `deletedGoals_${user?.uid}`;
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const deletedGoals = JSON.parse(stored);
+        const todayBoundaries = getTodayBoundaries();
+        const today = todayBoundaries.start.toISOString().split('T')[0];
+        
+        deletedGoalsForToday = deletedGoals.filter(goal => {
+          const isCompleted = goal.completed || false;
+          if (!isCompleted) return false;
+          
+          const completedDate = goal.completedAt || goal.completed_at;
+          if (!completedDate) return false;
+          const completedDateStr = new Date(completedDate).toISOString().split('T')[0];
+          return completedDateStr === today;
+        });
+      }
+    } catch (err) {
+      console.error('Error reading deleted goals from localStorage:', err);
+    }
+    
+    const allFiltered = [...filtered, ...deletedGoalsForToday];
+    const sorted = sortGoalsByPriority(allFiltered);
+    return sorted.slice(0, 5); // Limit to top 5
+  }, [allGoals, user]);
+
+  // Track previous filteredGoals to detect actual changes (not just reference equality)
+  const prevFilteredGoalsRef = useRef([]);
+  
+  // Fetch completion states when filtered goals change (only if goals actually added/removed)
   useEffect(() => {
-    fetchGoalsAndCompletions();
-  }, [user, fetchGoalsAndCompletions]);
+    const prevGoalIds = prevFilteredGoalsRef.current.map(g => g.id).sort();
+    const currentGoalIds = filteredGoals.map(g => g.id).sort();
+    
+    // Only refetch if goals were actually added or removed (not just completion status changed)
+    const goalsChanged = JSON.stringify(prevGoalIds) !== JSON.stringify(currentGoalIds);
+    
+    if (goalsChanged) {
+      if (filteredGoals.length > 0) {
+        fetchCompletions(filteredGoals);
+      } else {
+        // Clear completion states if no goals
+        setCompletionStates({});
+        setProgressData({});
+      }
+    }
+    
+    // Update ref for next comparison
+    prevFilteredGoalsRef.current = filteredGoals;
+  }, [filteredGoals, fetchCompletions]);
 
   // Clean up old deleted goals from localStorage (older than today)
   // Only keep goals that were COMPLETED today (not just deleted)
@@ -245,24 +245,44 @@ const TodaysGoals = ({ onGoalUpdate }) => {
           return;
         }
       } else if (goal.type === 'one_time' || goal.type === 'one-time') {
-        if (!isCurrentlyComplete) {
-          await markOneTimeGoalComplete(user.uid, goalId);
-        }
+        // Toggle completion status for one-time goals
+        const newCompleted = !isCurrentlyComplete;
+        await updateGoal(goalId, {
+          completed: newCompleted,
+          completedAt: newCompleted ? new Date().toISOString() : null,
+        });
+        // Update completion state locally (no API call needed - completion status is in goal object)
+        setCompletionStates(prev => ({ ...prev, [goalId]: newCompleted }));
+        setUpdating(prev => ({ ...prev, [goalId]: false }));
+        return;
       } else if (goal.type === 'milestone') {
         // For milestones, mark the next incomplete milestone as done
         const milestones = goal.milestones || goal.Milestones || [];
         const incompleteMilestone = milestones.find(m => !m.done);
         if (incompleteMilestone) {
           await updateMilestone(user.uid, goalId, incompleteMilestone.id, { done: true });
+          // Update goal in context to reflect milestone change
+          const updatedMilestones = milestones.map(m => 
+            m.id === incompleteMilestone.id 
+              ? { ...m, done: true, doneAt: new Date().toISOString() }
+              : m
+          );
+          await updateGoal(goalId, { milestones: updatedMilestones });
+          
+          // Update completion state locally (check if all milestones are now done)
+          const allDone = updatedMilestones.length > 0 && updatedMilestones.every(m => m.done);
+          setCompletionStates(prev => ({ ...prev, [goalId]: allDone }));
         }
+        setUpdating(prev => ({ ...prev, [goalId]: false }));
+        return;
       }
 
-      // Refresh to get updated progress
-      await fetchGoalsAndCompletions();
-      
-      // Notify parent component if callback provided
-      if (onGoalUpdate) {
-        onGoalUpdate();
+      // For habit/metric goals, fetch completion data only for this specific goal
+      if (goal.type === 'habit' || goal.type === 'metric') {
+        const updatedGoal = allGoals.find(g => g.id === goalId) || goal;
+        if (filteredGoals.find(g => g.id === goalId)) {
+          await fetchCompletions([updatedGoal]);
+        }
       }
     } catch (err) {
       setError('Failed to update goal');
@@ -291,12 +311,10 @@ const TodaysGoals = ({ onGoalUpdate }) => {
         quantity: quantity,
       });
 
-      // Refresh to get updated progress
-      await fetchGoalsAndCompletions();
-      
-      // Notify parent component if callback provided
-      if (onGoalUpdate) {
-        onGoalUpdate();
+      // Refresh completion states for this specific metric goal only
+      const updatedGoal = allGoals.find(g => g.id === goal.id) || goal;
+      if (filteredGoals.find(g => g.id === goal.id)) {
+        await fetchCompletions([updatedGoal]);
       }
     } catch (err) {
       setError('Failed to create entry');
@@ -374,7 +392,7 @@ const TodaysGoals = ({ onGoalUpdate }) => {
     );
   }
 
-  if (goals.length === 0) {
+  if (filteredGoals.length === 0) {
     return (
       <Card>
         <CardContent>
@@ -401,7 +419,7 @@ const TodaysGoals = ({ onGoalUpdate }) => {
           </Typography>
           
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {goals.map((goal, index) => {
+            {filteredGoals.map((goal, index) => {
               const isComplete = completionStates[goal.id] || false;
               const isUpdating = updating[goal.id] || false;
               const progress = progressData[goal.id];
@@ -470,7 +488,7 @@ const TodaysGoals = ({ onGoalUpdate }) => {
                         );
                       }
                     })}
-                    {index < goals.length - 1 && <Divider sx={{ my: 0.5 }} />}
+                    {index < filteredGoals.length - 1 && <Divider sx={{ my: 0.5 }} />}
                   </Box>
                 );
               }
@@ -515,7 +533,7 @@ const TodaysGoals = ({ onGoalUpdate }) => {
                     }
                     sx={{ width: '100%', m: 0 }}
                   />
-                  {index < goals.length - 1 && <Divider sx={{ my: 0.5 }} />}
+                  {index < filteredGoals.length - 1 && <Divider sx={{ my: 0.5 }} />}
                 </Box>
               );
             })}

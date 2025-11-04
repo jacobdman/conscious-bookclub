@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
+import GoalsProvider from './contexts/Goals/GoalsProvider';
 import Dashboard from './Dashboard';
 import ClubView from './ClubView';
 import BookList from './components/BookList';
@@ -48,7 +49,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <GoalsProvider>
+        <AppContent />
+      </GoalsProvider>
     </AuthProvider>
   );
 }
