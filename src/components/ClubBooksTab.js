@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
-import { getBooks } from '../services/firestoreService';
+import { getBooks } from '../services/dataService';
 import InFlightBooksProgress from './InFlightBooksProgress';
 import FinishedBooksLeaderboard from './FinishedBooksLeaderboard';
 

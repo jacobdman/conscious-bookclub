@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box } from '@mui/material';
-import { getPosts, addPost, getBooks } from './services/firestoreService';
+import { getPosts, addPost, getBooks } from './services/dataService';
 import { useAuth } from './AuthContext';
 import Layout from './components/Layout';
 import NextMeetingCard from './components/NextMeetingCard';

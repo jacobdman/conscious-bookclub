@@ -1,0 +1,6 @@
+{
+  "app": {
+    "use_postgres": "true",
+    "database_url": "postgresql://username:password@localhost:5432/conscious_bookclub"
+  }
+}

@@ -85,7 +85,7 @@ function transformBookData(csvBook) {
     fiction: csvBook.fiction,
     theme: themes,
     discussionDate: discussionDate,
-    coverUrl: null, // Will be added manually later
+    coverImage: null, // Will be added manually later
     createdAt: new Date()
   };
 }

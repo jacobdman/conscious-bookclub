@@ -22,7 +22,7 @@ import {
   MenuItem
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
-import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata, getUserBookProgress, updateUserBookProgress, getAllDiscussedBooks } from '../services/firestoreService';
+import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata, getUserBookProgress, updateUserBookProgress, getAllDiscussedBooks } from '../services/dataService';
 import { useAuth } from '../AuthContext';
 import Layout from './Layout';
 import AddBookForm from './AddBookForm';
@@ -113,16 +113,32 @@ const BookList = () => {
         setFilteredCount(cached.totalCount);
         setTotalPages(Math.ceil(cached.totalCount / size));
         setLoading(false);
-        // Load progress for cached books
-        loadProgressForBooks(cached.books);
+        
+        // Extract progress from cached books if available
+        const progressMap = {};
+        let hasProgressInResponse = false;
+        cached.books.forEach((book) => {
+          if (book.progress !== undefined) {
+            hasProgressInResponse = true;
+            progressMap[book.id] = book.progress;
+          }
+        });
+        
+        if (hasProgressInResponse) {
+          setBookProgress(progressMap);
+        } else if (user?.uid) {
+          // Fallback: load progress separately if not in cached data
+          loadProgressForBooks(cached.books);
+        }
         return;
       }
       
-      // Fetch from Firestore
+      // Fetch books with progress included if userId is available
+      const userId = user?.uid || null;
       let result;
       if (theme !== 'all') {
         // Theme-filtered pagination
-        result = await getBooksPageFiltered(theme, pageNumber, size, 'createdAt', 'desc');
+        result = await getBooksPageFiltered(theme, pageNumber, size, 'createdAt', 'desc', userId);
         setFilteredCount(result.totalCount);
       } else if (filter === 'discussed') {
         // Filter by discussed books - get ALL discussed books first
@@ -140,7 +156,7 @@ const BookList = () => {
         };
       } else {
         // Regular pagination (no filter)
-        result = await getBooksPage(pageNumber, size, 'createdAt', 'desc');
+        result = await getBooksPage(pageNumber, size, 'createdAt', 'desc', userId);
         setFilteredCount(0); // Not filtering
       }
       
@@ -148,21 +164,36 @@ const BookList = () => {
       setTotalBookCount(result.totalCount);
       setTotalPages(Math.ceil(result.totalCount / size));
       
+      // Extract progress from books response (if included)
+      const progressMap = {};
+      let hasProgressInResponse = false;
+      result.books.forEach((book) => {
+        if (book.progress !== undefined) {
+          hasProgressInResponse = true;
+          progressMap[book.id] = book.progress;
+        }
+      });
+      
+      if (hasProgressInResponse) {
+        // Progress was included in the response, use it directly
+        setBookProgress(progressMap);
+      } else if (userId) {
+        // Fallback: progress not in response, fetch separately (for Firestore compatibility)
+        loadProgressForBooks(result.books);
+      }
+      
       // Cache this page
       setPageCache(prev => ({
         ...prev,
         [cacheKey]: { books: result.books, totalCount: result.totalCount }
       }));
       
-      // Load progress for the books
-      loadProgressForBooks(result.books);
-      
     } catch (err) {
       setError('Failed to fetch books');
     } finally {
       setLoading(false);
     }
-  }, [pageSize, pageCache, loadProgressForBooks]);
+  }, [pageSize, pageCache, loadProgressForBooks, user]);
 
   // Pagination handler
   const handlePageChange = (event, page) => {
@@ -424,7 +455,7 @@ const BookList = () => {
                 >
                   <TableCell>
                     <Avatar
-                      src={book.coverUrl}
+                      src={book.coverImage}
                       alt={book.title}
                       variant="rounded"
                       sx={{ width: 60, height: 80 }}

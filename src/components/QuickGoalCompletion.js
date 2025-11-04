@@ -12,14 +12,14 @@ import {
   Divider,
 } from '@mui/material';
 import { useAuth } from '../AuthContext';
-import { getGoals } from '../services/firestoreService';
+import { getGoals } from '../services/dataService';
 import {
   checkGoalCompletion,
   markGoalComplete,
   markGoalIncomplete,
   markMilestoneComplete,
   markOneTimeGoalComplete,
-} from '../services/firestoreService';
+} from '../services/dataService';
 import {
   getCurrentPeriodId,
   filterGoalsForQuickCompletion,

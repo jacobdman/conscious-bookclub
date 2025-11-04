@@ -164,7 +164,7 @@ const parseBookData = (item) => {
     description: volumeInfo.description || '',
     categories: volumeInfo.categories || [],
     genre: mapCategoryToGenre(volumeInfo.categories),
-    coverUrl: volumeInfo.imageLinks?.thumbnail || volumeInfo.imageLinks?.smallThumbnail || '',
+    coverImage: volumeInfo.imageLinks?.thumbnail || volumeInfo.imageLinks?.smallThumbnail || '',
     publishedDate: volumeInfo.publishedDate || '',
     pageCount: volumeInfo.pageCount || null,
     language: volumeInfo.language || 'en',

@@ -5,7 +5,7 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
-import { createUserDocument } from './services/firestoreService';
+import { createUserDocument } from './services/dataService';
 
 const AuthContext = createContext();
 
