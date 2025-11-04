@@ -129,24 +129,26 @@ export const isTodayOrOverdue = (date) => {
 
 /**
  * Sort goals by priority for quick completion view
- * Priority order: daily habits → overdue one-time/milestones → weekly habits
+ * Priority order: daily habits → one-time/milestones → weekly habits
  * @param {Array} goals - Array of goal objects
  * @returns {Array} - Sorted goals array
  */
 export const sortGoalsByPriority = (goals) => {
   return goals.sort((a, b) => {
+    // Normalize types
+    const aType = a.type === 'one-time' ? 'one_time' : a.type;
+    const bType = b.type === 'one-time' ? 'one_time' : b.type;
+    
     // Daily cadence goals first
     if (a.cadence === 'day' && b.cadence !== 'day') return -1;
     if (b.cadence === 'day' && a.cadence !== 'day') return 1;
     
-    // Then overdue one-time and milestone goals
-    const aIsOverdue = (a.type === 'one_time' && isTodayOrOverdue(a.dueAt) && !a.completed) ||
-                      (a.type === 'milestone' && a.milestones?.some(m => isTodayOrOverdue(m.dueDate) && !m.done));
-    const bIsOverdue = (b.type === 'one_time' && isTodayOrOverdue(b.dueAt) && !b.completed) ||
-                      (b.type === 'milestone' && b.milestones?.some(m => isTodayOrOverdue(m.dueDate) && !m.done));
+    // Then one-time and milestone goals (prioritize incomplete ones)
+    const aIsOneTimeOrMilestone = (aType === 'one_time' || aType === 'milestone') && !a.completed;
+    const bIsOneTimeOrMilestone = (bType === 'one_time' || bType === 'milestone') && !b.completed;
     
-    if (aIsOverdue && !bIsOverdue) return -1;
-    if (bIsOverdue && !aIsOverdue) return 1;
+    if (aIsOneTimeOrMilestone && !bIsOneTimeOrMilestone) return -1;
+    if (bIsOneTimeOrMilestone && !aIsOneTimeOrMilestone) return 1;
     
     // Then weekly cadence goals
     if (a.cadence === 'week' && b.cadence !== 'week') return -1;
@@ -167,18 +169,22 @@ export const filterGoalsForQuickCompletion = (goals) => {
     // Skip completed/archived goals
     if (goal.completed || goal.archived) return false;
     
-    switch (goal.type) {
+    // Normalize goal type for consistent matching
+    const goalType = goal.type === 'one-time' ? 'one_time' : goal.type;
+    
+    switch (goalType) {
       case 'habit':
       case 'metric':
         // Show all active habit/metric goals with cadence
         return !goal.completed && goal.cadence;
         
       case 'one_time':
-        // Show if due today, overdue, or has no due date (always show incomplete one-time goals)
-        return !goal.completed && (isTodayOrOverdue(goal.dueAt) || !goal.dueAt);
+        // Show all incomplete one-time goals (always show incomplete ones in Today's Goals)
+        // This is "Today's Goals" so we want to see all incomplete one-time goals
+        return !goal.completed;
         
       case 'milestone':
-        // Show if has any milestones (completed or incomplete) due today or overdue
+        // Show if has any milestones (completed or incomplete)
         // Note: milestone goals may not have due dates on individual milestones
         return goal.milestones && goal.milestones.length > 0;
         

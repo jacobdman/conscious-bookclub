@@ -21,7 +21,7 @@ import { Edit, Add } from '@mui/icons-material';
 import { useAuth } from '../AuthContext';
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../services/dataService';
 import GoalFormModal from './GoalFormModal';
-import QuickGoalCompletion from './QuickGoalCompletion';
+import TodaysGoals from './QuickGoalCompletion';
 import Layout from './Layout';
 
 const Goals = () => {
@@ -171,7 +171,7 @@ const Goals = () => {
         </Box>
 
         <Box sx={{ mb: 3 }}>
-          <QuickGoalCompletion onGoalUpdate={fetchGoals} />
+          <TodaysGoals onGoalUpdate={fetchGoals} />
         </Box>
 
         <Box sx={{ mb: 2 }}>

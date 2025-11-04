@@ -534,7 +534,31 @@ const addGoal = async (userId, goalData) => {
 };
 
 const updateGoal = async (userId, goalId, updates) => {
-  await Goal.update(updates, {where: {id: goalId, userId}});
+  // Remove milestones from updates if present (we'll handle them separately)
+  const {milestones, ...goalUpdates} = updates;
+
+  // Check if this is a milestone goal (either updating to milestone or already is one)
+  const goal = await Goal.findOne({where: {id: goalId, userId}});
+  const isMilestoneGoal = updates.type === "milestone" || goal?.type === "milestone";
+
+  // Update the goal itself
+  await Goal.update(goalUpdates, {where: {id: goalId, userId}});
+
+  // Handle milestones if provided and this is a milestone goal
+  if (isMilestoneGoal && milestones && Array.isArray(milestones)) {
+    // Delete existing milestones for this goal
+    await Milestone.destroy({where: {goalId}});
+
+    // Create new milestones
+    for (const milestoneData of milestones) {
+      await Milestone.create({
+        goalId,
+        title: milestoneData.title,
+        done: milestoneData.done || false,
+        doneAt: milestoneData.doneAt || null,
+      });
+    }
+  }
 };
 
 const deleteGoal = async (userId, goalId) => {
