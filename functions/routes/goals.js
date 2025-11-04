@@ -22,7 +22,7 @@ router.post("/:userId", async (req, res) => {
     const {userId} = req.params;
     const goalData = req.body;
     const result = await dbService.addGoal(userId, goalData);
-    res.status(201).json({id: result.id, ...goalData});
+    res.status(201).json(result);
   } catch (error) {
     console.error("Error creating goal:", error);
     res.status(500).json({error: "Failed to create goal"});

@@ -530,7 +530,17 @@ const addGoal = async (userId, goalData) => {
     }
   }
 
-  return {id: goal.id};
+  // Fetch the complete goal with milestones to return all fields
+  const completeGoal = await Goal.findByPk(goal.id, {
+    include: [
+      {
+        model: Milestone,
+        attributes: ["id", "title", "done", "doneAt"],
+      },
+    ],
+  });
+
+  return completeGoal.toJSON();
 };
 
 const updateGoal = async (userId, goalId, updates) => {

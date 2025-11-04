@@ -164,7 +164,7 @@ export const addGoal = async (userId, goal) => {
     method: 'POST',
     body: JSON.stringify(goal),
   });
-  return { id: result.id };
+  return result; // Return the full goal object from API
 };
 
 export const updateGoal = async (userId, goalId, updates) => {

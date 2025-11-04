@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import { useAuth } from '../AuthContext';
 import { useGoalsContext } from '../contexts/Goals/GoalsProvider';
-import { getGoalEntries, getGoalProgress, createGoalEntry, updateMilestone } from '../services/dataService';
+import { getGoalEntries, getGoalProgress, createGoalEntry, updateMilestone, deleteGoalEntry } from '../services/dataService';
 import {
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
@@ -141,20 +141,46 @@ const TodaysGoals = () => {
       setUpdating(prev => ({ ...prev, [goalId]: true }));
 
       if (goal.type === 'habit') {
-        // For habits, create an entry when toggling to complete
+        // For habits, create or delete entry based on current state
         if (!isCurrentlyComplete) {
+          // Create entry when checking
           await createGoalEntry(user.uid, goalId, {
             occurred_at: new Date().toISOString(),
             quantity: null,
           });
+        } else {
+          // Delete today's entry when unchecking
+          const todayBoundaries = getTodayBoundaries();
+          const entries = await getGoalEntries(user.uid, goalId, todayBoundaries.start, todayBoundaries.end);
+          if (entries && entries.length > 0) {
+            // Delete the most recent entry for today
+            const mostRecentEntry = entries.sort((a, b) => 
+              new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
+            )[0];
+            if (mostRecentEntry) {
+              await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
+            }
+          }
         }
-        // Note: We don't handle "uncompleting" by deleting entries here
       } else if (goal.type === 'metric') {
-        // For metrics, open quantity dialog
+        // For metrics, open quantity dialog when checking, or delete entry when unchecking
         if (!isCurrentlyComplete) {
           setQuantityDialog({ open: true, goal: goal });
           setUpdating(prev => ({ ...prev, [goalId]: false }));
           return;
+        } else {
+          // Delete today's most recent entry when unchecking
+          const todayBoundaries = getTodayBoundaries();
+          const entries = await getGoalEntries(user.uid, goalId, todayBoundaries.start, todayBoundaries.end);
+          if (entries && entries.length > 0) {
+            // Delete the most recent entry for today
+            const mostRecentEntry = entries.sort((a, b) => 
+              new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
+            )[0];
+            if (mostRecentEntry) {
+              await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
+            }
+          }
         }
       } else if (normalizeGoalType(goal.type) === 'one_time') {
         // Toggle completion status for one-time goals
@@ -168,22 +194,85 @@ const TodaysGoals = () => {
         setUpdating(prev => ({ ...prev, [goalId]: false }));
         return;
       } else if (goal.type === 'milestone') {
-        // For milestones, mark the next incomplete milestone as done
+        // For milestones, toggle the next incomplete milestone or undo the last completed one
         const milestones = goal.milestones || goal.Milestones || [];
         const incompleteMilestone = milestones.find(m => !m.done);
+        
         if (incompleteMilestone) {
-          await updateMilestone(user.uid, goalId, incompleteMilestone.id, { done: true });
+          // Mark the next incomplete milestone as done
+          // Get the milestone ID, handling both id and ID field names
+          const milestoneId = incompleteMilestone.id || incompleteMilestone.ID;
+          if (!milestoneId) {
+            console.error('Milestone ID not found for milestone:', incompleteMilestone);
+            setUpdating(prev => ({ ...prev, [goalId]: false }));
+            return;
+          }
+          
+          // Ensure milestoneId is a number (backend expects integer)
+          const milestoneIdNum = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+          await updateMilestone(user.uid, goalId, milestoneIdNum, { done: true });
           // Update goal in context to reflect milestone change
-          const updatedMilestones = milestones.map(m => 
-            m.id === incompleteMilestone.id 
-              ? { ...m, done: true, doneAt: new Date().toISOString() }
-              : m
-          );
+          const updatedMilestones = milestones.map(m => {
+            const mId = m.id || m.ID;
+            const mIdNum = typeof mId === 'string' ? parseInt(mId, 10) : mId;
+            if (mIdNum === milestoneIdNum) {
+              return { ...m, done: true, doneAt: new Date().toISOString() };
+            }
+            return m;
+          });
           await updateGoal(goalId, { milestones: updatedMilestones });
           
           // Update completion state locally (check if all milestones are now done)
           const allDone = updatedMilestones.length > 0 && updatedMilestones.every(m => m.done);
           setCompletionStates(prev => ({ ...prev, [goalId]: allDone }));
+        } else if (isCurrentlyComplete) {
+          // If all are done and user unchecks, undo the last completed milestone from today
+          const todayBoundaries = getTodayBoundaries();
+          const todayStart = todayBoundaries.start;
+          const todayEnd = todayBoundaries.end;
+          
+          // Find the most recently completed milestone that was done today
+          const completedToday = milestones
+            .filter(m => {
+              const doneAt = m.doneAt || m.done_at;
+              if (!doneAt) return false;
+              const doneDate = new Date(doneAt);
+              return doneDate >= todayStart && doneDate < todayEnd;
+            })
+            .sort((a, b) => {
+              const aDate = new Date(a.doneAt || a.done_at);
+              const bDate = new Date(b.doneAt || b.done_at);
+              return bDate - aDate;
+            });
+          
+          if (completedToday.length > 0) {
+            const milestoneToUndo = completedToday[0];
+            // Get the milestone ID, handling both id and ID field names
+            const milestoneId = milestoneToUndo.id || milestoneToUndo.ID;
+            if (!milestoneId) {
+              console.error('Milestone ID not found for milestone:', milestoneToUndo);
+              setUpdating(prev => ({ ...prev, [goalId]: false }));
+              return;
+            }
+            
+            // Ensure milestoneId is a number (backend expects integer)
+            const milestoneIdNum = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+            await updateMilestone(user.uid, goalId, milestoneIdNum, { done: false });
+            // Update goal in context
+            const updatedMilestones = milestones.map(m => {
+              const mId = m.id || m.ID;
+              const mIdNum = typeof mId === 'string' ? parseInt(mId, 10) : mId;
+              if (mIdNum === milestoneIdNum) {
+                return { ...m, done: false, doneAt: null };
+              }
+              return m;
+            });
+            await updateGoal(goalId, { milestones: updatedMilestones });
+            
+            // Update completion state
+            const allDone = updatedMilestones.length > 0 && updatedMilestones.every(m => m.done);
+            setCompletionStates(prev => ({ ...prev, [goalId]: allDone }));
+          }
         }
         setUpdating(prev => ({ ...prev, [goalId]: false }));
         return;
@@ -195,6 +284,11 @@ const TodaysGoals = () => {
         if (filteredGoals.find(g => g.id === goalId)) {
           await fetchCompletions([updatedGoal]);
         }
+        
+        // Notify Goals component to refetch entries if this goal is expanded
+        window.dispatchEvent(new CustomEvent('goalEntryChanged', { 
+          detail: { goalId, goalType: goal.type } 
+        }));
       }
     } catch (err) {
       setError('Failed to update goal');
@@ -228,6 +322,11 @@ const TodaysGoals = () => {
       if (filteredGoals.find(g => g.id === goal.id)) {
         await fetchCompletions([updatedGoal]);
       }
+      
+      // Notify Goals component to refetch entries if this goal is expanded
+      window.dispatchEvent(new CustomEvent('goalEntryChanged', { 
+        detail: { goalId: goal.id, goalType: goal.type } 
+      }));
     } catch (err) {
       setError('Failed to create entry');
     } finally {

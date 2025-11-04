@@ -173,6 +173,25 @@ const Goals = () => {
     }
   };
 
+  // Listen for entry changes from Quick Goal Completion component
+  useEffect(() => {
+    const handleEntryChange = async (event) => {
+      const { goalId, goalType } = event.detail;
+      // Only refetch if this goal is currently expanded
+      if (expandedGoals.has(goalId) && (goalType === 'habit' || goalType === 'metric')) {
+        const goal = goals.find(g => g.id === goalId);
+        if (goal) {
+          await fetchGoalDetails(goal);
+        }
+      }
+    };
+
+    window.addEventListener('goalEntryChanged', handleEntryChange);
+    return () => {
+      window.removeEventListener('goalEntryChanged', handleEntryChange);
+    };
+  }, [expandedGoals, goals, user, fetchGoalDetails]);
+
   const handleSaveEntry = async (entryData) => {
     if (!user || !entryDialog.goal) return;
 

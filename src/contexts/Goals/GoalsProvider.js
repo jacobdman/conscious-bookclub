@@ -64,11 +64,11 @@ const GoalsProvider = ({ children }) => {
     if (!user) return;
 
     try {
-      // Make API call
+      // Make API call - returns full goal object with id, created_at, etc.
       const result = await addGoal(user.uid, goalData);
       
-      // Optimistically add to state (normalize the goal data)
-      const newGoal = normalizeGoal({ ...goalData, id: result.id }, result.id);
+      // Normalize and add to state directly from API response
+      const newGoal = normalizeGoal(result, result.id);
       setGoals(prev => [...prev, newGoal]);
       
       return newGoal;
@@ -83,44 +83,63 @@ const GoalsProvider = ({ children }) => {
   const handleUpdateGoal = useCallback(async (goalId, updates) => {
     if (!user) return;
 
-    try {
-      // Make API call
-      await updateGoal(user.uid, goalId, updates);
-      
-      // Optimistically update state
-      setGoals(prev => prev.map(goal => {
+    // Store previous state for potential revert
+    let previousGoal = null;
+
+    // Optimistically update state and capture previous goal
+    setGoals(prev => {
+      previousGoal = prev.find(g => g.id === goalId);
+      return prev.map(goal => {
         if (goal.id === goalId) {
           return normalizeGoal({ ...goal, ...updates }, goalId);
         }
         return goal;
-      }));
+      });
+    });
+
+    try {
+      // Make API call
+      await updateGoal(user.uid, goalId, updates);
     } catch (err) {
       setError('Failed to update goal');
       console.error('Error updating goal:', err);
-      // Revert on error by refreshing
-      refreshGoals();
+      // Revert optimistic update on error
+      if (previousGoal) {
+        setGoals(prev => prev.map(goal => {
+          if (goal.id === goalId) {
+            return previousGoal;
+          }
+          return goal;
+        }));
+      }
       throw err;
     }
-  }, [user, refreshGoals]);
+  }, [user]);
 
   // Delete a goal
   const handleDeleteGoal = useCallback(async (goalId) => {
     if (!user) return;
+
+    // Store the goal for potential revert and optimistically remove from state
+    let deletedGoal = null;
+    setGoals(prev => {
+      deletedGoal = prev.find(g => g.id === goalId);
+      return prev.filter(goal => goal.id !== goalId);
+    });
     
     try {
       // Make API call
       await deleteGoal(user.uid, goalId);
-      
-      // Optimistically remove from state
-      setGoals(prev => prev.filter(goal => goal.id !== goalId));
     } catch (err) {
       setError('Failed to delete goal');
       console.error('Error deleting goal:', err);
-      // Revert on error by refreshing
-      refreshGoals();
+      // Revert optimistic update on error
+      if (deletedGoal) {
+        setGoals(prev => [...prev, deletedGoal]);
+      }
       throw err;
     }
-  }, [user, refreshGoals]);
+  }, [user]);
 
   return (
     <GoalsContext.Provider
