@@ -15,6 +15,8 @@ import {
   IconButton,
   Chip,
   Grid,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -23,6 +25,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null }) => {
+  // Note: onArchive is kept for backward compatibility but actually deletes the goal
   const [formData, setFormData] = useState({
     title: '',
     type: 'habit',
@@ -33,6 +36,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
     unit: '',
     dueAt: null,
     milestones: [],
+    completed: false,
   });
 
   const [newMilestone, setNewMilestone] = useState({ title: '' });
@@ -57,6 +61,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         unit: editingGoal.unit || '',
         dueAt: parseDate(editingGoal.dueAt || editingGoal.due_at),
         milestones: editingGoal.milestones || [],
+        completed: editingGoal.completed || false,
       });
     } else {
       setFormData({
@@ -69,6 +74,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         unit: '',
         dueAt: null,
         milestones: [],
+        completed: false,
       });
     }
   }, [editingGoal, open]);
@@ -133,11 +139,23 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
       goalData.dueAt = formData.dueAt ? formData.dueAt.toISOString() : null;
     }
 
+    // Handle completion status for all goal types when editing
+    if (editingGoal) {
+      goalData.completed = formData.completed;
+      if (formData.completed && !editingGoal.completed) {
+        // If marking as completed, set completedAt
+        goalData.completedAt = new Date().toISOString();
+      } else if (!formData.completed && editingGoal.completed) {
+        // If uncompleting, clear completedAt
+        goalData.completedAt = null;
+      }
+    }
+
     onSave(goalData);
     onClose();
   };
 
-  const handleArchive = () => {
+  const handleDelete = () => {
     if (editingGoal) {
       onArchive(editingGoal.id);
       onClose();
@@ -258,16 +276,29 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
 
       case 'one_time':
         return (
-          <DatePicker
-            label="Due Date (Optional)"
-            value={formData.dueAt}
-            onChange={(date) => handleInputChange('dueAt', date)}
-            slotProps={{
-              textField: {
-                fullWidth: true,
-              },
-            }}
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <DatePicker
+              label="Due Date (Optional)"
+              value={formData.dueAt}
+              onChange={(date) => handleInputChange('dueAt', date)}
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                },
+              }}
+            />
+            {editingGoal && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formData.completed || false}
+                    onChange={(e) => handleInputChange('completed', e.target.checked)}
+                  />
+                }
+                label="Mark as completed"
+              />
+            )}
+          </Box>
         );
 
       default:
@@ -320,8 +351,8 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
           {editingGoal && (
-            <Button onClick={handleArchive} color="error">
-              Archive Goal
+            <Button onClick={handleDelete} color="error">
+              Delete Goal
             </Button>
           )}
           <Button onClick={handleSave} variant="contained" disabled={!formData.title.trim()}>

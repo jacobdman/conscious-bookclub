@@ -26,7 +26,6 @@ import {
   hasEntryToday,
   getProgressText,
   formatMilestoneDisplay,
-  getPeriodBoundaries,
 } from '../utils/goalHelpers';
 
 const TodaysGoals = ({ onGoalUpdate }) => {
@@ -38,7 +37,7 @@ const TodaysGoals = ({ onGoalUpdate }) => {
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState({});
   const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null });
-
+  
   const fetchGoalsAndCompletions = useCallback(async () => {
     if (!user) return;
 
@@ -66,7 +65,38 @@ const TodaysGoals = ({ onGoalUpdate }) => {
 
       // Filter and sort goals for quick completion
       const filteredGoals = filterGoalsForQuickCompletion(allGoals);
-      const sortedGoals = sortGoalsByPriority(filteredGoals);
+      
+      // Add deleted goals that were COMPLETED today from localStorage
+      // Only show goals that were actually completed (not just deleted)
+      let deletedGoalsForToday = [];
+      try {
+        const key = `deletedGoals_${user.uid}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const deletedGoals = JSON.parse(stored);
+          const todayBoundaries = getTodayBoundaries();
+          const today = todayBoundaries.start.toISOString().split('T')[0]; // Get today's date string
+          
+          // Filter to only include goals that were COMPLETED today (not just deleted)
+          deletedGoalsForToday = deletedGoals.filter(goal => {
+            // Must be completed
+            const isCompleted = goal.completed || false;
+            if (!isCompleted) return false;
+            
+            // Must have been completed today
+            const completedDate = goal.completedAt || goal.completed_at;
+            if (!completedDate) return false;
+            const completedDateStr = new Date(completedDate).toISOString().split('T')[0];
+            return completedDateStr === today;
+          });
+        }
+      } catch (err) {
+        console.error('Error reading deleted goals from localStorage:', err);
+      }
+      
+      const allFilteredGoals = [...filteredGoals, ...deletedGoalsForToday];
+      
+      const sortedGoals = sortGoalsByPriority(allFilteredGoals);
       const topGoals = sortedGoals.slice(0, 5); // Limit to top 5
 
       setGoals(topGoals);
@@ -76,7 +106,28 @@ const TodaysGoals = ({ onGoalUpdate }) => {
       const progressData = {};
       const todayBoundaries = getTodayBoundaries();
 
+      // Process both active goals and deleted goals (deleted goals are already included in topGoals)
       for (const goal of topGoals) {
+        // Check if this is a deleted goal (stored in localStorage)
+        const isDeleted = goal.deletedAt !== undefined;
+        
+        if (isDeleted) {
+          // For deleted goals, just use their stored completion status
+          // Don't try to fetch from API since the goal no longer exists
+          if (goal.type === 'one_time' || goal.type === 'one-time') {
+            completionStates[goal.id] = goal.completed || false;
+          } else if (goal.type === 'milestone') {
+            const milestones = goal.milestones || goal.Milestones || [];
+            const allDone = milestones.length > 0 && milestones.every(m => m.done);
+            completionStates[goal.id] = allDone || false;
+          } else {
+            // For habit/metric deleted goals, mark as completed since they were deleted
+            completionStates[goal.id] = true;
+          }
+          continue;
+        }
+        
+        // For active goals, fetch data from API
         if (goal.type === 'habit') {
           // For habits: check if entry exists TODAY
           try {
@@ -123,8 +174,53 @@ const TodaysGoals = ({ onGoalUpdate }) => {
     fetchGoalsAndCompletions();
   }, [user, fetchGoalsAndCompletions]);
 
+  // Clean up old deleted goals from localStorage (older than today)
+  // Only keep goals that were COMPLETED today (not just deleted)
+  useEffect(() => {
+    if (!user) return;
+    
+    try {
+      const key = `deletedGoals_${user.uid}`;
+      const stored = localStorage.getItem(key);
+      if (!stored) return;
+      
+      const deletedGoals = JSON.parse(stored);
+      const todayBoundaries = getTodayBoundaries();
+      const today = todayBoundaries.start.toISOString().split('T')[0];
+      
+      // Filter to only keep goals that were COMPLETED today (not just deleted)
+      const goalsForToday = deletedGoals.filter(goal => {
+        // Must be completed
+        const isCompleted = goal.completed || false;
+        if (!isCompleted) return false;
+        
+        // Must have been completed today
+        const completedDate = goal.completedAt || goal.completed_at;
+        if (!completedDate) return false;
+        const completedDateStr = new Date(completedDate).toISOString().split('T')[0];
+        return completedDateStr === today;
+      });
+      
+      // Update localStorage with filtered goals
+      if (goalsForToday.length !== deletedGoals.length) {
+        if (goalsForToday.length === 0) {
+          localStorage.removeItem(key);
+        } else {
+          localStorage.setItem(key, JSON.stringify(goalsForToday));
+        }
+      }
+    } catch (err) {
+      console.error('Error cleaning up deleted goals from localStorage:', err);
+    }
+  }, [user]);
+
   const handleGoalToggle = async (goal) => {
     if (!user) return;
+
+    // Don't allow toggling deleted goals
+    if (goal.deletedAt !== undefined) {
+      return;
+    }
 
     const goalId = goal.id;
     const isCurrentlyComplete = completionStates[goalId];
@@ -322,48 +418,57 @@ const TodaysGoals = ({ onGoalUpdate }) => {
                       const isLastItem = itemIndex === displayItems.length - 1;
                       const isNextIncomplete = isLastItem && !itemComplete;
                       
-                      return (
-                        <FormControlLabel
-                          key={itemIndex}
-                          control={
-                            isNextIncomplete ? (
+                      const labelContent = (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              textDecoration: itemComplete ? 'line-through' : 'none',
+                              opacity: itemComplete ? 0.6 : 1,
+                              flex: 1,
+                              ml: itemComplete ? 4 : 0, // Indent completed items
+                            }}
+                          >
+                            {item.text}
+                          </Typography>
+                          {isNextIncomplete && (
+                            <>
+                              <Chip
+                                label={getGoalTypeLabel(goal)}
+                                color={getGoalTypeColor(goal)}
+                                size="small"
+                                variant="outlined"
+                              />
+                              {isUpdating && <CircularProgress size={16} />}
+                            </>
+                          )}
+                        </Box>
+                      );
+                      
+                      // Use FormControlLabel only when there's a checkbox, otherwise use Box
+                      if (isNextIncomplete) {
+                        return (
+                          <FormControlLabel
+                            key={itemIndex}
+                            control={
                               <Checkbox
                                 checked={false}
                                 onChange={() => handleGoalToggle(goal)}
                                 disabled={isUpdating}
                                 color="primary"
                               />
-                            ) : null
-                          }
-                          label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                  textDecoration: itemComplete ? 'line-through' : 'none',
-                                  opacity: itemComplete ? 0.6 : 1,
-                                  flex: 1,
-                                  ml: itemComplete ? 4 : 0, // Indent completed items
-                                }}
-                              >
-                                {item.text}
-                              </Typography>
-                              {isNextIncomplete && (
-                                <>
-                                  <Chip
-                                    label={getGoalTypeLabel(goal)}
-                                    color={getGoalTypeColor(goal)}
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                  {isUpdating && <CircularProgress size={16} />}
-                                </>
-                              )}
-                            </Box>
-                          }
-                          sx={{ width: '100%', m: 0 }}
-                        />
-                      );
+                            }
+                            label={labelContent}
+                            sx={{ width: '100%', m: 0 }}
+                          />
+                        );
+                      } else {
+                        return (
+                          <Box key={itemIndex} sx={{ display: 'flex', alignItems: 'center', width: '100%', m: 0 }}>
+                            {labelContent}
+                          </Box>
+                        );
+                      }
                     })}
                     {index < goals.length - 1 && <Divider sx={{ my: 0.5 }} />}
                   </Box>

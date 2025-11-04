@@ -166,8 +166,8 @@ export const sortGoalsByPriority = (goals) => {
  */
 export const filterGoalsForQuickCompletion = (goals) => {
   return goals.filter(goal => {
-    // Skip completed/archived goals
-    if (goal.completed || goal.archived) return false;
+    // Skip archived goals (but allow completed goals - they'll be handled per type)
+    if (goal.archived) return false;
     
     // Normalize goal type for consistent matching
     const goalType = goal.type === 'one-time' ? 'one_time' : goal.type;
@@ -175,13 +175,22 @@ export const filterGoalsForQuickCompletion = (goals) => {
     switch (goalType) {
       case 'habit':
       case 'metric':
-        // Show all active habit/metric goals with cadence
+        // Show all active habit/metric goals with cadence (not completed)
         return !goal.completed && goal.cadence;
         
       case 'one_time':
-        // Show all incomplete one-time goals (always show incomplete ones in Today's Goals)
-        // This is "Today's Goals" so we want to see all incomplete one-time goals
-        return !goal.completed;
+        // Show incomplete one-time goals, OR completed ones that were completed today
+        if (!goal.completed) {
+          return true; // Always show incomplete ones
+        }
+        // If completed, check if it was completed today
+        if (goal.completedAt || goal.completed_at) {
+          const completedDate = new Date(goal.completedAt || goal.completed_at);
+          const todayBoundaries = getTodayBoundaries();
+          const wasCompletedToday = completedDate >= todayBoundaries.start && completedDate < todayBoundaries.end;
+          return wasCompletedToday;
+        }
+        return false;
         
       case 'milestone':
         // Show if has any milestones (completed or incomplete)
