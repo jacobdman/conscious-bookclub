@@ -9,6 +9,8 @@ import Goals from './components/Goals';
 import Login from './Login';
 import { CircularProgress, Box } from '@mui/material';
 
+const USE_POSTGRES = process.env.REACT_APP_USE_POSTGRES === 'true';
+
 function AppContent() {
   const { user, loading } = useAuth();
 
@@ -34,6 +36,7 @@ function AppContent() {
   return (
     <Router>
       <Routes>
+        {console.log('USE_POSTGRES', USE_POSTGRES)}
         <Route path="/" element={<Dashboard />} />
         <Route path="/club" element={<ClubView />} />
         <Route path="/books" element={<BookList />} />

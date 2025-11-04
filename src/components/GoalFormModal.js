@@ -35,21 +35,28 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
 
   const [newMilestone, setNewMilestone] = useState({ title: '', dueDate: null });
 
+  // Helper function to convert various date formats to Date object
+  const parseDate = (dateValue) => {
+    if (!dateValue) return null;
+    if (dateValue instanceof Date) return dateValue;
+    if (dateValue.seconds) return new Date(dateValue.seconds * 1000);
+    if (typeof dateValue === 'string') return new Date(dateValue);
+    return new Date(dateValue);
+  };
+
   useEffect(() => {
     if (editingGoal) {
       setFormData({
         title: editingGoal.title || '',
         description: editingGoal.description || '',
         trackingType: editingGoal.trackingType || 'one-time',
-        dueDate: editingGoal.dueDate ? new Date(editingGoal.dueDate.seconds * 1000) : null,
+        dueDate: parseDate(editingGoal.dueDate),
         milestones: editingGoal.milestones ? editingGoal.milestones.map(milestone => ({
           ...milestone,
-          dueDate: milestone.dueDate ? 
-            (milestone.dueDate.seconds ? new Date(milestone.dueDate.seconds * 1000) : milestone.dueDate) 
-            : null
+          dueDate: parseDate(milestone.dueDate),
         })) : [],
-        startDate: editingGoal.startDate ? new Date(editingGoal.startDate.seconds * 1000) : null,
-        endDate: editingGoal.endDate ? new Date(editingGoal.endDate.seconds * 1000) : null,
+        startDate: parseDate(editingGoal.startDate),
+        endDate: parseDate(editingGoal.endDate),
       });
     } else {
       setFormData({
@@ -146,9 +153,9 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
                 />
                 <Typography variant="caption" color="text.secondary">
                   Due: {milestone.dueDate ? 
-                    (milestone.dueDate.seconds ? 
-                      new Date(milestone.dueDate.seconds * 1000).toLocaleDateString() : 
-                      milestone.dueDate.toLocaleDateString()
+                    (milestone.dueDate instanceof Date ? 
+                      milestone.dueDate.toLocaleDateString() : 
+                      parseDate(milestone.dueDate)?.toLocaleDateString() || 'Invalid date'
                     ) : 'No date'}
                 </Typography>
               </Box>

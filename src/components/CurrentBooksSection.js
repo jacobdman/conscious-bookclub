@@ -10,7 +10,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../AuthContext';
-import { getUserBookProgress, updateUserBookProgress } from '../services/firestoreService';
+import { getUserBookProgress, updateUserBookProgress } from '../services/dataService';
 
 const CurrentBooksSection = ({ books }) => {
   const { user } = useAuth();
@@ -23,25 +23,41 @@ const CurrentBooksSection = ({ books }) => {
   useEffect(() => {
     if (!user || !books || books.length === 0) return;
 
-    const loadProgress = async () => {
-      const progressPromises = books.map(async (book) => {
-        try {
-          const progress = await getUserBookProgress(user.uid, book.id);
-          return { bookId: book.id, progress };
-        } catch (error) {
-          return { bookId: book.id, progress: null };
-        }
-      });
+    // Check if progress is already included in books
+    const progressMap = {};
+    let hasProgressInBooks = false;
+    books.forEach((book) => {
+      if (book.progress !== undefined) {
+        hasProgressInBooks = true;
+        progressMap[book.id] = book.progress;
+      }
+    });
 
-      const results = await Promise.all(progressPromises);
-      const progressMap = {};
-      results.forEach(({ bookId, progress }) => {
-        progressMap[bookId] = progress;
-      });
+    if (hasProgressInBooks) {
+      // Progress already included in books, use it directly
       setBookProgress(progressMap);
-    };
+    } else {
+      // Progress not included, fetch separately (fallback for backward compatibility)
+      const loadProgress = async () => {
+        const progressPromises = books.map(async (book) => {
+          try {
+            const progress = await getUserBookProgress(user.uid, book.id);
+            return { bookId: book.id, progress };
+          } catch (error) {
+            return { bookId: book.id, progress: null };
+          }
+        });
 
-    loadProgress();
+        const results = await Promise.all(progressPromises);
+        const fetchedProgressMap = {};
+        results.forEach(({ bookId, progress }) => {
+          fetchedProgressMap[bookId] = progress;
+        });
+        setBookProgress(fetchedProgressMap);
+      };
+
+      loadProgress();
+    }
   }, [user, books]);
 
   const formatDiscussionDate = (date) => {
@@ -199,7 +215,7 @@ const CurrentBooksSection = ({ books }) => {
             <CardMedia
               component="img"
               height="300"
-              image={book.coverUrl || '/logo192.png'}
+              image={book.coverImage || '/logo192.png'}
               alt={book.title}
             />
             <CardContent>

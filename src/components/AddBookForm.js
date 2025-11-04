@@ -22,7 +22,7 @@ import {
   Avatar,
   Tooltip
 } from '@mui/material';
-import { addBook, updateBook, deleteBook } from '../services/firestoreService';
+import { addBook, updateBook, deleteBook } from '../services/dataService';
 import { debouncedSearchBooks } from '../services/googleBooksService';
 
 const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = null }) => {
@@ -34,7 +34,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     author: '',
     theme: [],
     genre: '',
-    coverUrl: '',
+    coverImage: '',
     fiction: false,
     discussionDate: '',
     description: ''
@@ -74,7 +74,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         author: editingBook.author || '',
         theme: cleanTheme,
         genre: editingBook.genre || '',
-        coverUrl: editingBook.coverUrl || '',
+        coverImage: editingBook.coverImage || '',
         fiction: Boolean(editingBook.fiction),
         discussionDate: formattedDate,
         description: editingBook.description || ''
@@ -86,7 +86,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         setSelectedBook({
           title: editingBook.title,
           author: editingBook.author,
-          coverUrl: editingBook.coverUrl,
+          coverImage: editingBook.coverImage,
           genre: editingBook.genre,
           description: editingBook.description
         });
@@ -97,7 +97,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         author: '',
         theme: [],
         genre: '',
-        coverUrl: '',
+        coverImage: '',
         fiction: false,
         discussionDate: '',
         description: ''
@@ -179,7 +179,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         ...prev,
         title: value.title,
         author: value.author,
-        coverUrl: value.coverUrl,
+        coverImage: value.coverImage,
         genre: value.genre || prev.genre,
         description: value.description || prev.description
       }));
@@ -233,7 +233,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         author: formData.author.trim(),
         theme: formData.theme,
         genre: formData.genre || null,
-        coverUrl: formData.coverUrl.trim() || null,
+        coverImage: formData.coverImage.trim() || null,
         fiction: formData.fiction || false, // Ensure it's always a boolean
         discussionDate: formData.discussionDate ? new Date(formData.discussionDate) : null,
         description: formData.description.trim() || null
@@ -256,7 +256,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         author: '',
         theme: [],
         genre: '',
-        coverUrl: '',
+        coverImage: '',
         fiction: false,
         discussionDate: '',
         description: ''
@@ -306,7 +306,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         author: '',
         theme: [],
         genre: '',
-        coverUrl: '',
+        coverImage: '',
         fiction: false,
         discussionDate: '',
         description: ''
@@ -360,9 +360,9 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
               }}
               renderOption={(props, option) => (
                 <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {option.coverUrl && (
+                  {option.coverImage && (
                     <Avatar
-                      src={option.coverUrl}
+                      src={option.coverImage}
                       alt={option.title}
                       sx={{ width: 32, height: 48, borderRadius: 1 }}
                       variant="rounded"
@@ -453,8 +453,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
 
             <TextField
               label="Cover Image URL"
-              value={formData.coverUrl}
-              onChange={handleChange('coverUrl')}
+              value={formData.coverImage}
+              onChange={handleChange('coverImage')}
               fullWidth
               disabled={loading}
               helperText="Optional: URL to the book's cover image"

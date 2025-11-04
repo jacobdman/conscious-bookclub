@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import { Edit, Add } from '@mui/icons-material';
 import { useAuth } from '../AuthContext';
-import { getGoals, addGoal, updateGoal, deleteGoal } from '../services/firestoreService';
+import { getGoals, addGoal, updateGoal, deleteGoal } from '../services/dataService';
 import GoalFormModal from './GoalFormModal';
 import QuickGoalCompletion from './QuickGoalCompletion';
 import Layout from './Layout';
@@ -113,8 +113,14 @@ const Goals = () => {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'No date';
-    const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
-    return date.toLocaleDateString();
+    try {
+      if (timestamp instanceof Date) return timestamp.toLocaleDateString();
+      if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toLocaleDateString();
+      const date = new Date(timestamp);
+      return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString();
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   const getProgressInfo = (goal) => {

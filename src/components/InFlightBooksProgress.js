@@ -11,7 +11,7 @@ import {
   Divider,
   CircularProgress
 } from '@mui/material';
-import { getAllUsersProgressForBook, getBookStats, getAllUsers } from '../services/firestoreService';
+import { getAllUsersProgressForBook, getBookStats, getAllUsers } from '../services/dataService';
 
 const InFlightBooksProgress = ({ books }) => {
   const [bookProgressData, setBookProgressData] = useState({});
@@ -159,9 +159,9 @@ const InFlightBooksProgress = ({ books }) => {
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} md={3}>
                   <Box display="flex" alignItems="center" gap={2}>
-                    {book.coverUrl && (
+                    {book.coverImage && (
                       <img
-                        src={book.coverUrl}
+                        src={book.coverImage}
                         alt={book.title}
                         style={{
                           width: 60,

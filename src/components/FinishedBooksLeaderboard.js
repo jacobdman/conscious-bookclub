@@ -13,7 +13,7 @@ import {
   CircularProgress,
   Divider
 } from '@mui/material';
-import { getTopFinishedBooksUsers, getUserStats } from '../services/firestoreService';
+import { getTopFinishedBooksUsers, getUserStats } from '../services/dataService';
 import { useAuth } from '../AuthContext';
 
 const FinishedBooksLeaderboard = () => {
@@ -33,7 +33,7 @@ const FinishedBooksLeaderboard = () => {
         
         // Get current user's stats if they're not in top 10
         if (user) {
-          const currentUserInTop = topUsers.find(u => u.userId === user.uid);
+          const currentUserInTop = topUsers.find(u => u.id === user.uid);
           if (!currentUserInTop) {
             const userStats = await getUserStats(user.uid);
             setCurrentUserStats(userStats);
@@ -84,11 +84,11 @@ const FinishedBooksLeaderboard = () => {
         ) : (
           <List>
             {leaderboard.slice(0, 3).map((userStats, index) => (
-              <React.Fragment key={userStats.userId}>
+              <React.Fragment key={userStats.id}>
                 <ListItem sx={{ px: 0 }}>
                   <ListItemAvatar>
                     <Avatar
-                      src={userStats.photoURL}
+                      src={userStats.photoUrl}
                       sx={{ 
                         width: 40, 
                         height: 40,
@@ -109,7 +109,7 @@ const FinishedBooksLeaderboard = () => {
                         <Typography variant="subtitle1">
                           {userStats.displayName || 'Unknown User'}
                         </Typography>
-                        {userStats.userId === user?.uid && (
+                        {userStats.id === user?.uid && (
                           <Chip label="You" size="small" color="primary" />
                         )}
                       </Box>
@@ -118,7 +118,7 @@ const FinishedBooksLeaderboard = () => {
                       <Typography variant="body2" color="text.secondary">
                         {userStats.finishedCount} {userStats.finishedCount === 1 ? 'book' : 'books'} finished
                         {userStats.lastFinishedAt && (
-                          <span> • Last: {new Date(userStats.lastFinishedAt.seconds * 1000).toLocaleDateString()}</span>
+                          <span> • Last: {new Date(userStats.lastFinishedAt).toLocaleDateString()}</span>
                         )}
                       </Typography>
                     }
@@ -135,7 +135,7 @@ const FinishedBooksLeaderboard = () => {
                 <ListItem sx={{ px: 0 }}>
                   <ListItemAvatar>
                     <Avatar
-                      src={currentUserStats.photoURL}
+                      src={currentUserStats.photoUrl}
                       sx={{ width: 40, height: 40 }}
                     >
                       {currentUserStats.displayName?.charAt(0) || '?'}
@@ -157,7 +157,7 @@ const FinishedBooksLeaderboard = () => {
                       <Typography variant="body2" color="text.secondary">
                         {currentUserStats.finishedCount} {currentUserStats.finishedCount === 1 ? 'book' : 'books'} finished
                         {currentUserStats.lastFinishedAt && (
-                          <span> • Last: {new Date(currentUserStats.lastFinishedAt.seconds * 1000).toLocaleDateString()}</span>
+                          <span> • Last: {new Date(currentUserStats.lastFinishedAt).toLocaleDateString()}</span>
                         )}
                       </Typography>
                     }

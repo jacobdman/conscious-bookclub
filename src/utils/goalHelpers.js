@@ -43,18 +43,23 @@ export const getWeekNumber = (date) => {
 
 /**
  * Check if a date is today
- * @param {Date|Object} date - The date to check (can be Firestore timestamp)
+ * @param {Date|Object|string} date - The date to check (can be Firestore timestamp, Date object, or string)
  * @returns {boolean} - True if the date is today
  */
 export const isToday = (date) => {
   if (!date) return false;
   
   let checkDate;
-  if (date.seconds) {
+  if (date instanceof Date) {
+    checkDate = date;
+  } else if (date.seconds) {
     checkDate = new Date(date.seconds * 1000);
   } else {
     checkDate = new Date(date);
   }
+  
+  // Check if date is valid
+  if (isNaN(checkDate.getTime())) return false;
   
   const today = new Date();
   return checkDate.toDateString() === today.toDateString();
@@ -62,18 +67,23 @@ export const isToday = (date) => {
 
 /**
  * Check if a date is today or in the past
- * @param {Date|Object} date - The date to check (can be Firestore timestamp)
+ * @param {Date|Object|string} date - The date to check (can be Firestore timestamp, Date object, or string)
  * @returns {boolean} - True if the date is today or overdue
  */
 export const isTodayOrOverdue = (date) => {
   if (!date) return false;
   
   let checkDate;
-  if (date.seconds) {
+  if (date instanceof Date) {
+    checkDate = date;
+  } else if (date.seconds) {
     checkDate = new Date(date.seconds * 1000);
   } else {
     checkDate = new Date(date);
   }
+  
+  // Check if date is valid
+  if (isNaN(checkDate.getTime())) return false;
   
   const today = new Date();
   today.setHours(23, 59, 59, 999); // End of today
