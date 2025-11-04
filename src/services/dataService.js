@@ -175,6 +175,54 @@ export const markOneTimeGoalComplete = async (userId, goalId) => {
   });
 };
 
+// Entry management functions
+export const createGoalEntry = async (userId, goalId, entryData) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/entries`, {
+    method: 'POST',
+    body: JSON.stringify(entryData),
+  });
+};
+
+export const getGoalEntries = async (userId, goalId, periodStart = null, periodEnd = null) => {
+  const params = new URLSearchParams();
+  if (periodStart) params.append('periodStart', periodStart.toISOString());
+  if (periodEnd) params.append('periodEnd', periodEnd.toISOString());
+  return apiCall(`/v1/goals/${userId}/${goalId}/entries?${params}`);
+};
+
+export const updateGoalEntry = async (userId, goalId, entryId, updates) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/entries/${entryId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+};
+
+export const deleteGoalEntry = async (userId, goalId, entryId) => {
+  await apiCall(`/v1/goals/${userId}/${goalId}/entries/${entryId}`, {
+    method: 'DELETE',
+  });
+};
+
+// Progress functions
+export const getGoalProgress = async (userId, goalId) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/progress`);
+};
+
+// Milestone functions
+export const createMilestone = async (userId, goalId, milestoneData) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/milestones`, {
+    method: 'POST',
+    body: JSON.stringify(milestoneData),
+  });
+};
+
+export const updateMilestone = async (userId, goalId, milestoneId, updates) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/milestones/${milestoneId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+};
+
 // User functions
 export const createUserDocument = async (user) => {
   await apiCall('/v1/users', {

@@ -49,16 +49,40 @@ CREATE TABLE goals (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(255) REFERENCES users(uid) ON DELETE CASCADE,
     title VARCHAR(500) NOT NULL,
-    type VARCHAR(50) NOT NULL, -- 'daily', 'weekly', 'monthly', 'one_time'
-    frequency VARCHAR(50), -- 'daily', 'weekly', 'monthly'
-    milestones JSONB DEFAULT '[]'::jsonb,
+    type VARCHAR(50) NOT NULL, -- 'habit', 'metric', 'milestone', 'one_time'
+    measure VARCHAR(50), -- 'count' or 'sum', nullable
+    cadence VARCHAR(50), -- 'day', 'week', 'month', 'quarter', nullable
+    target_count INTEGER,
+    target_quantity NUMERIC,
+    unit VARCHAR(100),
+    due_at TIMESTAMP WITH TIME ZONE,
+    visibility VARCHAR(50) DEFAULT 'public',
     archived BOOLEAN DEFAULT FALSE,
     completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     completed_at TIMESTAMP WITH TIME ZONE
 );
 
--- Goal completions table
+-- Goal entries table - stores individual datapoints for habit/metric goals
+CREATE TABLE goal_entry (
+    id SERIAL PRIMARY KEY,
+    goal_id INTEGER REFERENCES goals(id) ON DELETE CASCADE,
+    user_id VARCHAR(255) REFERENCES users(uid) ON DELETE CASCADE,
+    occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    quantity NUMERIC,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Milestones table - separate table for milestone items
+CREATE TABLE milestone (
+    id SERIAL PRIMARY KEY,
+    goal_id INTEGER REFERENCES goals(id) ON DELETE CASCADE,
+    title VARCHAR(500) NOT NULL,
+    done BOOLEAN DEFAULT FALSE,
+    done_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Goal completions table (deprecated, kept for backwards compatibility)
 CREATE TABLE goal_completions (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(255) REFERENCES users(uid) ON DELETE CASCADE,
@@ -92,6 +116,11 @@ CREATE INDEX idx_posts_created_at ON posts(created_at);
 CREATE INDEX idx_goals_user_id ON goals(user_id);
 CREATE INDEX idx_goals_archived ON goals(archived);
 CREATE INDEX idx_goals_completed ON goals(completed);
+CREATE INDEX idx_goals_type ON goals(type);
+CREATE INDEX idx_goal_entry_goal_id ON goal_entry(goal_id);
+CREATE INDEX idx_goal_entry_user_id ON goal_entry(user_id);
+CREATE INDEX idx_goal_entry_occurred_at ON goal_entry(occurred_at);
+CREATE INDEX idx_milestone_goal_id ON milestone(goal_id);
 CREATE INDEX idx_goal_completions_user_id ON goal_completions(user_id);
 CREATE INDEX idx_goal_completions_goal_id ON goal_completions(goal_id);
 CREATE INDEX idx_goal_completions_period_id ON goal_completions(period_id);

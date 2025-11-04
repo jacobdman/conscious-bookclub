@@ -14,14 +14,13 @@ import {
 import { useAuth } from '../AuthContext';
 import { getGoals } from '../services/dataService';
 import {
-  checkGoalCompletion,
-  markGoalComplete,
-  markGoalIncomplete,
+  createGoalEntry,
+  getGoalProgress,
   markMilestoneComplete,
   markOneTimeGoalComplete,
+  updateMilestone,
 } from '../services/dataService';
 import {
-  getCurrentPeriodId,
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
   isTodayOrOverdue,
@@ -59,20 +58,20 @@ const QuickGoalCompletion = ({ onGoalUpdate }) => {
       // Check completion states for each goal
       const completionStates = {};
       for (const goal of topGoals) {
-        const periodId = getCurrentPeriodId(goal.trackingType);
-        
-        if (goal.trackingType === 'daily' || goal.trackingType === 'weekly') {
-          if (periodId) {
-            completionStates[goal.id] = await checkGoalCompletion(user.uid, goal.id, periodId);
+        if (goal.type === 'habit' || goal.type === 'metric') {
+          // Get progress for habit/metric goals
+          try {
+            const progress = await getGoalProgress(user.uid, goal.id);
+            completionStates[goal.id] = progress.completed || false;
+          } catch (err) {
+            completionStates[goal.id] = false;
           }
-        } else if (goal.trackingType === 'one-time') {
+        } else if (goal.type === 'one_time') {
           completionStates[goal.id] = goal.completed || false;
-        } else if (goal.trackingType === 'milestones') {
-          // For milestones, check if the next overdue milestone is incomplete
-          const nextOverdueMilestone = goal.milestones?.find(milestone => 
-            !milestone.completed && isTodayOrOverdue(milestone.dueDate)
-          );
-          completionStates[goal.id] = !nextOverdueMilestone;
+        } else if (goal.type === 'milestone') {
+          // For milestones, check if all are done
+          const allDone = goal.milestones?.length > 0 && goal.milestones.every(m => m.done);
+          completionStates[goal.id] = allDone || false;
         }
       }
 
@@ -93,39 +92,45 @@ const QuickGoalCompletion = ({ onGoalUpdate }) => {
 
     const goalId = goal.id;
     const isCurrentlyComplete = completionStates[goalId];
-    const periodId = getCurrentPeriodId(goal.trackingType);
 
     try {
       setUpdating(prev => ({ ...prev, [goalId]: true }));
 
-      if (goal.trackingType === 'daily' || goal.trackingType === 'weekly') {
-        if (isCurrentlyComplete) {
-          await markGoalIncomplete(user.uid, goalId, periodId);
-        } else {
-          await markGoalComplete(user.uid, goalId, periodId);
+      if (goal.type === 'habit') {
+        // For habits, create an entry when toggling to complete
+        if (!isCurrentlyComplete) {
+          await createGoalEntry(user.uid, goalId, {
+            occurred_at: new Date().toISOString(),
+            quantity: null,
+          });
         }
-      } else if (goal.trackingType === 'one-time') {
+        // Note: We don't handle "uncompleting" by deleting entries here
+        // Users can manage entries separately if needed
+      } else if (goal.type === 'metric') {
+        // For metrics, prompt for quantity (for now, create with 0 and let user edit)
+        // TODO: Add a prompt dialog for quantity input
+        if (!isCurrentlyComplete) {
+          await createGoalEntry(user.uid, goalId, {
+            occurred_at: new Date().toISOString(),
+            quantity: 0,
+          });
+        }
+      } else if (goal.type === 'one_time') {
         if (!isCurrentlyComplete) {
           await markOneTimeGoalComplete(user.uid, goalId);
         }
-      } else if (goal.trackingType === 'milestones') {
-        // For milestones, complete the first overdue milestone
-        const overdueMilestoneIndex = goal.milestones?.findIndex(milestone => 
-          !milestone.completed && isTodayOrOverdue(milestone.dueDate)
-        );
-        
-        if (overdueMilestoneIndex !== -1) {
-          await markMilestoneComplete(user.uid, goalId, overdueMilestoneIndex);
+      } else if (goal.type === 'milestone') {
+        // For milestones, mark the first incomplete milestone as done
+        const incompleteMilestone = goal.milestones?.find(m => !m.done);
+        if (incompleteMilestone) {
+          await updateMilestone(user.uid, goalId, incompleteMilestone.id, { done: true });
           
-          // Update local state to mark milestone as complete
+          // Update local state
           setGoals(prevGoals => prevGoals.map(g => {
             if (g.id === goalId) {
-              const updatedMilestones = [...g.milestones];
-              updatedMilestones[overdueMilestoneIndex] = {
-                ...updatedMilestones[overdueMilestoneIndex],
-                completed: true,
-                completedAt: new Date()
-              };
+              const updatedMilestones = g.milestones.map(m => 
+                m.id === incompleteMilestone.id ? { ...m, done: true, doneAt: new Date() } : m
+              );
               return { ...g, milestones: updatedMilestones };
             }
             return g;
@@ -133,17 +138,8 @@ const QuickGoalCompletion = ({ onGoalUpdate }) => {
         }
       }
 
-      // Update local state
-      setCompletionStates(prev => ({
-        ...prev,
-        [goalId]: !isCurrentlyComplete
-      }));
-
-      // For milestone goals, we've already updated local state above
-      // For other goals, refresh to get updated data
-      if (goal.trackingType !== 'milestones') {
-        await fetchGoalsAndCompletions();
-      }
+      // Refresh to get updated progress
+      await fetchGoalsAndCompletions();
       
       // Notify parent component if callback provided
       if (onGoalUpdate) {
@@ -157,40 +153,32 @@ const QuickGoalCompletion = ({ onGoalUpdate }) => {
   };
 
   const getGoalDisplayText = (goal) => {
-    switch (goal.trackingType) {
-      case 'daily':
-        return goal.title;
-      case 'weekly':
-        return goal.title;
-      case 'one-time':
-        return goal.title;
-      case 'milestones':
-        // Find the next incomplete milestone due today or overdue
-        const nextMilestone = goal.milestones?.find(milestone => 
-          !milestone.completed && isTodayOrOverdue(milestone.dueDate)
-        );
-        return nextMilestone ? `${goal.title}: ${nextMilestone.title}` : goal.title;
-      default:
-        return goal.title;
+    if (goal.type === 'milestone') {
+      // Find the next incomplete milestone
+      const nextMilestone = goal.milestones?.find(m => !m.done);
+      return nextMilestone ? `${goal.title}: ${nextMilestone.title}` : goal.title;
     }
+    return goal.title;
   };
 
   const getGoalTypeLabel = (goal) => {
-    switch (goal.trackingType) {
-      case 'daily': return 'Daily';
-      case 'weekly': return 'Weekly';
-      case 'one-time': return 'One-time';
-      case 'milestones': return 'Milestone';
-      default: return goal.trackingType;
+    switch (goal.type) {
+      case 'habit': 
+        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Habit` : 'Habit';
+      case 'metric': 
+        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Metric` : 'Metric';
+      case 'one_time': return 'One-time';
+      case 'milestone': return 'Milestone';
+      default: return goal.type || 'Goal';
     }
   };
 
   const getGoalTypeColor = (goal) => {
-    switch (goal.trackingType) {
-      case 'daily': return 'success';
-      case 'weekly': return 'warning';
-      case 'one-time': return 'primary';
-      case 'milestones': return 'secondary';
+    switch (goal.type) {
+      case 'habit': return 'success';
+      case 'metric': return 'warning';
+      case 'one_time': return 'primary';
+      case 'milestone': return 'secondary';
       default: return 'default';
     }
   };

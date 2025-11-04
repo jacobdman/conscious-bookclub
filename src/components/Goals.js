@@ -91,22 +91,24 @@ const Goals = () => {
     }
   };
 
-  const getTrackingTypeLabel = (type) => {
-    switch (type) {
-      case 'one-time': return 'One-time';
-      case 'milestones': return 'Milestones';
-      case 'daily': return 'Daily';
-      case 'weekly': return 'Weekly';
-      default: return type;
+  const getTrackingTypeLabel = (goal) => {
+    switch (goal.type) {
+      case 'habit': 
+        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Habit` : 'Habit';
+      case 'metric': 
+        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Metric` : 'Metric';
+      case 'milestone': return 'Milestone';
+      case 'one_time': return 'One-time';
+      default: return goal.type || 'Goal';
     }
   };
 
   const getTrackingTypeColor = (type) => {
     switch (type) {
-      case 'one-time': return 'primary';
-      case 'milestones': return 'secondary';
-      case 'daily': return 'success';
-      case 'weekly': return 'warning';
+      case 'habit': return 'success';
+      case 'metric': return 'warning';
+      case 'milestone': return 'secondary';
+      case 'one_time': return 'primary';
       default: return 'default';
     }
   };
@@ -123,16 +125,17 @@ const Goals = () => {
   };
 
   const getProgressInfo = (goal) => {
-    switch (goal.trackingType) {
-      case 'one-time':
-        return goal.completed ? 'Completed' : `Due: ${formatDate(goal.dueDate)}`;
-      case 'milestones':
-        const completedMilestones = goal.milestones?.filter(m => m.completed).length || 0;
+    switch (goal.type) {
+      case 'one_time':
+        return goal.completed ? 'Completed' : `Due: ${formatDate(goal.dueAt || goal.due_at)}`;
+      case 'milestone':
+        const completedMilestones = goal.milestones?.filter(m => m.done).length || 0;
         const totalMilestones = goal.milestones?.length || 0;
         return `${completedMilestones}/${totalMilestones} milestones`;
-      case 'daily':
-      case 'weekly':
-        return `Started: ${formatDate(goal.startDate)}`;
+      case 'habit':
+        return goal.cadence ? `${goal.targetCount || goal.target_count || 0} times/${goal.cadence}` : 'No target set';
+      case 'metric':
+        return goal.cadence ? `${goal.targetQuantity || goal.target_quantity || 0} ${goal.unit || ''}/${goal.cadence}` : 'No target set';
       default:
         return 'No progress info';
     }
@@ -218,8 +221,8 @@ const Goals = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={getTrackingTypeLabel(goal.trackingType)}
-                        color={getTrackingTypeColor(goal.trackingType)}
+                        label={getTrackingTypeLabel(goal)}
+                        color={getTrackingTypeColor(goal.type)}
                         size="small"
                       />
                     </TableCell>

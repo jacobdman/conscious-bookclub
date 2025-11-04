@@ -25,15 +25,17 @@ import DeleteIcon from '@mui/icons-material/Delete';
 const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null }) => {
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
-    trackingType: 'one-time',
-    dueDate: null,
+    type: 'habit',
+    measure: 'count',
+    cadence: 'week',
+    targetCount: null,
+    targetQuantity: null,
+    unit: '',
+    dueAt: null,
     milestones: [],
-    startDate: null,
-    endDate: null,
   });
 
-  const [newMilestone, setNewMilestone] = useState({ title: '', dueDate: null });
+  const [newMilestone, setNewMilestone] = useState({ title: '' });
 
   // Helper function to convert various date formats to Date object
   const parseDate = (dateValue) => {
@@ -47,25 +49,26 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
     if (editingGoal) {
       setFormData({
         title: editingGoal.title || '',
-        description: editingGoal.description || '',
-        trackingType: editingGoal.trackingType || 'one-time',
-        dueDate: parseDate(editingGoal.dueDate),
-        milestones: editingGoal.milestones ? editingGoal.milestones.map(milestone => ({
-          ...milestone,
-          dueDate: parseDate(milestone.dueDate),
-        })) : [],
-        startDate: parseDate(editingGoal.startDate),
-        endDate: parseDate(editingGoal.endDate),
+        type: editingGoal.type || 'habit',
+        measure: editingGoal.measure || 'count',
+        cadence: editingGoal.cadence || 'week',
+        targetCount: editingGoal.targetCount || editingGoal.target_count || null,
+        targetQuantity: editingGoal.targetQuantity || editingGoal.target_quantity || null,
+        unit: editingGoal.unit || '',
+        dueAt: parseDate(editingGoal.dueAt || editingGoal.due_at),
+        milestones: editingGoal.milestones || [],
       });
     } else {
       setFormData({
         title: '',
-        description: '',
-        trackingType: 'one-time',
-        dueDate: null,
+        type: 'habit',
+        measure: 'count',
+        cadence: 'week',
+        targetCount: null,
+        targetQuantity: null,
+        unit: '',
+        dueAt: null,
         milestones: [],
-        startDate: null,
-        endDate: null,
       });
     }
   }, [editingGoal, open]);
@@ -78,12 +81,12 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
   };
 
   const handleAddMilestone = () => {
-    if (newMilestone.title.trim() && newMilestone.dueDate) {
+    if (newMilestone.title.trim()) {
       setFormData(prev => ({
         ...prev,
-        milestones: [...prev.milestones, { ...newMilestone, completed: false }]
+        milestones: [...prev.milestones, { title: newMilestone.title.trim(), done: false }]
       }));
-      setNewMilestone({ title: '', dueDate: null });
+      setNewMilestone({ title: '' });
     }
   };
 
@@ -99,18 +102,35 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
 
     const goalData = {
       title: formData.title.trim(),
-      description: formData.description.trim(),
-      trackingType: formData.trackingType,
+      type: formData.type,
     };
 
     // Add type-specific fields
-    if (formData.trackingType === 'one-time') {
-      goalData.dueDate = formData.dueDate;
-    } else if (formData.trackingType === 'milestones') {
+    if (formData.type === 'habit') {
+      goalData.measure = 'count';
+      goalData.cadence = formData.cadence;
+      goalData.targetCount = parseInt(formData.targetCount);
+      if (!goalData.targetCount || !goalData.cadence) {
+        alert('Habit goals require cadence and target count');
+        return;
+      }
+    } else if (formData.type === 'metric') {
+      goalData.measure = 'sum';
+      goalData.cadence = formData.cadence;
+      goalData.targetQuantity = parseFloat(formData.targetQuantity);
+      goalData.unit = formData.unit.trim();
+      if (!goalData.targetQuantity || !goalData.unit || !goalData.cadence) {
+        alert('Metric goals require cadence, target quantity, and unit');
+        return;
+      }
+    } else if (formData.type === 'milestone') {
       goalData.milestones = formData.milestones;
-    } else if (formData.trackingType === 'daily' || formData.trackingType === 'weekly') {
-      goalData.startDate = formData.startDate;
-      goalData.endDate = formData.endDate;
+      if (goalData.milestones.length === 0) {
+        alert('Milestone goals require at least one milestone');
+        return;
+      }
+    } else if (formData.type === 'one_time') {
+      goalData.dueAt = formData.dueAt ? formData.dueAt.toISOString() : null;
     }
 
     onSave(goalData);
@@ -124,19 +144,83 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
     }
   };
 
-  const renderTrackingTypeFields = () => {
-    switch (formData.trackingType) {
-      case 'one-time':
+  const renderTypeFields = () => {
+    switch (formData.type) {
+      case 'habit':
         return (
-          <DatePicker
-            label="Due Date"
-            value={formData.dueDate}
-            onChange={(date) => handleInputChange('dueDate', date)}
-            renderInput={(params) => <TextField {...params} fullWidth />}
-          />
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <FormControl fullWidth>
+                <InputLabel>Cadence</InputLabel>
+                <Select
+                  value={formData.cadence}
+                  onChange={(e) => handleInputChange('cadence', e.target.value)}
+                  label="Cadence"
+                >
+                  <MenuItem value="day">Day</MenuItem>
+                  <MenuItem value="week">Week</MenuItem>
+                  <MenuItem value="month">Month</MenuItem>
+                  <MenuItem value="quarter">Quarter</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="Target Count"
+                type="number"
+                value={formData.targetCount || ''}
+                onChange={(e) => handleInputChange('targetCount', e.target.value)}
+                fullWidth
+                required
+                inputProps={{ min: 1 }}
+              />
+            </Grid>
+          </Grid>
         );
 
-      case 'milestones':
+      case 'metric':
+        return (
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <FormControl fullWidth>
+                <InputLabel>Cadence</InputLabel>
+                <Select
+                  value={formData.cadence}
+                  onChange={(e) => handleInputChange('cadence', e.target.value)}
+                  label="Cadence"
+                >
+                  <MenuItem value="day">Day</MenuItem>
+                  <MenuItem value="week">Week</MenuItem>
+                  <MenuItem value="month">Month</MenuItem>
+                  <MenuItem value="quarter">Quarter</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                label="Target Quantity"
+                type="number"
+                value={formData.targetQuantity || ''}
+                onChange={(e) => handleInputChange('targetQuantity', e.target.value)}
+                fullWidth
+                required
+                inputProps={{ step: '0.1', min: 0 }}
+              />
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                label="Unit"
+                value={formData.unit}
+                onChange={(e) => handleInputChange('unit', e.target.value)}
+                fullWidth
+                required
+                placeholder="e.g., miles, hours"
+              />
+            </Grid>
+          </Grid>
+        );
+
+      case 'milestone':
         return (
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -150,13 +234,6 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
                   onDelete={() => handleRemoveMilestone(index)}
                   deleteIcon={<DeleteIcon />}
                 />
-                <Typography variant="caption" color="text.secondary">
-                  Due: {milestone.dueDate ? 
-                    (milestone.dueDate instanceof Date ? 
-                      milestone.dueDate.toLocaleDateString() : 
-                      parseDate(milestone.dueDate)?.toLocaleDateString() || 'Invalid date'
-                    ) : 'No date'}
-                </Typography>
               </Box>
             ))}
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 2 }}>
@@ -166,12 +243,11 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
                 onChange={(e) => setNewMilestone(prev => ({ ...prev, title: e.target.value }))}
                 size="small"
                 sx={{ flexGrow: 1 }}
-              />
-              <DatePicker
-                label="Due Date"
-                value={newMilestone.dueDate}
-                onChange={(date) => setNewMilestone(prev => ({ ...prev, dueDate: date }))}
-                renderInput={(params) => <TextField {...params} size="small" sx={{ minWidth: 150 }} />}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddMilestone();
+                  }
+                }}
               />
               <IconButton onClick={handleAddMilestone} color="primary">
                 <AddIcon />
@@ -180,27 +256,18 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
           </Box>
         );
 
-      case 'daily':
-      case 'weekly':
+      case 'one_time':
         return (
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <DatePicker
-                label="Start Date"
-                value={formData.startDate}
-                onChange={(date) => handleInputChange('startDate', date)}
-                renderInput={(params) => <TextField {...params} fullWidth />}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <DatePicker
-                label="End Date (Optional)"
-                value={formData.endDate}
-                onChange={(date) => handleInputChange('endDate', date)}
-                renderInput={(params) => <TextField {...params} fullWidth />}
-              />
-            </Grid>
-          </Grid>
+          <DatePicker
+            label="Due Date (Optional)"
+            value={formData.dueAt}
+            onChange={(date) => handleInputChange('dueAt', date)}
+            slotProps={{
+              textField: {
+                fullWidth: true,
+              },
+            }}
+          />
         );
 
       default:
@@ -224,30 +291,30 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
               required
             />
 
-            <TextField
-              label="Description"
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              fullWidth
-              multiline
-              rows={3}
-            />
-
             <FormControl fullWidth>
-              <InputLabel>Tracking Type</InputLabel>
+              <InputLabel>Goal Type</InputLabel>
               <Select
-                value={formData.trackingType}
-                onChange={(e) => handleInputChange('trackingType', e.target.value)}
-                label="Tracking Type"
+                value={formData.type}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  // Reset type-specific fields when changing type
+                  handleInputChange('type', newType);
+                  if (newType === 'habit') {
+                    handleInputChange('measure', 'count');
+                  } else if (newType === 'metric') {
+                    handleInputChange('measure', 'sum');
+                  }
+                }}
+                label="Goal Type"
               >
-                <MenuItem value="one-time">One-time</MenuItem>
-                <MenuItem value="milestones">Milestones</MenuItem>
-                <MenuItem value="daily">Daily</MenuItem>
-                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="habit">Habit</MenuItem>
+                <MenuItem value="metric">Metric</MenuItem>
+                <MenuItem value="milestone">Milestone</MenuItem>
+                <MenuItem value="one_time">One-time</MenuItem>
               </Select>
             </FormControl>
 
-            {renderTrackingTypeFields()}
+            {renderTypeFields()}
           </Box>
         </DialogContent>
         <DialogActions>
