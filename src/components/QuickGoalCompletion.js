@@ -27,6 +27,7 @@ import {
   hasEntryToday,
   getProgressText,
   formatMilestoneDisplay,
+  normalizeGoalType,
 } from '../utils/goalHelpers';
 
 const TodaysGoals = () => {
@@ -51,27 +52,8 @@ const TodaysGoals = () => {
       const progressData = {};
       const todayBoundaries = getTodayBoundaries();
 
-      // Process both active goals and deleted goals
+      // Process active goals
       for (const goal of goalsToCheck) {
-        // Check if this is a deleted goal (stored in localStorage)
-        const isDeleted = goal.deletedAt !== undefined;
-        
-        if (isDeleted) {
-          // For deleted goals, just use their stored completion status
-          // Don't try to fetch from API since the goal no longer exists
-          if (goal.type === 'one_time' || goal.type === 'one-time') {
-            completionStates[goal.id] = goal.completed || false;
-          } else if (goal.type === 'milestone') {
-            const milestones = goal.milestones || goal.Milestones || [];
-            const allDone = milestones.length > 0 && milestones.every(m => m.done);
-            completionStates[goal.id] = allDone || false;
-          } else {
-            // For habit/metric deleted goals, mark as completed since they were deleted
-            completionStates[goal.id] = true;
-          }
-          continue;
-        }
-        
         // For active goals, fetch data from API
         if (goal.type === 'habit') {
           // For habits: check if entry exists TODAY
@@ -96,7 +78,7 @@ const TodaysGoals = () => {
             completionStates[goal.id] = false;
             progressData[goal.id] = null;
           }
-        } else if (goal.type === 'one_time' || goal.type === 'one-time') {
+        } else if (normalizeGoalType(goal.type) === 'one_time') {
           completionStates[goal.id] = goal.completed || false;
         } else if (goal.type === 'milestone') {
           // For milestones: check if all are done
@@ -119,35 +101,9 @@ const TodaysGoals = () => {
   // Get filtered and sorted goals whenever allGoals changes
   const filteredGoals = useMemo(() => {
     const filtered = filterGoalsForQuickCompletion(allGoals);
-    
-    // Add deleted goals that were COMPLETED today from localStorage
-    let deletedGoalsForToday = [];
-    try {
-      const key = `deletedGoals_${user?.uid}`;
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        const deletedGoals = JSON.parse(stored);
-        const todayBoundaries = getTodayBoundaries();
-        const today = todayBoundaries.start.toISOString().split('T')[0];
-        
-        deletedGoalsForToday = deletedGoals.filter(goal => {
-          const isCompleted = goal.completed || false;
-          if (!isCompleted) return false;
-          
-          const completedDate = goal.completedAt || goal.completed_at;
-          if (!completedDate) return false;
-          const completedDateStr = new Date(completedDate).toISOString().split('T')[0];
-          return completedDateStr === today;
-        });
-      }
-    } catch (err) {
-      console.error('Error reading deleted goals from localStorage:', err);
-    }
-    
-    const allFiltered = [...filtered, ...deletedGoalsForToday];
-    const sorted = sortGoalsByPriority(allFiltered);
+    const sorted = sortGoalsByPriority(filtered);
     return sorted.slice(0, 5); // Limit to top 5
-  }, [allGoals, user]);
+  }, [allGoals]);
 
   // Track previous filteredGoals to detect actual changes (not just reference equality)
   const prevFilteredGoalsRef = useRef([]);
@@ -174,53 +130,9 @@ const TodaysGoals = () => {
     prevFilteredGoalsRef.current = filteredGoals;
   }, [filteredGoals, fetchCompletions]);
 
-  // Clean up old deleted goals from localStorage (older than today)
-  // Only keep goals that were COMPLETED today (not just deleted)
-  useEffect(() => {
-    if (!user) return;
-    
-    try {
-      const key = `deletedGoals_${user.uid}`;
-      const stored = localStorage.getItem(key);
-      if (!stored) return;
-      
-      const deletedGoals = JSON.parse(stored);
-      const todayBoundaries = getTodayBoundaries();
-      const today = todayBoundaries.start.toISOString().split('T')[0];
-      
-      // Filter to only keep goals that were COMPLETED today (not just deleted)
-      const goalsForToday = deletedGoals.filter(goal => {
-        // Must be completed
-        const isCompleted = goal.completed || false;
-        if (!isCompleted) return false;
-        
-        // Must have been completed today
-        const completedDate = goal.completedAt || goal.completed_at;
-        if (!completedDate) return false;
-        const completedDateStr = new Date(completedDate).toISOString().split('T')[0];
-        return completedDateStr === today;
-      });
-      
-      // Update localStorage with filtered goals
-      if (goalsForToday.length !== deletedGoals.length) {
-        if (goalsForToday.length === 0) {
-          localStorage.removeItem(key);
-        } else {
-          localStorage.setItem(key, JSON.stringify(goalsForToday));
-        }
-      }
-    } catch (err) {
-      console.error('Error cleaning up deleted goals from localStorage:', err);
-    }
-  }, [user]);
 
   const handleGoalToggle = async (goal) => {
     if (!user) return;
-
-    // Don't allow toggling deleted goals
-    if (goal.deletedAt !== undefined) {
-      return;
-    }
 
     const goalId = goal.id;
     const isCurrentlyComplete = completionStates[goalId];
@@ -244,7 +156,7 @@ const TodaysGoals = () => {
           setUpdating(prev => ({ ...prev, [goalId]: false }));
           return;
         }
-      } else if (goal.type === 'one_time' || goal.type === 'one-time') {
+      } else if (normalizeGoalType(goal.type) === 'one_time') {
         // Toggle completion status for one-time goals
         const newCompleted = !isCurrentlyComplete;
         await updateGoal(goalId, {

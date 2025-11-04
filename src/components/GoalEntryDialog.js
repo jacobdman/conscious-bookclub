@@ -7,16 +7,20 @@ import {
   Button,
   TextField,
   Box,
+  Snackbar,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
-const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null }) => {
+const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null, saving = false, error = null }) => {
   const [formData, setFormData] = useState({
     occurred_at: new Date(),
     quantity: null,
   });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '' });
 
   useEffect(() => {
     if (entry) {
@@ -32,9 +36,20 @@ const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null }) => {
     }
   }, [entry, goal, open]);
 
+  // Show snackbar when error prop changes
+  useEffect(() => {
+    if (error) {
+      setSnackbar({ open: true, message: error });
+    }
+  }, [error]);
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ open: false, message: '' });
+  };
+
   const handleSave = () => {
     if (goal?.type === 'metric' && (!formData.quantity || formData.quantity <= 0)) {
-      alert('Quantity must be greater than 0 for metric goals');
+      setSnackbar({ open: true, message: 'Quantity must be greater than 0 for metric goals' });
       return;
     }
 
@@ -42,7 +57,6 @@ const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null }) => {
       occurred_at: formData.occurred_at.toISOString(),
       quantity: goal?.type === 'metric' ? parseFloat(formData.quantity) : null,
     });
-    onClose();
   };
 
   return (
@@ -72,17 +86,42 @@ const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null }) => {
                 onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
                 fullWidth
                 required
+                disabled={saving}
                 inputProps={{ step: '0.1', min: 0 }}
+                error={error !== null}
+                helperText={error || ''}
               />
+            )}
+            {error && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {error}
+              </Alert>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained">
-            {entry ? 'Update' : 'Add'}
+          <Button onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" disabled={saving}>
+            {saving ? (
+              <>
+                <CircularProgress size={16} sx={{ mr: 1 }} />
+                {entry ? 'Updating...' : 'Adding...'}
+              </>
+            ) : (
+              entry ? 'Update' : 'Add'
+            )}
           </Button>
         </DialogActions>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Dialog>
     </LocalizationProvider>
   );

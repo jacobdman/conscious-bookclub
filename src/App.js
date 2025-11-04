@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import GoalsProvider from './contexts/Goals/GoalsProvider';
+import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotificationContext';
+import { setGlobalErrorHandler } from './services/dataService';
 import Dashboard from './Dashboard';
 import ClubView from './ClubView';
 import BookList from './components/BookList';
@@ -12,6 +14,12 @@ import { CircularProgress, Box } from '@mui/material';
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const { showError } = useErrorNotification();
+
+  // Set global error handler for API service
+  useEffect(() => {
+    setGlobalErrorHandler(showError);
+  }, [showError]);
 
   if (loading) {
     return (
@@ -49,9 +57,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <GoalsProvider>
-        <AppContent />
-      </GoalsProvider>
+      <ErrorNotificationProvider>
+        <GoalsProvider>
+          <AppContent />
+        </GoalsProvider>
+      </ErrorNotificationProvider>
     </AuthProvider>
   );
 }

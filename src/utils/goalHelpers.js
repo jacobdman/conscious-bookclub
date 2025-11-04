@@ -3,6 +3,16 @@
  */
 
 /**
+ * Normalize goal type (handle variations like 'one-time' vs 'one_time')
+ * @param {string} type - Goal type
+ * @returns {string} - Normalized goal type
+ */
+export const normalizeGoalType = (type) => {
+  if (!type) return type;
+  return type === 'one-time' ? 'one_time' : type;
+};
+
+/**
  * Get the current period identifier for a given cadence
  * @param {string} cadence - The goal's cadence ('day', 'week', 'month', 'quarter')
  * @returns {string|null} - The period identifier or null if not applicable
@@ -136,8 +146,8 @@ export const isTodayOrOverdue = (date) => {
 export const sortGoalsByPriority = (goals) => {
   return goals.sort((a, b) => {
     // Normalize types
-    const aType = a.type === 'one-time' ? 'one_time' : a.type;
-    const bType = b.type === 'one-time' ? 'one_time' : b.type;
+    const aType = normalizeGoalType(a.type);
+    const bType = normalizeGoalType(b.type);
     
     // Daily cadence goals first
     if (a.cadence === 'day' && b.cadence !== 'day') return -1;
@@ -170,7 +180,7 @@ export const filterGoalsForQuickCompletion = (goals) => {
     if (goal.archived) return false;
     
     // Normalize goal type for consistent matching
-    const goalType = goal.type === 'one-time' ? 'one_time' : goal.type;
+    const goalType = normalizeGoalType(goal.type);
     
     switch (goalType) {
       case 'habit':

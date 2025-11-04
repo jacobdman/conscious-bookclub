@@ -36,7 +36,7 @@ import TodaysGoals from './QuickGoalCompletion';
 import GoalEntryDialog from './GoalEntryDialog';
 import GoalEntryList from './GoalEntryList';
 import Layout from './Layout';
-import { getPeriodBoundaries, getProgressText } from '../utils/goalHelpers';
+import { getPeriodBoundaries, getProgressText, normalizeGoalType } from '../utils/goalHelpers';
 
 const Goals = () => {
   const { user } = useAuth();
@@ -49,7 +49,7 @@ const Goals = () => {
   const [goalEntries, setGoalEntries] = useState({});
   const [goalProgress, setGoalProgress] = useState({});
   const [entriesLoading, setEntriesLoading] = useState({});
-  const [entryDialog, setEntryDialog] = useState({ open: false, goal: null, entry: null });
+  const [entryDialog, setEntryDialog] = useState({ open: false, goal: null, entry: null, saving: false, error: null });
 
   const fetchGoalDetails = async (goal) => {
     if (!user) return;
@@ -133,21 +133,42 @@ const Goals = () => {
   };
 
   const handleAddEntry = (goal) => {
-    setEntryDialog({ open: true, goal, entry: null });
+    setEntryDialog({ open: true, goal, entry: null, saving: false, error: null });
   };
 
   const handleEditEntry = (goal, entry) => {
-    setEntryDialog({ open: true, goal, entry });
+    setEntryDialog({ open: true, goal, entry, saving: false, error: null });
   };
 
   const handleDeleteEntry = async (goal, entry) => {
     if (!user || !window.confirm('Are you sure you want to delete this entry?')) return;
 
+    const goalId = goal.id;
+    const entryId = entry.id;
+
+    // Optimistically remove entry from local state
+    setGoalEntries(prev => {
+      const entries = prev[goalId] || [];
+      return {
+        ...prev,
+        [goalId]: entries.filter(e => e.id !== entryId)
+      };
+    });
+
     try {
-      await deleteGoalEntry(user.uid, goal.id, entry.id);
-      // Refresh entries
-      await fetchGoalDetails(goal);
+      await deleteGoalEntry(user.uid, goalId, entryId);
+      
+      // Refetch progress only (not full goal details)
+      try {
+        const progress = await getGoalProgress(user.uid, goalId);
+        setGoalProgress(prev => ({ ...prev, [goalId]: progress }));
+      } catch (err) {
+        // If progress fetch fails, refresh full goal details
+        await fetchGoalDetails(goal);
+      }
     } catch (err) {
+      // Revert on error - refresh entries
+      await fetchGoalDetails(goal);
       setLocalError('Failed to delete entry');
     }
   };
@@ -155,20 +176,82 @@ const Goals = () => {
   const handleSaveEntry = async (entryData) => {
     if (!user || !entryDialog.goal) return;
 
+    const goal = entryDialog.goal;
+    const goalId = goal.id;
+    const isUpdate = !!entryDialog.entry;
+
+    // Set saving state
+    setEntryDialog(prev => ({ ...prev, saving: true, error: null }));
+
+    let savedEntry = null;
+    let optimisticEntryId = null;
+
     try {
-      if (entryDialog.entry) {
+      if (isUpdate) {
         // Update existing entry
-        await updateGoalEntry(user.uid, entryDialog.goal.id, entryDialog.entry.id, entryData);
+        savedEntry = await updateGoalEntry(user.uid, goalId, entryDialog.entry.id, entryData);
+        
+        // Optimistically update entry in local state
+        setGoalEntries(prev => {
+          const entries = prev[goalId] || [];
+          return {
+            ...prev,
+            [goalId]: entries.map(e => 
+              e.id === entryDialog.entry.id 
+                ? { ...e, ...entryData, ...savedEntry }
+                : e
+            )
+          };
+        });
       } else {
         // Create new entry
-        await createGoalEntry(user.uid, entryDialog.goal.id, entryData);
+        savedEntry = await createGoalEntry(user.uid, goalId, entryData);
+        optimisticEntryId = savedEntry?.id || Date.now(); // Use timestamp as fallback
+        
+        // Optimistically add entry to local state
+        setGoalEntries(prev => {
+          const entries = prev[goalId] || [];
+          return {
+            ...prev,
+            [goalId]: [...entries, savedEntry]
+          };
+        });
       }
       
-      // Refresh entries and progress
-      await fetchGoalDetails(entryDialog.goal);
-      setEntryDialog({ open: false, goal: null, entry: null });
+      // Refetch progress only (not full goal details)
+      try {
+        const progress = await getGoalProgress(user.uid, goalId);
+        setGoalProgress(prev => ({ ...prev, [goalId]: progress }));
+      } catch (err) {
+        // If progress fetch fails, refresh full goal details
+        await fetchGoalDetails(goal);
+      }
+      
+      // Close dialog on success
+      setEntryDialog({ open: false, goal: null, entry: null, saving: false, error: null });
     } catch (err) {
-      setLocalError('Failed to save entry');
+      // Keep dialog open on error and show error message
+      setEntryDialog(prev => ({ 
+        ...prev, 
+        saving: false, 
+        error: err.message || 'Failed to save entry'
+      }));
+      
+      // Revert optimistic update on error
+      if (isUpdate) {
+        // Refresh entries to revert
+        await fetchGoalDetails(goal);
+      } else {
+        // Remove optimistically added entry
+        const entryIdToRemove = savedEntry?.id || optimisticEntryId;
+        setGoalEntries(prev => {
+          const entries = prev[goalId] || [];
+          return {
+            ...prev,
+            [goalId]: entries.filter(e => e.id !== entryIdToRemove)
+          };
+        });
+      }
     }
   };
 
@@ -206,26 +289,26 @@ const Goals = () => {
   };
 
   const getTrackingTypeLabel = (goal) => {
-    switch (goal.type) {
+    const goalType = normalizeGoalType(goal.type);
+    switch (goalType) {
       case 'habit': 
         return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Habit` : 'Habit';
       case 'metric': 
         return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Metric` : 'Metric';
       case 'milestone': return 'Milestone';
       case 'one_time':
-      case 'one-time':
         return 'One-time';
       default: return goal.type || 'Goal';
     }
   };
 
   const getTrackingTypeColor = (type) => {
-    switch (type) {
+    const goalType = normalizeGoalType(type);
+    switch (goalType) {
       case 'habit': return 'success';
       case 'metric': return 'warning';
       case 'milestone': return 'secondary';
       case 'one_time':
-      case 'one-time':
         return 'primary';
       default: return 'default';
     }
@@ -379,7 +462,7 @@ const Goals = () => {
           )}
         </Box>
       );
-    } else if (goal.type === 'one_time' || goal.type === 'one-time') {
+    } else if (normalizeGoalType(goal.type) === 'one_time') {
       return (
         <Box sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -486,7 +569,7 @@ const Goals = () => {
                     <React.Fragment key={goal.id}>
                       <TableRow sx={{ opacity: goal.completed ? 0.6 : 1 }}>
                         <TableCell>
-                          {(goal.type === 'habit' || goal.type === 'metric' || goal.type === 'milestone' || goal.type === 'one_time' || goal.type === 'one-time') && (
+                          {(goal.type === 'habit' || goal.type === 'metric' || goal.type === 'milestone' || normalizeGoalType(goal.type) === 'one_time') && (
                             <IconButton
                               size="small"
                               onClick={() => handleToggleExpand(goal.id)}
@@ -528,7 +611,7 @@ const Goals = () => {
                           >
                             <Edit />
                           </IconButton>
-                          {(goal.type === 'habit' || goal.type === 'metric' || goal.type === 'milestone' || goal.type === 'one_time' || goal.type === 'one-time') && (
+                          {(goal.type === 'habit' || goal.type === 'metric' || goal.type === 'milestone' || normalizeGoalType(goal.type) === 'one_time') && (
                             <IconButton
                               onClick={() => handleToggleExpand(goal.id)}
                               size="small"
@@ -565,10 +648,12 @@ const Goals = () => {
 
         <GoalEntryDialog
           open={entryDialog.open}
-          onClose={() => setEntryDialog({ open: false, goal: null, entry: null })}
+          onClose={() => setEntryDialog({ open: false, goal: null, entry: null, saving: false, error: null })}
           onSave={handleSaveEntry}
           goal={entryDialog.goal}
           entry={entryDialog.entry}
+          saving={entryDialog.saving}
+          error={entryDialog.error}
         />
       </Box>
     </Layout>

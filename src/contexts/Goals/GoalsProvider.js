@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../AuthContext';
 import { getGoals, addGoal, updateGoal, deleteGoal } from '../../services/dataService';
+import { normalizeGoalType } from '../../utils/goalHelpers';
 import GoalsContext from './GoalsContext';
 
 // Helper function to normalize goal data
@@ -22,9 +23,7 @@ const normalizeGoal = (goalData, docId = null) => {
     }));
   }
   // Normalize goal type
-  if (goalData.type === 'one-time') {
-    goalData.type = 'one_time';
-  }
+  goalData.type = normalizeGoalType(goalData.type);
   return {
     id: docId || goalData.id,
     ...goalData
@@ -107,43 +106,10 @@ const GoalsProvider = ({ children }) => {
   // Delete a goal
   const handleDeleteGoal = useCallback(async (goalId) => {
     if (!user) return;
-
-    // Store the goal before deleting (for localStorage if needed)
-    const goalToDelete = goals.find(g => g.id === goalId);
     
     try {
       // Make API call
       await deleteGoal(user.uid, goalId);
-      
-      // If this is a one-time goal that was COMPLETED today, store it in localStorage
-      if (goalToDelete && (goalToDelete.type === 'one_time' || goalToDelete.type === 'one-time')) {
-        const isCompleted = goalToDelete.completed || false;
-        const completedAt = goalToDelete.completedAt || goalToDelete.completed_at;
-        
-        if (isCompleted && completedAt) {
-          const { getTodayBoundaries } = require('../../utils/goalHelpers');
-          const todayBoundaries = getTodayBoundaries();
-          const completedDate = new Date(completedAt);
-          
-          if (completedDate >= todayBoundaries.start && completedDate < todayBoundaries.end) {
-            try {
-              const key = `deletedGoals_${user.uid}`;
-              const stored = localStorage.getItem(key);
-              const deletedGoals = stored ? JSON.parse(stored) : [];
-              
-              if (!deletedGoals.find(g => g.id === goalId)) {
-                deletedGoals.push({
-                  ...goalToDelete,
-                  deletedAt: new Date().toISOString(),
-                });
-                localStorage.setItem(key, JSON.stringify(deletedGoals));
-              }
-            } catch (err) {
-              console.error('Error storing deleted goal in localStorage:', err);
-            }
-          }
-        }
-      }
       
       // Optimistically remove from state
       setGoals(prev => prev.filter(goal => goal.id !== goalId));
@@ -154,7 +120,7 @@ const GoalsProvider = ({ children }) => {
       refreshGoals();
       throw err;
     }
-  }, [user, goals, refreshGoals]);
+  }, [user, refreshGoals]);
 
   return (
     <GoalsContext.Provider

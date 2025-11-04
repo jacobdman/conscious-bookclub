@@ -17,6 +17,8 @@ import {
   Grid,
   FormControlLabel,
   Checkbox,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -40,6 +42,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
   });
 
   const [newMilestone, setNewMilestone] = useState({ title: '' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
   // Helper function to convert various date formats to Date object
   const parseDate = (dateValue) => {
@@ -103,8 +106,19 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
     }));
   };
 
+  const showSnackbar = (message, severity = 'error') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
   const handleSave = () => {
-    if (!formData.title.trim()) return;
+    if (!formData.title.trim()) {
+      showSnackbar('Goal title is required');
+      return;
+    }
 
     const goalData = {
       title: formData.title.trim(),
@@ -117,7 +131,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
       goalData.cadence = formData.cadence;
       goalData.targetCount = parseInt(formData.targetCount);
       if (!goalData.targetCount || !goalData.cadence) {
-        alert('Habit goals require cadence and target count');
+        showSnackbar('Habit goals require cadence and target count');
         return;
       }
     } else if (formData.type === 'metric') {
@@ -126,13 +140,13 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
       goalData.targetQuantity = parseFloat(formData.targetQuantity);
       goalData.unit = formData.unit.trim();
       if (!goalData.targetQuantity || !goalData.unit || !goalData.cadence) {
-        alert('Metric goals require cadence, target quantity, and unit');
+        showSnackbar('Metric goals require cadence, target quantity, and unit');
         return;
       }
     } else if (formData.type === 'milestone') {
       goalData.milestones = formData.milestones;
       if (goalData.milestones.length === 0) {
-        alert('Milestone goals require at least one milestone');
+        showSnackbar('Milestone goals require at least one milestone');
         return;
       }
     } else if (formData.type === 'one_time') {
@@ -359,6 +373,16 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
             {editingGoal ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Dialog>
     </LocalizationProvider>
   );
