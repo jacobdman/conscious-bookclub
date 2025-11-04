@@ -70,12 +70,7 @@ const InFlightBooksProgress = ({ books }) => {
   const formatDiscussionDate = (date) => {
     if (!date) return 'No date set';
     
-    let discussionDate;
-    if (date.seconds) {
-      discussionDate = new Date(date.seconds * 1000);
-    } else {
-      discussionDate = new Date(date);
-    }
+    const discussionDate = new Date(date);
     
     return discussionDate.toLocaleDateString('en-US', {
       weekday: 'short',

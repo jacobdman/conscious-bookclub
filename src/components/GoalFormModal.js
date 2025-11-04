@@ -39,7 +39,6 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
   const parseDate = (dateValue) => {
     if (!dateValue) return null;
     if (dateValue instanceof Date) return dateValue;
-    if (dateValue.seconds) return new Date(dateValue.seconds * 1000);
     if (typeof dateValue === 'string') return new Date(dateValue);
     return new Date(dateValue);
   };

@@ -178,7 +178,7 @@ const BookList = () => {
         // Progress was included in the response, use it directly
         setBookProgress(progressMap);
       } else if (userId) {
-        // Fallback: progress not in response, fetch separately (for Firestore compatibility)
+        // Fallback: progress not in response, fetch separately
         loadProgressForBooks(result.books);
       }
       
@@ -302,7 +302,7 @@ const BookList = () => {
 
   const formatDate = (date) => {
     if (!date) return 'TBD';
-    return new Date(date.seconds ? date.seconds * 1000 : date).toLocaleDateString();
+    return new Date(date).toLocaleDateString();
   };
 
   const handleBookAdded = (newBook) => {

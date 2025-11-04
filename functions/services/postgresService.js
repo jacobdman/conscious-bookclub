@@ -316,7 +316,7 @@ GoalCompletion.belongsTo(Goal, {foreignKey: "goalId"});
 BookProgress.belongsTo(User, {foreignKey: "userId"});
 BookProgress.belongsTo(Book, {foreignKey: "bookId"});
 
-// Service functions matching Firestore interface
+// Service functions for database operations
 const getPosts = async () => {
   const posts = await Post.findAll({
     order: [["created_at", "DESC"]],

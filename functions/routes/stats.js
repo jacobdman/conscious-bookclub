@@ -8,26 +8,14 @@ router.get("/health", async (req, res) => {
   let connectedToDatabase = false;
   let databaseType = "unknown";
   let error = null;
-  const usePostgres = process.env.USE_POSTGRES === "true";
 
   try {
-    if (usePostgres) {
-      // Test PostgreSQL connection via Sequelize
-      const postgresService = require("../services/postgresService");
-      await postgresService.initializeDatabase();
-      connectedToDatabase = true;
-      databaseType = "postgresql";
-      console.log("PostgreSQL connection has been established successfully.");
-    } else {
-      // Test Firestore connection
-      const {getFirestore} = require("firebase-admin/firestore");
-      const db = getFirestore();
-      const testCollection = db.collection("health_check");
-      await testCollection.limit(1).get();
-      connectedToDatabase = true;
-      databaseType = "firestore";
-      console.log("Firestore connection has been established successfully.");
-    }
+    // Test PostgreSQL connection via Sequelize
+    const postgresService = require("../services/postgresService");
+    await postgresService.initializeDatabase();
+    connectedToDatabase = true;
+    databaseType = "postgresql";
+    console.log("PostgreSQL connection has been established successfully.");
   } catch (err) {
     console.error("Unable to connect to the database:", err);
     error = err.message;
@@ -39,7 +27,6 @@ router.get("/health", async (req, res) => {
     database: {
       type: databaseType,
       connected: connectedToDatabase,
-      usePostgres: process.env.USE_POSTGRES === "true",
     },
   };
 

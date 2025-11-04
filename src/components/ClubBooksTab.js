@@ -25,13 +25,7 @@ const ClubBooksTab = () => {
           return false; // Skip books without discussion dates
         }
         
-        // Convert Firestore timestamp to Date if needed
-        let discussionDate;
-        if (book.discussionDate.seconds) {
-          discussionDate = new Date(book.discussionDate.seconds * 1000);
-        } else {
-          discussionDate = new Date(book.discussionDate);
-        }
+        const discussionDate = new Date(book.discussionDate);
         
         // Set time to start of day for comparison
         discussionDate.setHours(0, 0, 0, 0);
@@ -41,19 +35,8 @@ const ClubBooksTab = () => {
       
       // Sort by discussion date (earliest first)
       upcomingBooks.sort((a, b) => {
-        let dateA, dateB;
-        
-        if (a.discussionDate.seconds) {
-          dateA = new Date(a.discussionDate.seconds * 1000);
-        } else {
-          dateA = new Date(a.discussionDate);
-        }
-        
-        if (b.discussionDate.seconds) {
-          dateB = new Date(b.discussionDate.seconds * 1000);
-        } else {
-          dateB = new Date(b.discussionDate);
-        }
+        const dateA = new Date(a.discussionDate);
+        const dateB = new Date(b.discussionDate);
         
         return dateA - dateB;
       });
