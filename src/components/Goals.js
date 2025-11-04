@@ -115,7 +115,6 @@ const Goals = () => {
     if (!timestamp) return 'No date';
     try {
       if (timestamp instanceof Date) return timestamp.toLocaleDateString();
-      if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toLocaleDateString();
       const date = new Date(timestamp);
       return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString();
     } catch (error) {

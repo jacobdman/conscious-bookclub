@@ -43,20 +43,13 @@ export const getWeekNumber = (date) => {
 
 /**
  * Check if a date is today
- * @param {Date|Object|string} date - The date to check (can be Firestore timestamp, Date object, or string)
+ * @param {Date|string} date - The date to check (can be Date object or string)
  * @returns {boolean} - True if the date is today
  */
 export const isToday = (date) => {
   if (!date) return false;
   
-  let checkDate;
-  if (date instanceof Date) {
-    checkDate = date;
-  } else if (date.seconds) {
-    checkDate = new Date(date.seconds * 1000);
-  } else {
-    checkDate = new Date(date);
-  }
+  const checkDate = date instanceof Date ? date : new Date(date);
   
   // Check if date is valid
   if (isNaN(checkDate.getTime())) return false;
@@ -67,20 +60,13 @@ export const isToday = (date) => {
 
 /**
  * Check if a date is today or in the past
- * @param {Date|Object|string} date - The date to check (can be Firestore timestamp, Date object, or string)
+ * @param {Date|string} date - The date to check (can be Date object or string)
  * @returns {boolean} - True if the date is today or overdue
  */
 export const isTodayOrOverdue = (date) => {
   if (!date) return false;
   
-  let checkDate;
-  if (date instanceof Date) {
-    checkDate = date;
-  } else if (date.seconds) {
-    checkDate = new Date(date.seconds * 1000);
-  } else {
-    checkDate = new Date(date);
-  }
+  const checkDate = date instanceof Date ? date : new Date(date);
   
   // Check if date is valid
   if (isNaN(checkDate.getTime())) return false;
@@ -117,8 +103,7 @@ export const sortGoalsByPriority = (goals) => {
     if (b.trackingType === 'weekly' && a.trackingType !== 'weekly') return 1;
     
     // Finally, sort by creation date (newest first)
-    return new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt) - 
-           new Date(a.createdAt?.seconds ? a.createdAt.seconds * 1000 : a.createdAt);
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
 };
 

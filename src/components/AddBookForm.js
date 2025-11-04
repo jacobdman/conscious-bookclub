@@ -46,12 +46,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       // Format discussion date for input field (YYYY-MM-DD)
       let formattedDate = '';
       if (editingBook.discussionDate) {
-        let discussionDate;
-        if (editingBook.discussionDate.seconds) {
-          discussionDate = new Date(editingBook.discussionDate.seconds * 1000);
-        } else {
-          discussionDate = new Date(editingBook.discussionDate);
-        }
+        const discussionDate = new Date(editingBook.discussionDate);
         formattedDate = discussionDate.toISOString().split('T')[0];
       }
 
@@ -275,8 +270,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
   const handleDelete = async () => {
     if (!editingBook || !editingBook.id) return;
     
-    const hasDiscussionDate = editingBook.discussionDate && 
-      (editingBook.discussionDate.seconds || editingBook.discussionDate);
+    const hasDiscussionDate = editingBook.discussionDate;
     
     if (hasDiscussionDate) {
       setSubmitError('Cannot delete a book that has a scheduled discussion date. Please remove the discussion date first.');
@@ -506,7 +500,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
               <span>
                 <Button
                   onClick={handleDelete}
-                  disabled={loading || (editingBook.discussionDate && (editingBook.discussionDate.seconds || editingBook.discussionDate))}
+                  disabled={loading || (editingBook && editingBook.discussionDate)}
                   variant="outlined"
                   color="error"
                   sx={{ mr: 'auto' }}

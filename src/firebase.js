@@ -7,7 +7,6 @@ import {
   signOut
 } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
-import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBmG4u5Kv4nt-5F5XfZhKNsyg9MJ-h96Qo",
@@ -21,8 +20,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const functions = getFunctions(app);
-const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Export Firebase instances and utilities
-export { auth, onAuthStateChanged, signOut, db, getRedirectResult, googleProvider, functions };
+export { auth, onAuthStateChanged, signOut, getRedirectResult, googleProvider, functions };

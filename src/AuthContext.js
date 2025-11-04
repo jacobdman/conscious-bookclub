@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Create or update user document in Firestore
+        // Create or update user document
         try {
           await createUserDocument(user);
         } catch (error) {

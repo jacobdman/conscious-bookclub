@@ -63,12 +63,7 @@ const CurrentBooksSection = ({ books }) => {
   const formatDiscussionDate = (date) => {
     if (!date) return 'TBD';
     
-    let discussionDate;
-    if (date.seconds) {
-      discussionDate = new Date(date.seconds * 1000);
-    } else {
-      discussionDate = new Date(date);
-    }
+    const discussionDate = new Date(date);
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
