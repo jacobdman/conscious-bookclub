@@ -1,4 +1,4 @@
-
+/* eslint-disable new-cap */
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
