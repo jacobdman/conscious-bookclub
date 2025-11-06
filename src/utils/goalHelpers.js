@@ -3,31 +3,91 @@
  */
 
 /**
- * Get the current period identifier for a given tracking type
- * @param {string} trackingType - The goal's tracking type (daily, weekly, monthly, quarterly)
+ * Normalize goal type (handle variations like 'one-time' vs 'one_time')
+ * @param {string} type - Goal type
+ * @returns {string} - Normalized goal type
+ */
+export const normalizeGoalType = (type) => {
+  if (!type) return type;
+  return type === 'one-time' ? 'one_time' : type;
+};
+
+/**
+ * Get the current period identifier for a given cadence
+ * @param {string} cadence - The goal's cadence ('day', 'week', 'month', 'quarter')
  * @returns {string|null} - The period identifier or null if not applicable
  */
-export const getCurrentPeriodId = (trackingType) => {
+export const getCurrentPeriodId = (cadence) => {
+  if (!cadence) return null;
+  
   const now = new Date();
   
-  switch(trackingType) {
-    case 'daily':
+  switch(cadence) {
+    case 'day':
       return now.toISOString().split('T')[0]; // "2025-10-13"
     
-    case 'weekly':
+    case 'week':
       const weekNum = getWeekNumber(now);
       return `${now.getFullYear()}-W${weekNum}`; // "2025-W42"
     
-    case 'monthly':
+    case 'month':
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // "2025-10"
     
-    case 'quarterly':
+    case 'quarter':
       const quarter = Math.floor(now.getMonth() / 3) + 1;
       return `${now.getFullYear()}-Q${quarter}`; // "2025-Q4"
     
     default:
       return null;
   }
+};
+
+/**
+ * Get period boundaries for a given cadence
+ * @param {string} cadence - The cadence ('day', 'week', 'month', 'quarter')
+ * @param {Date} timestamp - Optional timestamp (defaults to now)
+ * @returns {Object} - Object with start and end Date objects
+ */
+export const getPeriodBoundaries = (cadence, timestamp = null) => {
+  const now = timestamp || new Date();
+  const utcNow = new Date(now.toISOString());
+  
+  let start, end;
+  
+  switch (cadence) {
+    case 'day': {
+      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate()));
+      end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
+      break;
+    }
+    case 'week': {
+      // Week starts on Monday (ISO week)
+      const dayOfWeek = utcNow.getUTCDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const monday = new Date(utcNow);
+      monday.setUTCDate(utcNow.getUTCDate() - daysToMonday);
+      start = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate()));
+      end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 7);
+      break;
+    }
+    case 'month': {
+      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), 1));
+      end = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth() + 1, 1));
+      break;
+    }
+    case 'quarter': {
+      const quarter = Math.floor(utcNow.getUTCMonth() / 3);
+      start = new Date(Date.UTC(utcNow.getUTCFullYear(), quarter * 3, 1));
+      end = new Date(Date.UTC(utcNow.getUTCFullYear(), (quarter + 1) * 3, 1));
+      break;
+    }
+    default:
+      throw new Error(`Invalid cadence: ${cadence}`);
+  }
+  
+  return {start, end};
 };
 
 /**
@@ -79,31 +139,33 @@ export const isTodayOrOverdue = (date) => {
 
 /**
  * Sort goals by priority for quick completion view
- * Priority order: daily → overdue one-time/milestones → weekly
+ * Priority order: daily habits → one-time/milestones → weekly habits
  * @param {Array} goals - Array of goal objects
  * @returns {Array} - Sorted goals array
  */
 export const sortGoalsByPriority = (goals) => {
   return goals.sort((a, b) => {
-    // Daily goals first
-    if (a.trackingType === 'daily' && b.trackingType !== 'daily') return -1;
-    if (b.trackingType === 'daily' && a.trackingType !== 'daily') return 1;
+    // Normalize types
+    const aType = normalizeGoalType(a.type);
+    const bType = normalizeGoalType(b.type);
     
-    // Then overdue one-time and milestone goals
-    const aIsOverdue = (a.trackingType === 'one-time' && isTodayOrOverdue(a.dueDate) && !a.completed) ||
-                      (a.trackingType === 'milestones' && a.milestones?.some(m => isTodayOrOverdue(m.dueDate) && !m.completed));
-    const bIsOverdue = (b.trackingType === 'one-time' && isTodayOrOverdue(b.dueDate) && !b.completed) ||
-                      (b.trackingType === 'milestones' && b.milestones?.some(m => isTodayOrOverdue(m.dueDate) && !m.completed));
+    // Daily cadence goals first
+    if (a.cadence === 'day' && b.cadence !== 'day') return -1;
+    if (b.cadence === 'day' && a.cadence !== 'day') return 1;
     
-    if (aIsOverdue && !bIsOverdue) return -1;
-    if (bIsOverdue && !aIsOverdue) return 1;
+    // Then one-time and milestone goals (prioritize incomplete ones)
+    const aIsOneTimeOrMilestone = (aType === 'one_time' || aType === 'milestone') && !a.completed;
+    const bIsOneTimeOrMilestone = (bType === 'one_time' || bType === 'milestone') && !b.completed;
     
-    // Then weekly goals
-    if (a.trackingType === 'weekly' && b.trackingType !== 'weekly') return -1;
-    if (b.trackingType === 'weekly' && a.trackingType !== 'weekly') return 1;
+    if (aIsOneTimeOrMilestone && !bIsOneTimeOrMilestone) return -1;
+    if (bIsOneTimeOrMilestone && !aIsOneTimeOrMilestone) return 1;
+    
+    // Then weekly cadence goals
+    if (a.cadence === 'week' && b.cadence !== 'week') return -1;
+    if (b.cadence === 'week' && a.cadence !== 'week') return 1;
     
     // Finally, sort by creation date (newest first)
-    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    return new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0);
   });
 };
 
@@ -114,30 +176,173 @@ export const sortGoalsByPriority = (goals) => {
  */
 export const filterGoalsForQuickCompletion = (goals) => {
   return goals.filter(goal => {
-    // Skip completed goals
-    if (goal.completed) return false;
+    // Skip archived goals (but allow completed goals - they'll be handled per type)
+    if (goal.archived) return false;
     
-    switch (goal.trackingType) {
-      case 'daily':
-        // Show all active daily goals
-        return !goal.completed;
+    // Normalize goal type for consistent matching
+    const goalType = normalizeGoalType(goal.type);
+    
+    switch (goalType) {
+      case 'habit':
+      case 'metric':
+        // Show all active habit/metric goals with cadence (not completed)
+        return !goal.completed && goal.cadence;
         
-      case 'weekly':
-        // Show all active weekly goals
-        return !goal.completed;
+      case 'one_time':
+        // Show incomplete one-time goals, OR completed ones that were completed today
+        if (!goal.completed) {
+          return true; // Always show incomplete ones
+        }
+        // If completed, check if it was completed today
+        if (goal.completedAt || goal.completed_at) {
+          const completedDate = new Date(goal.completedAt || goal.completed_at);
+          const todayBoundaries = getTodayBoundaries();
+          const wasCompletedToday = completedDate >= todayBoundaries.start && completedDate < todayBoundaries.end;
+          return wasCompletedToday;
+        }
+        return false;
         
-      case 'one-time':
-        // Show if due today, overdue, or has no due date (always show incomplete one-time goals)
-        return !goal.completed && (isTodayOrOverdue(goal.dueDate) || !goal.dueDate);
-        
-      case 'milestones':
-        // Show if has any milestones (completed or incomplete) due today or overdue
-        return goal.milestones?.some(milestone => 
-          isTodayOrOverdue(milestone.dueDate)
-        );
+      case 'milestone':
+        // Show if has any milestones (completed or incomplete)
+        // Note: milestone goals may not have due dates on individual milestones
+        return goal.milestones && goal.milestones.length > 0;
         
       default:
         return false;
     }
   });
+};
+
+/**
+ * Get today's date boundaries (start and end of today in UTC)
+ * @returns {Object} - Object with start and end Date objects for today
+ */
+export const getTodayBoundaries = () => {
+  const now = new Date();
+  const utcNow = new Date(now.toISOString());
+  
+  const start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate()));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  
+  return {start, end};
+};
+
+/**
+ * Check if a habit has an entry for today
+ * @param {Array} entries - Array of entry objects
+ * @returns {boolean} - True if any entry exists for today
+ */
+export const hasEntryToday = (entries) => {
+  if (!entries || entries.length === 0) return false;
+  
+  const {start, end} = getTodayBoundaries();
+  
+  return entries.some(entry => {
+    const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+    return entryDate >= start && entryDate < end;
+  });
+};
+
+/**
+ * Get entries for today
+ * @param {Array} entries - Array of entry objects
+ * @returns {Array} - Filtered entries for today
+ */
+export const getTodayEntries = (entries) => {
+  if (!entries || entries.length === 0) return [];
+  
+  const {start, end} = getTodayBoundaries();
+  
+  return entries.filter(entry => {
+    const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+    return entryDate >= start && entryDate < end;
+  });
+};
+
+/**
+ * Format progress text for display
+ * @param {Object} goal - Goal object
+ * @param {Object} progress - Progress object with actual, target, unit
+ * @returns {string} - Formatted progress text
+ */
+export const getProgressText = (goal, progress) => {
+  if (!progress) return '';
+  
+  if (goal.type === 'metric' && progress.unit) {
+    return `${parseFloat(progress.actual || 0).toFixed(1)} / ${parseFloat(progress.target || 0).toFixed(1)} ${progress.unit}`;
+  } else if (goal.type === 'habit') {
+    return `${progress.actual || 0} / ${progress.target || 0} times`;
+  }
+  
+  return '';
+};
+
+/**
+ * Get the next incomplete milestone
+ * @param {Array} milestones - Array of milestone objects
+ * @returns {Object|null} - Next incomplete milestone or null
+ */
+export const getNextIncompleteMilestone = (milestones) => {
+  if (!milestones || milestones.length === 0) return null;
+  return milestones.find(m => !m.done) || null;
+};
+
+/**
+ * Get milestones completed today
+ * @param {Array} milestones - Array of milestone objects
+ * @returns {Array} - Milestones completed today
+ */
+export const getCompletedMilestonesToday = (milestones) => {
+  if (!milestones || milestones.length === 0) return [];
+  
+  return milestones.filter(m => {
+    if (!m.done || !m.doneAt) return false;
+    return isToday(m.doneAt);
+  });
+};
+
+/**
+ * Format milestone goal display text
+ * Shows completed milestones from today (strikethrough) + next incomplete
+ * @param {Object} goal - Goal object with milestones
+ * @returns {Array} - Array of milestone display objects with text and completed flag
+ */
+export const formatMilestoneDisplay = (goal) => {
+  if (!goal.milestones || goal.milestones.length === 0) {
+    return [{text: goal.title, completed: false}];
+  }
+  
+  const completedToday = getCompletedMilestonesToday(goal.milestones);
+  const nextIncomplete = getNextIncompleteMilestone(goal.milestones);
+  
+  const display = [];
+  
+  // Add completed milestones from today (with strikethrough)
+  completedToday.forEach(m => {
+    display.push({
+      text: `${goal.title}: ${m.title}`,
+      completed: true,
+      milestone: m,
+    });
+  });
+  
+  // Add next incomplete milestone
+  if (nextIncomplete) {
+    display.push({
+      text: `${goal.title}: ${nextIncomplete.title}`,
+      completed: false,
+      milestone: nextIncomplete,
+    });
+  }
+  
+  // If no next incomplete and no completed today, show goal title
+  if (display.length === 0) {
+    display.push({
+      text: goal.title,
+      completed: false,
+    });
+  }
+  
+  return display;
 };

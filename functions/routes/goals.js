@@ -22,7 +22,7 @@ router.post("/:userId", async (req, res) => {
     const {userId} = req.params;
     const goalData = req.body;
     const result = await dbService.addGoal(userId, goalData);
-    res.status(201).json({id: result.id, ...goalData});
+    res.status(201).json(result);
   } catch (error) {
     console.error("Error creating goal:", error);
     res.status(500).json({error: "Failed to create goal"});
@@ -109,7 +109,7 @@ router.get("/:userId/:goalId/completion", async (req, res) => {
   }
 });
 
-// POST /v1/goals/:userId/:goalId/milestone/:milestoneIndex - Mark milestone complete
+// POST /v1/goals/:userId/:goalId/milestone/:milestoneIndex - Mark milestone complete (legacy)
 router.post("/:userId/:goalId/milestone/:milestoneIndex", async (req, res) => {
   try {
     const {userId, goalId, milestoneIndex} = req.params;
@@ -118,6 +118,102 @@ router.post("/:userId/:goalId/milestone/:milestoneIndex", async (req, res) => {
   } catch (error) {
     console.error("Error completing milestone:", error);
     res.status(500).json({error: "Failed to complete milestone"});
+  }
+});
+
+// Entry routes
+// POST /v1/goals/:userId/:goalId/entries - Create entry
+router.post("/:userId/:goalId/entries", async (req, res) => {
+  try {
+    const {userId, goalId} = req.params;
+    const entryData = req.body;
+    const entry = await dbService.createGoalEntry(userId, parseInt(goalId), entryData);
+    res.status(201).json(entry);
+  } catch (error) {
+    console.error("Error creating entry:", error);
+    res.status(500).json({error: "Failed to create entry"});
+  }
+});
+
+// GET /v1/goals/:userId/:goalId/entries - Get entries
+router.get("/:userId/:goalId/entries", async (req, res) => {
+  try {
+    const {userId, goalId} = req.params;
+    const {periodStart, periodEnd} = req.query;
+    const entries = await dbService.getGoalEntries(
+        userId,
+        parseInt(goalId),
+        periodStart ? new Date(periodStart) : null,
+        periodEnd ? new Date(periodEnd) : null,
+    );
+    res.json(entries);
+  } catch (error) {
+    console.error("Error fetching entries:", error);
+    res.status(500).json({error: "Failed to fetch entries"});
+  }
+});
+
+// PUT /v1/goals/:userId/:goalId/entries/:entryId - Update entry
+router.put("/:userId/:goalId/entries/:entryId", async (req, res) => {
+  try {
+    const {userId, entryId} = req.params;
+    const updates = req.body;
+    const entry = await dbService.updateGoalEntry(userId, parseInt(entryId), updates);
+    res.json(entry);
+  } catch (error) {
+    console.error("Error updating entry:", error);
+    res.status(500).json({error: "Failed to update entry"});
+  }
+});
+
+// DELETE /v1/goals/:userId/:goalId/entries/:entryId - Delete entry
+router.delete("/:userId/:goalId/entries/:entryId", async (req, res) => {
+  try {
+    const {userId, entryId} = req.params;
+    await dbService.deleteGoalEntry(userId, parseInt(entryId));
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting entry:", error);
+    res.status(500).json({error: "Failed to delete entry"});
+  }
+});
+
+// GET /v1/goals/:userId/:goalId/progress - Get current progress
+router.get("/:userId/:goalId/progress", async (req, res) => {
+  try {
+    const {userId, goalId} = req.params;
+    const progress = await dbService.getGoalProgress(userId, parseInt(goalId));
+    res.json(progress);
+  } catch (error) {
+    console.error("Error fetching progress:", error);
+    res.status(500).json({error: "Failed to fetch progress"});
+  }
+});
+
+// Milestone routes
+// POST /v1/goals/:userId/:goalId/milestones - Create milestone
+router.post("/:userId/:goalId/milestones", async (req, res) => {
+  try {
+    const {goalId} = req.params;
+    const milestoneData = req.body;
+    const milestone = await dbService.createMilestone(parseInt(goalId), milestoneData);
+    res.status(201).json(milestone);
+  } catch (error) {
+    console.error("Error creating milestone:", error);
+    res.status(500).json({error: "Failed to create milestone"});
+  }
+});
+
+// PUT /v1/goals/:userId/:goalId/milestones/:milestoneId - Update milestone
+router.put("/:userId/:goalId/milestones/:milestoneId", async (req, res) => {
+  try {
+    const {milestoneId} = req.params;
+    const updates = req.body;
+    const milestone = await dbService.updateMilestone(parseInt(milestoneId), updates);
+    res.json(milestone);
+  } catch (error) {
+    console.error("Error updating milestone:", error);
+    res.status(500).json({error: "Failed to update milestone"});
   }
 });
 

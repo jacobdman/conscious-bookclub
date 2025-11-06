@@ -15,26 +15,64 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+// Global error notification handler (will be set by ErrorNotificationProvider)
+let globalErrorHandler = null;
+
+export const setGlobalErrorHandler = (handler) => {
+  globalErrorHandler = handler;
+};
+
 // Helper function to make API calls
 const apiCall = async (endpoint, options = {}) => {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
 
-  if (!response.ok) {
-    throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      // Try to extract error message from response
+      let errorMessage = `API call failed: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch (e) {
+        // If response is not JSON, use default message
+      }
+
+      // Show global error notification
+      if (globalErrorHandler) {
+        globalErrorHandler(errorMessage);
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    // Handle 204 No Content responses
+    if (response.status === 204) {
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    // If it's already an Error with message, re-throw it
+    if (error instanceof Error) {
+      throw error;
+    }
+    // Otherwise, create a new error
+    const errorMessage = error.message || 'An unexpected error occurred';
+    if (globalErrorHandler) {
+      globalErrorHandler(errorMessage);
+    }
+    throw new Error(errorMessage);
   }
-
-  // Handle 204 No Content responses
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
 };
 
 // Posts functions
@@ -126,7 +164,7 @@ export const addGoal = async (userId, goal) => {
     method: 'POST',
     body: JSON.stringify(goal),
   });
-  return { id: result.id };
+  return result; // Return the full goal object from API
 };
 
 export const updateGoal = async (userId, goalId, updates) => {
@@ -172,6 +210,54 @@ export const markOneTimeGoalComplete = async (userId, goalId) => {
   await apiCall(`/v1/goals/${userId}/${goalId}/complete`, {
     method: 'POST',
     body: JSON.stringify({}),
+  });
+};
+
+// Entry management functions
+export const createGoalEntry = async (userId, goalId, entryData) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/entries`, {
+    method: 'POST',
+    body: JSON.stringify(entryData),
+  });
+};
+
+export const getGoalEntries = async (userId, goalId, periodStart = null, periodEnd = null) => {
+  const params = new URLSearchParams();
+  if (periodStart) params.append('periodStart', periodStart.toISOString());
+  if (periodEnd) params.append('periodEnd', periodEnd.toISOString());
+  return apiCall(`/v1/goals/${userId}/${goalId}/entries?${params}`);
+};
+
+export const updateGoalEntry = async (userId, goalId, entryId, updates) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/entries/${entryId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+};
+
+export const deleteGoalEntry = async (userId, goalId, entryId) => {
+  await apiCall(`/v1/goals/${userId}/${goalId}/entries/${entryId}`, {
+    method: 'DELETE',
+  });
+};
+
+// Progress functions
+export const getGoalProgress = async (userId, goalId) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/progress`);
+};
+
+// Milestone functions
+export const createMilestone = async (userId, goalId, milestoneData) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/milestones`, {
+    method: 'POST',
+    body: JSON.stringify(milestoneData),
+  });
+};
+
+export const updateMilestone = async (userId, goalId, milestoneId, updates) => {
+  return apiCall(`/v1/goals/${userId}/${goalId}/milestones/${milestoneId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
   });
 };
 

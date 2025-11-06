@@ -171,12 +171,30 @@ const Goal = sequelize.define("Goal", {
     type: DataTypes.STRING(50),
     allowNull: false,
   },
-  frequency: {
+  measure: {
     type: DataTypes.STRING(50),
   },
-  milestones: {
-    type: DataTypes.JSONB,
-    defaultValue: [],
+  cadence: {
+    type: DataTypes.STRING(50),
+  },
+  targetCount: {
+    type: DataTypes.INTEGER,
+    field: "target_count",
+  },
+  targetQuantity: {
+    type: DataTypes.DECIMAL,
+    field: "target_quantity",
+  },
+  unit: {
+    type: DataTypes.STRING(100),
+  },
+  dueAt: {
+    type: DataTypes.DATE,
+    field: "due_at",
+  },
+  visibility: {
+    type: DataTypes.STRING(50),
+    defaultValue: "public",
   },
   archived: {
     type: DataTypes.BOOLEAN,
@@ -195,6 +213,74 @@ const Goal = sequelize.define("Goal", {
   timestamps: true,
   createdAt: "created_at",
   updatedAt: false,
+});
+
+const GoalEntry = sequelize.define("GoalEntry", {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  goalId: {
+    type: DataTypes.INTEGER,
+    field: "goal_id",
+    references: {
+      model: Goal,
+      key: "id",
+    },
+  },
+  userId: {
+    type: DataTypes.STRING,
+    field: "user_id",
+    references: {
+      model: User,
+      key: "uid",
+    },
+  },
+  occurredAt: {
+    type: DataTypes.DATE,
+    field: "occurred_at",
+    allowNull: false,
+  },
+  quantity: {
+    type: DataTypes.DECIMAL,
+  },
+}, {
+  tableName: "goal_entry",
+  timestamps: true,
+  createdAt: "created_at",
+  updatedAt: false,
+});
+
+const Milestone = sequelize.define("Milestone", {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true,
+  },
+  goalId: {
+    type: DataTypes.INTEGER,
+    field: "goal_id",
+    references: {
+      model: Goal,
+      key: "id",
+    },
+  },
+  title: {
+    type: DataTypes.STRING(500),
+    allowNull: false,
+  },
+  done: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  doneAt: {
+    type: DataTypes.DATE,
+    field: "done_at",
+  },
+}, {
+  tableName: "milestone",
+  timestamps: false,
 });
 
 const GoalCompletion = sequelize.define("GoalCompletion", {
@@ -301,18 +387,24 @@ const BookProgress = sequelize.define("BookProgress", {
 User.hasMany(Post, {foreignKey: "authorId"});
 User.hasMany(Goal, {foreignKey: "userId"});
 User.hasMany(GoalCompletion, {foreignKey: "userId"});
+User.hasMany(GoalEntry, {foreignKey: "userId"});
 User.hasMany(BookProgress, {foreignKey: "userId"});
 
 Book.hasMany(Meeting, {foreignKey: "bookId"});
 Book.hasMany(BookProgress, {foreignKey: "bookId"});
 
 Goal.hasMany(GoalCompletion, {foreignKey: "goalId"});
+Goal.hasMany(GoalEntry, {foreignKey: "goalId"});
+Goal.hasMany(Milestone, {foreignKey: "goalId"});
 
 Post.belongsTo(User, {foreignKey: "authorId"});
 Meeting.belongsTo(Book, {foreignKey: "bookId"});
 Goal.belongsTo(User, {foreignKey: "userId"});
 GoalCompletion.belongsTo(User, {foreignKey: "userId"});
 GoalCompletion.belongsTo(Goal, {foreignKey: "goalId"});
+GoalEntry.belongsTo(User, {foreignKey: "userId"});
+GoalEntry.belongsTo(Goal, {foreignKey: "goalId"});
+Milestone.belongsTo(Goal, {foreignKey: "goalId"});
 BookProgress.belongsTo(User, {foreignKey: "userId"});
 BookProgress.belongsTo(Book, {foreignKey: "bookId"});
 
@@ -374,26 +466,113 @@ const getGoals = async (userId) => {
   const goals = await Goal.findAll({
     where: {userId},
     order: [["created_at", "DESC"]],
+    include: [
+      {
+        model: Milestone,
+        attributes: ["id", "title", "done", "doneAt"],
+      },
+    ],
   });
   return {
-    docs: goals.map((goal) => ({id: goal.id, data: () => goal.toJSON()})),
+    docs: goals.map((goal) => {
+      const goalData = goal.toJSON();
+      // Convert milestones array to match expected format
+      goalData.milestones = goalData.Milestones || [];
+      return {id: goal.id, data: () => goalData};
+    }),
   };
 };
 
 const addGoal = async (userId, goalData) => {
+  // Validate goal type invariants
+  const {type, measure, cadence, targetCount, targetQuantity, unit} = goalData;
+
+  if (type === "habit") {
+    if (measure !== "count") {
+      throw new Error("Habit goals must have measure='count'");
+    }
+    if (!cadence) {
+      throw new Error("Habit goals must have cadence");
+    }
+    if (!targetCount) {
+      throw new Error("Habit goals must have target_count");
+    }
+  } else if (type === "metric") {
+    if (measure !== "sum") {
+      throw new Error("Metric goals must have measure='sum'");
+    }
+    if (!cadence) {
+      throw new Error("Metric goals must have cadence");
+    }
+    if (!targetQuantity) {
+      throw new Error("Metric goals must have target_quantity");
+    }
+    if (!unit) {
+      throw new Error("Metric goals must have unit");
+    }
+  }
+
   const goal = await Goal.create({
     ...goalData,
     userId,
     createdAt: new Date(),
   });
-  return {id: goal.id};
+
+  // Create milestones if provided
+  if (type === "milestone" && goalData.milestones && Array.isArray(goalData.milestones)) {
+    for (const milestoneData of goalData.milestones) {
+      await Milestone.create({
+        goalId: goal.id,
+        title: milestoneData.title,
+        done: milestoneData.done || false,
+        doneAt: milestoneData.doneAt || null,
+      });
+    }
+  }
+
+  // Fetch the complete goal with milestones to return all fields
+  const completeGoal = await Goal.findByPk(goal.id, {
+    include: [
+      {
+        model: Milestone,
+        attributes: ["id", "title", "done", "doneAt"],
+      },
+    ],
+  });
+
+  return completeGoal.toJSON();
 };
 
 const updateGoal = async (userId, goalId, updates) => {
-  await Goal.update(updates, {where: {id: goalId, userId}});
+  // Remove milestones from updates if present (we'll handle them separately)
+  const {milestones, ...goalUpdates} = updates;
+
+  // Check if this is a milestone goal (either updating to milestone or already is one)
+  const goal = await Goal.findOne({where: {id: goalId, userId}});
+  const isMilestoneGoal = updates.type === "milestone" || goal?.type === "milestone";
+
+  // Update the goal itself
+  await Goal.update(goalUpdates, {where: {id: goalId, userId}});
+
+  // Handle milestones if provided and this is a milestone goal
+  if (isMilestoneGoal && milestones && Array.isArray(milestones)) {
+    // Delete existing milestones for this goal
+    await Milestone.destroy({where: {goalId}});
+
+    // Create new milestones
+    for (const milestoneData of milestones) {
+      await Milestone.create({
+        goalId,
+        title: milestoneData.title,
+        done: milestoneData.done || false,
+        doneAt: milestoneData.doneAt || null,
+      });
+    }
+  }
 };
 
 const deleteGoal = async (userId, goalId) => {
+  // Cascade delete will handle entries and milestones
   await Goal.destroy({where: {id: goalId, userId}});
 };
 
@@ -438,6 +617,203 @@ const markOneTimeGoalComplete = async (userId, goalId) => {
       {completed: true, completedAt: new Date()},
       {where: {id: goalId, userId}},
   );
+};
+
+// Entry management functions
+const createGoalEntry = async (userId, goalId, entryData) => {
+  const entry = await GoalEntry.create({
+    goalId,
+    userId,
+    occurredAt: entryData.occurred_at || new Date(),
+    quantity: entryData.quantity || null,
+  });
+  return {id: entry.id, ...entry.toJSON()};
+};
+
+const getGoalEntries = async (userId, goalId, periodStart, periodEnd) => {
+  const whereClause = {
+    goalId,
+    userId,
+  };
+
+  if (periodStart && periodEnd) {
+    whereClause.occurredAt = {
+      [Sequelize.Op.gte]: periodStart,
+      [Sequelize.Op.lt]: periodEnd,
+    };
+  }
+
+  const entries = await GoalEntry.findAll({
+    where: whereClause,
+    order: [["occurred_at", "DESC"]],
+  });
+  return entries.map((entry) => ({id: entry.id, ...entry.toJSON()}));
+};
+
+const updateGoalEntry = async (userId, entryId, updates) => {
+  const entry = await GoalEntry.findOne({
+    where: {id: entryId, userId},
+  });
+  if (!entry) {
+    throw new Error("Entry not found");
+  }
+  await entry.update({
+    occurredAt: updates.occurred_at || entry.occurredAt,
+    quantity: updates.quantity !== undefined ? updates.quantity : entry.quantity,
+  });
+  return {id: entry.id, ...entry.toJSON()};
+};
+
+const deleteGoalEntry = async (userId, entryId) => {
+  await GoalEntry.destroy({where: {id: entryId, userId}});
+};
+
+// Milestone management functions
+const createMilestone = async (goalId, milestoneData) => {
+  const milestone = await Milestone.create({
+    goalId,
+    title: milestoneData.title,
+    done: milestoneData.done || false,
+    doneAt: milestoneData.doneAt || null,
+  });
+  return {id: milestone.id, ...milestone.toJSON()};
+};
+
+const updateMilestone = async (milestoneId, updates) => {
+  const milestone = await Milestone.findByPk(milestoneId);
+  if (!milestone) {
+    throw new Error("Milestone not found");
+  }
+  await milestone.update({
+    title: updates.title || milestone.title,
+    done: updates.done !== undefined ? updates.done : milestone.done,
+    doneAt: updates.done ? (updates.doneAt || new Date()) : null,
+  });
+  return {id: milestone.id, ...milestone.toJSON()};
+};
+
+const getMilestones = async (goalId) => {
+  const milestones = await Milestone.findAll({
+    where: {goalId},
+    order: [["id", "ASC"]],
+  });
+  return milestones.map((m) => ({id: m.id, ...m.toJSON()}));
+};
+
+const markMilestoneDone = async (milestoneId, done) => {
+  const milestone = await Milestone.findByPk(milestoneId);
+  if (!milestone) {
+    throw new Error("Milestone not found");
+  }
+  await milestone.update({
+    done,
+    doneAt: done ? new Date() : null,
+  });
+  return {id: milestone.id, ...milestone.toJSON()};
+};
+
+// Evaluation logic functions
+const getPeriodBoundaries = (cadence, timestamp = null) => {
+  const now = timestamp || new Date();
+  const utcNow = new Date(now.toISOString());
+
+  let start; let end;
+
+  switch (cadence) {
+    case "day": {
+      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate()));
+      end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
+      break;
+    }
+    case "week": {
+      // Week starts on Monday (ISO week)
+      const dayOfWeek = utcNow.getUTCDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const monday = new Date(utcNow);
+      monday.setUTCDate(utcNow.getUTCDate() - daysToMonday);
+      start = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate()));
+      end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 7);
+      break;
+    }
+    case "month": {
+      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), 1));
+      end = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth() + 1, 1));
+      break;
+    }
+    case "quarter": {
+      const quarter = Math.floor(utcNow.getUTCMonth() / 3);
+      start = new Date(Date.UTC(utcNow.getUTCFullYear(), quarter * 3, 1));
+      end = new Date(Date.UTC(utcNow.getUTCFullYear(), (quarter + 1) * 3, 1));
+      break;
+    }
+    default:
+      throw new Error(`Invalid cadence: ${cadence}`);
+  }
+
+  return {start, end};
+};
+
+const evaluateGoal = async (userId, goalId, timestamp = null) => {
+  const goal = await Goal.findOne({where: {id: goalId, userId}});
+  if (!goal) {
+    throw new Error("Goal not found");
+  }
+
+  const goalData = goal.toJSON();
+
+  // For milestone and one-time goals, return their completion status
+  if (goalData.type === "milestone") {
+    const milestones = await getMilestones(goalId);
+    const allDone = milestones.length > 0 && milestones.every((m) => m.done);
+    return {
+      completed: allDone,
+      actual: milestones.filter((m) => m.done).length,
+      target: milestones.length,
+    };
+  }
+
+  if (goalData.type === "one_time") {
+    return {
+      completed: goalData.completed || false,
+      actual: goalData.completed ? 1 : 0,
+      target: 1,
+    };
+  }
+
+  // For habit and metric goals, evaluate based on entries
+  if (!goalData.cadence) {
+    throw new Error("Goal must have cadence for evaluation");
+  }
+
+  const {start, end} = getPeriodBoundaries(goalData.cadence, timestamp);
+  const entries = await getGoalEntries(userId, goalId, start, end);
+
+  if (goalData.measure === "count") {
+    const count = entries.length;
+    return {
+      completed: count >= goalData.targetCount,
+      actual: count,
+      target: goalData.targetCount,
+    };
+  } else if (goalData.measure === "sum") {
+    const sum = entries.reduce((acc, entry) => {
+      return acc + (parseFloat(entry.quantity) || 0);
+    }, 0);
+    return {
+      completed: sum >= parseFloat(goalData.targetQuantity),
+      actual: sum,
+      target: parseFloat(goalData.targetQuantity),
+      unit: goalData.unit,
+    };
+  }
+
+  throw new Error(`Invalid measure: ${goalData.measure}`);
+};
+
+const getGoalProgress = async (userId, goalId) => {
+  return evaluateGoal(userId, goalId);
 };
 
 const createUserDocument = async (user) => {
@@ -763,6 +1139,23 @@ module.exports = {
   markGoalIncomplete,
   markMilestoneComplete,
   markOneTimeGoalComplete,
+
+  // Goal Entries
+  createGoalEntry,
+  getGoalEntries,
+  updateGoalEntry,
+  deleteGoalEntry,
+
+  // Milestones
+  createMilestone,
+  updateMilestone,
+  getMilestones,
+  markMilestoneDone,
+
+  // Evaluation
+  getPeriodBoundaries,
+  evaluateGoal,
+  getGoalProgress,
 
   // Users
   createUserDocument,
