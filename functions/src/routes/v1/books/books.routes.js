@@ -1,0 +1,24 @@
+const express = require("express");
+const {
+  getBooks,
+  getDiscussedBooks,
+  getFilteredBooks,
+  getBook,
+  createBook,
+  updateBook,
+  deleteBook,
+} = require("./books.ctrl");
+
+const router = express.Router(); // eslint-disable-line new-cap
+
+router
+    .get("/", getBooks)
+    .get("/discussed", getDiscussedBooks)
+    .get("/filtered", getFilteredBooks)
+    .get("/:id", getBook)
+    .post("/", createBook)
+    .put("/:id", updateBook)
+    .delete("/:id", deleteBook);
+
+module.exports = router;
+
