@@ -244,6 +244,276 @@ const deleteBook = async (req, res, next) => {
   }
 };
 
+// GET /v1/books/progress - Get books with upcoming discussions and their progress
+const getBooksProgress = async (req, res, next) => {
+  try {
+    const {bookId, page = 1, pageSize = 10} = req.query;
+    const pageNum = parseInt(page, 10);
+    const pageSizeNum = parseInt(pageSize, 10);
+
+    // Get today's date at start of day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // If bookId is provided, get progress for that specific book only
+    if (bookId) {
+      const bookIdInt = parseInt(bookId, 10);
+      if (isNaN(bookIdInt)) {
+        const error = new Error("Invalid book ID");
+        error.status = 400;
+        throw error;
+      }
+
+      const book = await db.Book.findByPk(bookIdInt);
+      if (!book) {
+        const error = new Error("Book not found");
+        error.status = 404;
+        throw error;
+      }
+
+      // Calculate stats
+      const statsData = await db.BookProgress.findAll({
+        attributes: [
+          "status",
+          [db.sequelize.fn("COUNT", db.sequelize.col("BookProgress.id")), "count"],
+          [db.sequelize.fn("AVG", db.sequelize.col("BookProgress.percent_complete")), "avgPercent"],
+        ],
+        where: {bookId: bookIdInt},
+        group: ["status"],
+      });
+
+      let activeReaders = 0;
+      let finishedReaders = 0;
+      let avgPercent = 0;
+      let readerCount = 0;
+
+      statsData.forEach((stat) => {
+        const count = parseInt(stat.dataValues.count);
+        readerCount += count;
+
+        if (stat.status === "reading") {
+          activeReaders = count;
+        } else if (stat.status === "finished") {
+          finishedReaders = count;
+        }
+
+        if (stat.dataValues.avgPercent) {
+          avgPercent = parseFloat(stat.dataValues.avgPercent);
+        }
+      });
+
+      // Get paginated user progress
+      const offset = (pageNum - 1) * pageSizeNum;
+      const userProgress = await db.BookProgress.findAll({
+        where: {
+          bookId: bookIdInt,
+          privacy: "public",
+        },
+        include: [{
+          model: db.User,
+          as: "user",
+          attributes: ["uid", "displayName", "photoUrl"],
+          required: true,
+        }],
+        order: [
+          [db.sequelize.literal(`CASE WHEN status = 'finished' THEN 0 WHEN status = 'reading' THEN 1 ELSE 2 END`), "ASC"],
+          [db.sequelize.literal("percent_complete"), "DESC"],
+          [db.sequelize.literal("updated_at"), "DESC"],
+        ],
+        limit: pageSizeNum,
+        offset,
+      });
+
+      const users = userProgress.map((progress) => ({
+        userId: progress.userId,
+        displayName: progress.user?.displayName || "Unknown User",
+        photoUrl: progress.user?.photoUrl,
+        status: progress.status,
+        percentComplete: progress.percentComplete,
+      }));
+
+      return res.json({
+        book: {
+          id: book.id,
+          title: book.title,
+          author: book.author,
+          coverImage: book.coverImage,
+          discussionDate: book.discussionDate,
+          stats: {
+            activeReaders,
+            finishedReaders,
+            avgPercent: Math.round(avgPercent * 100) / 100,
+            readerCount,
+          },
+          users,
+        },
+      });
+    }
+
+    // Get all books with discussionDate >= today, sorted by discussion date
+    // For DATEONLY fields, Sequelize handles the date comparison automatically
+    const books = await db.Book.findAll({
+      where: {
+        discussionDate: {
+          [db.Op.gte]: today,
+        },
+      },
+      order: [["discussion_date", "ASC"]],
+    });
+
+    // For each book, calculate stats and get first page of user progress
+    const booksWithProgress = await Promise.allSettled(
+        books.map(async (book) => {
+          const bookId = book.id;
+
+          try {
+            // Calculate stats using aggregation
+            const statsData = await db.BookProgress.findAll({
+              attributes: [
+                "status",
+                [db.sequelize.fn("COUNT", db.sequelize.col("BookProgress.id")), "count"],
+                [db.sequelize.fn("AVG", db.sequelize.col("BookProgress.percent_complete")), "avgPercent"],
+              ],
+              where: {bookId},
+              group: ["status"],
+            });
+
+            let activeReaders = 0;
+            let finishedReaders = 0;
+            let avgPercent = 0;
+            let readerCount = 0;
+
+            statsData.forEach((stat) => {
+              const count = parseInt(stat.dataValues.count);
+              readerCount += count;
+
+              if (stat.status === "reading") {
+                activeReaders = count;
+              } else if (stat.status === "finished") {
+                finishedReaders = count;
+              }
+
+              if (stat.dataValues.avgPercent) {
+                avgPercent = parseFloat(stat.dataValues.avgPercent);
+              }
+            });
+
+            // Get first page of user progress (10 users)
+            const userProgress = await db.BookProgress.findAll({
+              where: {
+                bookId,
+                privacy: "public",
+              },
+              include: [{
+                model: db.User,
+                as: "user",
+                attributes: ["uid", "displayName", "photoUrl"],
+                required: true,
+              }],
+              order: [
+                [db.sequelize.literal(`CASE WHEN status = 'finished' THEN 0 WHEN status = 'reading' THEN 1 ELSE 2 END`), "ASC"],
+                [db.sequelize.literal("percent_complete"), "DESC"],
+                [db.sequelize.literal("updated_at"), "DESC"],
+              ],
+              limit: pageSizeNum,
+              offset: 0,
+            });
+
+            const users = userProgress.map((progress) => ({
+              userId: progress.userId,
+              displayName: progress.user?.displayName || "Unknown User",
+              photoUrl: progress.user?.photoUrl,
+              status: progress.status,
+              percentComplete: progress.percentComplete,
+            }));
+
+            return {
+              id: book.id,
+              title: book.title,
+              author: book.author,
+              coverImage: book.coverImage,
+              discussionDate: book.discussionDate,
+              stats: {
+                activeReaders,
+                finishedReaders,
+                avgPercent: Math.round(avgPercent * 100) / 100,
+                readerCount,
+              },
+              users: users || [],
+            };
+          } catch (err) {
+            console.error(`Error processing book ${bookId}:`, err);
+            // Return book with empty stats/users on error
+            return {
+              id: book.id,
+              title: book.title,
+              author: book.author,
+              coverImage: book.coverImage,
+              discussionDate: book.discussionDate,
+              stats: {
+                activeReaders: 0,
+                finishedReaders: 0,
+                avgPercent: 0,
+                readerCount: 0,
+              },
+              users: [],
+            };
+          }
+        }),
+    );
+
+    // Extract fulfilled results
+    const successfulBooks = booksWithProgress
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value);
+
+    res.json({books: successfulBooks});
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /v1/books/top-readers - Get top readers by finished books
+const getTopReaders = async (req, res, next) => {
+  try {
+    const {limit = 10} = req.query;
+    const limitCount = parseInt(limit, 10);
+
+    const results = await db.BookProgress.findAll({
+      attributes: [
+        "userId",
+        [db.sequelize.fn("COUNT", db.sequelize.col("BookProgress.id")), "finishedCount"],
+      ],
+      where: {status: "finished"},
+      group: [
+        "userId",
+        "user.uid",
+        "user.display_name",
+        "user.photo_url",
+      ],
+      order: [[db.sequelize.fn("COUNT", db.sequelize.col("BookProgress.id")), "DESC"]],
+      limit: limitCount,
+      include: [{
+        model: db.User,
+        as: "user",
+        attributes: ["uid", "displayName", "photoUrl"],
+        required: true,
+      }],
+    });
+
+    const leaderboard = results.map((result) => ({
+      id: result.userId,
+      finishedCount: parseInt(result.dataValues.finishedCount),
+      displayName: result.user?.displayName || "Unknown User",
+      photoUrl: result.user?.photoUrl,
+    }));
+
+    res.json(leaderboard);
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   getBooks,
   getDiscussedBooks,
@@ -252,5 +522,7 @@ module.exports = {
   createBook,
   updateBook,
   deleteBook,
+  getBooksProgress,
+  getTopReaders,
 };
 
