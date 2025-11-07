@@ -1,14 +1,13 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
-import GoalsProvider from './contexts/Goals/GoalsProvider';
-import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotificationContext';
-import { setGlobalErrorHandler } from './services/dataService';
-import Dashboard from './Dashboard';
-import ClubView from './ClubView';
-import BookList from './components/BookList';
-import Calendar from './components/Calendar';
-import Goals from './components/Goals';
+import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotification';
+import { setGlobalErrorHandler } from './services/apiHelpers';
+import Dashboard from './views/Dashboard';
+import ClubView from './views/ClubView';
+import Books from './views/Books';
+import Calendar from './views/Calendar';
+import Goals from './views/Goals';
 import Login from './Login';
 import { CircularProgress, Box } from '@mui/material';
 
@@ -45,7 +44,7 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/club" element={<ClubView />} />
-        <Route path="/books" element={<BookList />} />
+        <Route path="/books" element={<Books />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -58,9 +57,7 @@ function App() {
   return (
     <AuthProvider>
       <ErrorNotificationProvider>
-        <GoalsProvider>
-          <AppContent />
-        </GoalsProvider>
+        <AppContent />
       </ErrorNotificationProvider>
     </AuthProvider>
   );
