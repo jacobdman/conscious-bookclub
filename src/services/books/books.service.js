@@ -75,3 +75,20 @@ export const initializeBookMetadata = async () => {
   return result.totalCount;
 };
 
+// Books progress functions
+export const getBooksProgress = async (page = 1, pageSize = 10, bookId = null) => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    pageSize: pageSize.toString(),
+  });
+  if (bookId) {
+    params.append('bookId', bookId.toString());
+  }
+  return apiCall(`/v1/books/progress?${params}`);
+};
+
+export const getTopReaders = async (limit = 10) => {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  return apiCall(`/v1/books/top-readers?${params}`);
+};
+

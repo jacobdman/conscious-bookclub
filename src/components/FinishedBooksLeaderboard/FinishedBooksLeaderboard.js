@@ -13,7 +13,7 @@ import {
   CircularProgress,
   Divider
 } from '@mui/material';
-import { getTopFinishedBooksUsers, getUserStats } from 'services/stats/stats.service';
+import { getTopReaders } from 'services/books/books.service';
 import { useAuth } from 'AuthContext';
 
 const FinishedBooksLeaderboard = () => {
@@ -28,19 +28,24 @@ const FinishedBooksLeaderboard = () => {
         setLoading(true);
         
         // Get top 10 users
-        const topUsers = await getTopFinishedBooksUsers(10);
+        const topUsers = await getTopReaders(10);
         setLeaderboard(topUsers);
         
-        // Get current user's stats if they're not in top 10
+        // Only show current user separately if they're NOT in the top 3
         if (user) {
-          const currentUserInTop = topUsers.find(u => u.id === user.uid);
-          if (!currentUserInTop) {
-            const userStats = await getUserStats(user.uid);
-            setCurrentUserStats(userStats);
+          const top3 = topUsers.slice(0, 3);
+          const currentUserInTop3 = top3.find(u => u.id === user.uid);
+          const currentUserInTop10 = topUsers.find(u => u.id === user.uid);
+          
+          // Only set currentUserStats if they're in top 10 but NOT in top 3
+          if (currentUserInTop10 && !currentUserInTop3) {
+            setCurrentUserStats(currentUserInTop10);
+          } else {
+            setCurrentUserStats(null);
           }
         }
       } catch (error) {
-        // Error fetching leaderboard
+        console.error('Error fetching leaderboard:', error);
       } finally {
         setLoading(false);
       }
