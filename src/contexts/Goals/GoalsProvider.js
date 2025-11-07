@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../AuthContext';
-import { getGoals, addGoal, updateGoal, deleteGoal } from '../../services/dataService';
-import { normalizeGoalType } from '../../utils/goalHelpers';
+import { useAuth } from 'AuthContext';
+import { getGoals, addGoal, updateGoal, deleteGoal } from 'services/goals/goals.service';
+import { normalizeGoalType } from 'utils/goalHelpers';
 import GoalsContext from './GoalsContext';
 
 // Helper function to normalize goal data
@@ -30,12 +30,14 @@ const normalizeGoal = (goalData, docId = null) => {
   };
 };
 
+// ******************STATE VALUES**********************
 const GoalsProvider = ({ children }) => {
   const { user } = useAuth();
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // ******************LOAD FUNCTIONS**********************
   // Fetch goals from API
   const refreshGoals = useCallback(async () => {
     if (!user) return;
@@ -54,11 +56,13 @@ const GoalsProvider = ({ children }) => {
     }
   }, [user]);
 
+  // ******************EFFECTS/REACTIONS**********************
   // Initial load
   useEffect(() => {
     refreshGoals();
   }, [refreshGoals]);
 
+  // ******************SETTERS**********************
   // Add a new goal
   const handleAddGoal = useCallback(async (goalData) => {
     if (!user) return;
@@ -141,6 +145,7 @@ const GoalsProvider = ({ children }) => {
     }
   }, [user]);
 
+  // ******************EXPORTS**********************
   return (
     <GoalsContext.Provider
       value={{

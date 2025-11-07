@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "baseUrl": "src",
+    "paths": {
+      "components/*": ["components/*"],
+      "contexts/*": ["contexts/*"],
+      "views/*": ["views/*"],
+      "services/*": ["services/*"],
+      "utils/*": ["utils/*"],
+      "hooks/*": ["hooks/*"],
+      "types/*": ["types/*"],
+      "UI/*": ["UI/*"],
+      "AuthContext": ["AuthContext.js"],
+      "theme": ["theme.js"]
+    }
+  },
+  "include": ["src"]
+}
+
