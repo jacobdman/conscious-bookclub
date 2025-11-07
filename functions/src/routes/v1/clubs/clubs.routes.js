@@ -11,6 +11,7 @@ const {
   rotateInviteCode,
   deleteClub,
 } = require("./clubs.ctrl");
+const {getClubGoalsReport} = require("./goalsReport.ctrl");
 
 const router = express.Router(); // eslint-disable-line new-cap
 
@@ -24,7 +25,8 @@ router
     .get("/:clubId/members", getClubMembers)
     .post("/:clubId/members", addClubMember)
     .delete("/:clubId/members/:memberUserId", removeClubMember)
-    .put("/:clubId/members/:memberUserId/role", updateMemberRole);
+    .put("/:clubId/members/:memberUserId/role", updateMemberRole)
+    .get("/:clubId/goals-report", getClubGoalsReport);
 
 module.exports = router;
 

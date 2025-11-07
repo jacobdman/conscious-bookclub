@@ -12,6 +12,7 @@ import GoalsCard from 'components/Goals/GoalsCard';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import FeedSection from 'components/FeedSection';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
+import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -115,6 +116,9 @@ const Dashboard = () => {
             <Typography variant="h5" sx={{ mb: 1 }}>
               {currentClub.name}
             </Typography>
+          )}
+          {currentClub && (
+            <HabitConsistencyLeaderboardWithData />
           )}
           <NextMeetingCard />
           
