@@ -161,8 +161,10 @@ module.exports = {
       defaultClubId = defaultClubResults[0].id;
     } else {
       // Create default "Main Club" with the old Google Calendar ID in config
-      const oldCalendarId = '99d5640c339ece5cf6b5abb26854d93f2cf4b8fc4b87e4a5aa0ca6bb4bc49020@group.calendar.google.com';
-      const configJson = JSON.stringify({ googleCalendarId: oldCalendarId }).replace(/'/g, "''");
+      const oldCalendarId =
+          "99d5640c339ece5cf6b5abb26854d93f2cf4b8fc4b87e4a5aa0ca6bb4bc49020@" +
+          "group.calendar.google.com";
+      const configJson = JSON.stringify({googleCalendarId: oldCalendarId}).replace(/'/g, "''");
       defaultClubResults = await queryInterface.sequelize.query(
           `INSERT INTO clubs (name, config, created_at) 
            VALUES ('Main Club', '${configJson}'::jsonb, CURRENT_TIMESTAMP) 
@@ -175,7 +177,6 @@ module.exports = {
     }
 
     if (defaultClubId) {
-
       // Assign all existing data to default club using raw SQL
       await queryInterface.sequelize.query(
           `UPDATE books SET club_id = ${defaultClubId} WHERE club_id IS NULL`,

@@ -391,7 +391,9 @@ const getBooksProgress = async (req, res, next) => {
           required: true,
         }],
         order: [
-          [db.sequelize.literal(`CASE WHEN status = 'finished' THEN 0 WHEN status = 'reading' THEN 1 ELSE 2 END`), "ASC"],
+          [db.sequelize.literal(
+              `CASE WHEN status = 'finished' THEN 0 ` +
+              `WHEN status = 'reading' THEN 1 ELSE 2 END`), "ASC"],
           [db.sequelize.literal("percent_complete"), "DESC"],
           [db.sequelize.literal("updated_at"), "DESC"],
         ],
@@ -448,7 +450,8 @@ const getBooksProgress = async (req, res, next) => {
               attributes: [
                 "status",
                 [db.sequelize.fn("COUNT", db.sequelize.col("BookProgress.id")), "count"],
-                [db.sequelize.fn("AVG", db.sequelize.col("BookProgress.percent_complete")), "avgPercent"],
+                [db.sequelize.fn("AVG",
+                    db.sequelize.col("BookProgress.percent_complete")), "avgPercent"],
               ],
               where: {bookId},
               group: ["status"],
@@ -487,7 +490,9 @@ const getBooksProgress = async (req, res, next) => {
                 required: true,
               }],
               order: [
-                [db.sequelize.literal(`CASE WHEN status = 'finished' THEN 0 WHEN status = 'reading' THEN 1 ELSE 2 END`), "ASC"],
+                [db.sequelize.literal(
+                    `CASE WHEN status = 'finished' THEN 0 ` +
+                    `WHEN status = 'reading' THEN 1 ELSE 2 END`), "ASC"],
                 [db.sequelize.literal("percent_complete"), "DESC"],
                 [db.sequelize.literal("updated_at"), "DESC"],
               ],

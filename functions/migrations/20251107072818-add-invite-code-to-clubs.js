@@ -9,8 +9,8 @@ module.exports = {
     try {
       // Helper function to generate a random 10-character alphanumeric code
       const generateInviteCode = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let code = '';
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let code = "";
         for (let i = 0; i < 10; i++) {
           code += chars.charAt(Math.floor(Math.random() * chars.length));
         }
@@ -31,12 +31,12 @@ module.exports = {
       };
 
       // Check if column already exists
-      const tableDescription = await queryInterface.describeTable('clubs');
+      const tableDescription = await queryInterface.describeTable("clubs");
       const columnExists = tableDescription.invite_code !== undefined;
 
       // Add invite_code column if it doesn't exist
       if (!columnExists) {
-        await queryInterface.addColumn('clubs', 'invite_code', {
+        await queryInterface.addColumn("clubs", "invite_code", {
           type: Sequelize.STRING(10),
           allowNull: true, // Temporarily nullable to generate codes
           unique: true,
@@ -59,7 +59,9 @@ module.exports = {
           code = generateInviteCode();
           attempts++;
           if (attempts >= maxAttempts) {
-            throw new Error(`Failed to generate unique invite code for club ${club.id} after ${maxAttempts} attempts`);
+            throw new Error(
+                `Failed to generate unique invite code for club ${club.id} ` +
+                `after ${maxAttempts} attempts`);
           }
         } while (await codeExists(code));
 
@@ -78,14 +80,14 @@ module.exports = {
 
       // Add index for faster lookups (check if it exists first)
       try {
-        await queryInterface.addIndex('clubs', ['invite_code'], {
-          name: 'clubs_invite_code_idx',
+        await queryInterface.addIndex("clubs", ["invite_code"], {
+          name: "clubs_invite_code_idx",
           unique: true,
           transaction,
         });
       } catch (error) {
         // Index might already exist, that's okay
-        if (!error.message.includes('already exists')) {
+        if (!error.message.includes("already exists")) {
           throw error;
         }
       }
@@ -101,10 +103,10 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     // Remove index
-    await queryInterface.removeIndex('clubs', 'clubs_invite_code_idx');
+    await queryInterface.removeIndex("clubs", "clubs_invite_code_idx");
 
     // Remove column
-    await queryInterface.removeColumn('clubs', 'invite_code');
+    await queryInterface.removeColumn("clubs", "invite_code");
   },
 };
 
