@@ -39,13 +39,13 @@ const GoalsProvider = ({ children }) => {
 
   // ******************LOAD FUNCTIONS**********************
   // Fetch goals from API
-  const refreshGoals = useCallback(async () => {
+  const refreshGoals = useCallback(async (options = {}) => {
     if (!user) return;
 
     try {
       setLoading(true);
       setError(null);
-      const goals = await getGoals(user.uid);
+      const goals = await getGoals(user.uid, options);
       const goalsData = goals.map(goal => normalizeGoal(goal, goal.id));
       setGoals(goalsData);
     } catch (err) {
@@ -87,35 +87,20 @@ const GoalsProvider = ({ children }) => {
   const handleUpdateGoal = useCallback(async (goalId, updates) => {
     if (!user) return;
 
-    // Store previous state for potential revert
-    let previousGoal = null;
-
-    // Optimistically update state and capture previous goal
-    setGoals(prev => {
-      previousGoal = prev.find(g => g.id === goalId);
-      return prev.map(goal => {
-        if (goal.id === goalId) {
-          return normalizeGoal({ ...goal, ...updates }, goalId);
-        }
-        return goal;
-      });
-    });
-
     try {
-      // Make API call
-      await updateGoal(user.uid, goalId, updates);
+      // Make API call - returns full updated goal object with progress
+      const result = await updateGoal(user.uid, goalId, updates);
+      
+      // Normalize and replace goal in state with server response
+      const updatedGoal = normalizeGoal(result, result.id);
+      setGoals(prev => prev.map(goal => 
+        goal.id === goalId ? updatedGoal : goal
+      ));
+      
+      return updatedGoal;
     } catch (err) {
       setError('Failed to update goal');
       console.error('Error updating goal:', err);
-      // Revert optimistic update on error
-      if (previousGoal) {
-        setGoals(prev => prev.map(goal => {
-          if (goal.id === goalId) {
-            return previousGoal;
-          }
-          return goal;
-        }));
-      }
       throw err;
     }
   }, [user]);
