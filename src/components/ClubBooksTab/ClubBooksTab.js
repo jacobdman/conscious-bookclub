@@ -9,12 +9,9 @@ const ClubBooksTab = () => {
 
   const fetchInFlightBooks = useCallback(async () => {
     try {
-      const snapshot = await getBooks();
+      const books = await getBooks();
       
-      const allBooksData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return { id: doc.id, ...data };
-      });
+      const allBooksData = books.map(book => ({ id: book.id, ...book }));
       
       // Filter books that have discussion dates and are today or in the future
       const today = new Date();

@@ -3,7 +3,7 @@ import { apiCall } from '../apiHelpers';
 // Goals CRUD functions
 export const getGoals = async (userId) => {
   const goals = await apiCall(`/v1/goals/${userId}`);
-  return { docs: goals.map(goal => ({ id: goal.id, data: () => goal })) };
+  return goals;
 };
 
 export const addGoal = async (userId, goal) => {
