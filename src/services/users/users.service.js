@@ -15,11 +15,11 @@ export const createUserDocument = async (user) => {
 
 export const getUserDocument = async (userId) => {
   const user = await apiCall(`/v1/users/${userId}`);
-  return { exists: () => true, data: () => user };
+  return user;
 };
 
 export const getAllUsers = async () => {
   const users = await apiCall('/v1/users');
-  return { docs: users.map(user => ({ id: user.uid, data: () => user })) };
+  return users;
 };
 

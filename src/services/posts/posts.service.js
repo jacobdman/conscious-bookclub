@@ -3,7 +3,7 @@ import { apiCall } from '../apiHelpers';
 // Posts functions
 export const getPosts = async () => {
   const posts = await apiCall('/v1/posts');
-  return { docs: posts.map(post => ({ id: post.id, data: () => post })) };
+  return posts;
 };
 
 export const addPost = async (post) => {
@@ -11,6 +11,6 @@ export const addPost = async (post) => {
     method: 'POST',
     body: JSON.stringify(post),
   });
-  return { id: result.id };
+  return result;
 };
 

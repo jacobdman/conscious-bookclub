@@ -45,8 +45,8 @@ const GoalsProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
-      const snapshot = await getGoals(user.uid);
-      const goalsData = snapshot.docs.map(doc => normalizeGoal(doc.data(), doc.id));
+      const goals = await getGoals(user.uid);
+      const goalsData = goals.map(goal => normalizeGoal(goal, goal.id));
       setGoals(goalsData);
     } catch (err) {
       setError('Failed to fetch goals');

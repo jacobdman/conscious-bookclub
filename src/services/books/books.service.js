@@ -3,7 +3,7 @@ import { apiCall } from '../apiHelpers';
 // Books CRUD functions
 export const getBooks = async () => {
   const result = await apiCall('/v1/books');
-  return { docs: result.books.map(book => ({ id: book.id, data: () => book })) };
+  return result.books || result;
 };
 
 export const addBook = async (book) => {
@@ -11,7 +11,7 @@ export const addBook = async (book) => {
     method: 'POST',
     body: JSON.stringify(book),
   });
-  return { id: result.id };
+  return result;
 };
 
 export const updateBook = async (bookId, updates) => {
