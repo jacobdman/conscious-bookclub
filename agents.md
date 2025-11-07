@@ -473,6 +473,56 @@ Refer to `functions/agents.md` for complete backend coding standards and convent
 
 ---
 
+## PWA and Deployment
+
+### Progressive Web App (PWA) Features
+
+The app is configured as a Progressive Web App (PWA) with the following features:
+
+- **Service Worker**: Caches static assets and provides offline support
+- **Install Prompt**: Mobile users are prompted to install the app to their home screen
+- **Update Detection**: Users are notified when a new version is available
+- **Manifest**: App metadata for installation and display
+
+### Deployment Checklist
+
+**IMPORTANT**: Before deploying a new version, you must update the version number to trigger service worker updates:
+
+1. **Update Version**: Increment the version in `public/version.json`
+   - Use semantic versioning (e.g., "1.0.1", "1.1.0", "2.0.0")
+   - This version number is used by the service worker to detect updates
+   - Users with installed PWAs will be prompted to update when the version changes
+
+2. **Build and Deploy**: Run the standard deployment command
+   ```bash
+   npm run deploy
+   ```
+
+3. **Verify**: After deployment, check that:
+   - Service worker is registered (check browser DevTools → Application → Service Workers)
+   - Update prompt appears for users with installed PWAs
+   - New version is detected correctly
+
+### Version Update Process
+
+The version update flow works as follows:
+
+1. Developer increments version in `public/version.json` before deployment
+2. Service worker detects the new version on app load
+3. UpdatePrompt component shows a notification to users
+4. Users can choose to update immediately or later
+5. On update, the service worker activates and the page reloads with the new version
+
+**Note**: The service worker only registers in production builds. Development builds do not use service workers to avoid caching issues during development.
+
+### PWA Components
+
+- **PWAInstallPrompt**: Shows installation instructions for mobile users (appears on Dashboard)
+- **UpdatePrompt**: Global component that detects and prompts for service worker updates
+- **pwaHelpers**: Utility functions for PWA detection (isRunningAsPWA, isMobileDevice, etc.)
+
+---
+
 ## Summary
 
 This codebase follows a structured, organized approach to React development with:

@@ -11,6 +11,7 @@ import CurrentBooksSection from 'components/CurrentBooksSection';
 import GoalsCard from 'components/Goals/GoalsCard';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import FeedSection from 'components/FeedSection';
+import PWAInstallPrompt from 'components/PWAInstallPrompt';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -109,6 +110,7 @@ const Dashboard = () => {
     <GoalsProvider>
       <Layout>
         <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <PWAInstallPrompt />
           {currentClub && (
             <Typography variant="h5" sx={{ mb: 1 }}>
               {currentClub.name}
