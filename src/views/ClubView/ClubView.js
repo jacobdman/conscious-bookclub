@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Tabs, Tab, Typography } from '@mui/material';
+import { Box, Tabs, Tab } from '@mui/material';
 import Layout from 'components/Layout';
 import ClubBooksTab from 'components/ClubBooksTab';
+import ClubGoalsReport from 'components/ClubGoalsReport';
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -13,7 +14,7 @@ function TabPanel({ children, value, index, ...other }) {
       {...other}
     >
       {value === index && (
-        <Box sx={{ p: 3 }}>
+        <Box>
           {children}
         </Box>
       )}
@@ -46,12 +47,7 @@ const ClubView = () => {
             sx={{ px: 2 }}
           >
             <Tab label="Books" {...a11yProps(0)} />
-            <Tab 
-              label="Goals" 
-              {...a11yProps(1)} 
-              disabled 
-              sx={{ color: 'text.disabled' }}
-            />
+            <Tab label="Goals" {...a11yProps(1)} />
           </Tabs>
         </Box>
         
@@ -60,14 +56,7 @@ const ClubView = () => {
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="h5" color="text.secondary">
-              Goals Tab Coming Soon
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-              We're working on bringing you goal progress tracking for the whole club!
-            </Typography>
-          </Box>
+          <ClubGoalsReport />
         </TabPanel>
       </Box>
     </Layout>
