@@ -22,40 +22,27 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
     );
   }
 
-  // Calculate width to show 3.5 items (3 full + 0.5 of 4th)
   const itemWidth = 100; // minWidth of each item
-  const gap = 16; // gap between items (gap: 2 = 16px)
-  const containerWidth = itemWidth * 3.5 + gap * 3; // 3.5 items + 3 gaps
 
   return (
     <Box
       sx={{
-        position: 'relative',
         width: '100%',
-        maxWidth: containerWidth,
-        overflow: 'hidden',
       }}
     >
       <Box
         sx={{
           display: 'flex',
-          gap: 1,
+          gap: 0.7,
           overflowX: 'auto',
           pb: 1,
           scrollbarWidth: 'none', // Firefox
           '&::-webkit-scrollbar': {
             display: 'none', // Chrome, Safari, Edge
           },
-          // Add a fade-out gradient on the right to indicate scrollability
-          maskImage: 'linear-gradient(to right, black calc(100% - 50px), transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 50px), transparent 100%)',
         }}
       >
-      {leaderboard.map((entry, index) => {
-        // Show first 3 fully, 4th partially (50% visible)
-        const isPartial = index === 3;
-        const opacity = isPartial ? 0.5 : 1;
-        
+      {leaderboard.map((entry) => {
         return (
           <Box
             key={entry.userId}
@@ -66,7 +53,6 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
               position: 'relative',
               minWidth: itemWidth,
               flexShrink: 0,
-              opacity,
             }}
           >
             <Badge
