@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
 import { getGoals, addGoal, updateGoal, deleteGoal } from 'services/goals/goals.service';
 import { normalizeGoalType } from 'utils/goalHelpers';
 import GoalsContext from './GoalsContext';
@@ -33,6 +34,7 @@ const normalizeGoal = (goalData, docId = null) => {
 // ******************STATE VALUES**********************
 const GoalsProvider = ({ children }) => {
   const { user } = useAuth();
+  const { currentClub } = useClubContext();
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,12 +42,12 @@ const GoalsProvider = ({ children }) => {
   // ******************LOAD FUNCTIONS**********************
   // Fetch goals from API
   const refreshGoals = useCallback(async (options = {}) => {
-    if (!user) return;
+    if (!user || !currentClub) return;
 
     try {
       setLoading(true);
       setError(null);
-      const goals = await getGoals(user.uid, options);
+      const goals = await getGoals(user.uid, currentClub.id, options);
       const goalsData = goals.map(goal => normalizeGoal(goal, goal.id));
       setGoals(goalsData);
     } catch (err) {
@@ -54,7 +56,7 @@ const GoalsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, currentClub]);
 
   // ******************EFFECTS/REACTIONS**********************
   // Initial load
@@ -65,11 +67,11 @@ const GoalsProvider = ({ children }) => {
   // ******************SETTERS**********************
   // Add a new goal
   const handleAddGoal = useCallback(async (goalData) => {
-    if (!user) return;
+    if (!user || !currentClub) return;
 
     try {
       // Make API call - returns full goal object with id, created_at, etc.
-      const result = await addGoal(user.uid, goalData);
+      const result = await addGoal(user.uid, currentClub.id, goalData);
       
       // Normalize and add to state directly from API response
       const newGoal = normalizeGoal(result, result.id);
@@ -81,15 +83,15 @@ const GoalsProvider = ({ children }) => {
       console.error('Error creating goal:', err);
       throw err;
     }
-  }, [user]);
+  }, [user, currentClub]);
 
   // Update an existing goal
   const handleUpdateGoal = useCallback(async (goalId, updates) => {
-    if (!user) return;
+    if (!user || !currentClub) return;
 
     try {
       // Make API call - returns full updated goal object with progress
-      const result = await updateGoal(user.uid, goalId, updates);
+      const result = await updateGoal(user.uid, currentClub.id, goalId, updates);
       
       // Normalize and replace goal in state with server response
       const updatedGoal = normalizeGoal(result, result.id);
@@ -103,11 +105,11 @@ const GoalsProvider = ({ children }) => {
       console.error('Error updating goal:', err);
       throw err;
     }
-  }, [user]);
+  }, [user, currentClub]);
 
   // Delete a goal
   const handleDeleteGoal = useCallback(async (goalId) => {
-    if (!user) return;
+    if (!user || !currentClub) return;
 
     // Store the goal for potential revert and optimistically remove from state
     let deletedGoal = null;
@@ -118,7 +120,7 @@ const GoalsProvider = ({ children }) => {
     
     try {
       // Make API call
-      await deleteGoal(user.uid, goalId);
+      await deleteGoal(user.uid, currentClub.id, goalId);
     } catch (err) {
       setError('Failed to delete goal');
       console.error('Error deleting goal:', err);
@@ -128,7 +130,7 @@ const GoalsProvider = ({ children }) => {
       }
       throw err;
     }
-  }, [user]);
+  }, [user, currentClub]);
 
   // ******************EXPORTS**********************
   return (

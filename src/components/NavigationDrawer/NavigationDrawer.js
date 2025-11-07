@@ -8,13 +8,19 @@ import {
   Typography,
   Divider,
   ListItemIcon,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import { OpenInNew } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import useClubContext from 'contexts/Club';
 
 const NavigationDrawer = ({ open, onClose, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentClub, userClubs, setCurrentClub, loading: clubsLoading } = useClubContext();
 
   const menuItems = [
     { name: 'Dashboard', path: '/' },
@@ -26,6 +32,11 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
     { name: 'Profile', path: '/profile' },
   ];
 
+  // Add "Manage Club" if user is owner
+  if (currentClub?.role === 'owner') {
+    menuItems.splice(2, 0, { name: 'Manage Club', path: '/club/manage' });
+  }
+
   const handleNavigation = (path) => {
     navigate(path);
     onClose();
@@ -34,6 +45,24 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
   const handleExternalLink = (url) => {
     window.open(url, '_blank');
     onClose();
+  };
+
+  const handleClubChange = async (event) => {
+    const newClubId = event.target.value;
+    
+    // Special value to navigate to join club page
+    if (newClubId === 'join-new-club') {
+      navigate('/join-club');
+      onClose();
+      return;
+    }
+    
+    try {
+      await setCurrentClub(newClubId);
+      onClose();
+    } catch (err) {
+      console.error('Failed to switch club:', err);
+    }
   };
 
   return (
@@ -46,6 +75,33 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
         p: 2 
       }} role="presentation">
         <Typography variant="h6" sx={{ mb: 2 }}>Navigation</Typography>
+        
+        {/* Club selector */}
+        {!clubsLoading && userClubs.length > 0 && (
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="club-select-label">Club</InputLabel>
+            <Select
+              labelId="club-select-label"
+              id="club-select"
+              value={currentClub?.id || ''}
+              label="Club"
+              onChange={handleClubChange}
+              size="small"
+            >
+              {userClubs.map((club) => (
+                <MenuItem key={club.id} value={club.id}>
+                  {club.name}
+                </MenuItem>
+              ))}
+              <Divider sx={{ my: 0.5 }} />
+              <MenuItem value="join-new-club">
+                <Typography variant="body2" color="primary">
+                  + Join New Club
+                </Typography>
+              </MenuItem>
+            </Select>
+          </FormControl>
+        )}
         
         {/* Main navigation items */}
         <Box sx={{ flex: 1, overflow: 'auto' }}>

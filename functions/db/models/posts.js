@@ -26,6 +26,11 @@ module.exports = function(sequelize, DataTypes) {
           field: "reaction_counts",
           defaultValue: {thumbsUp: 0, thumbsDown: 0, heart: 0, laugh: 0},
         },
+        clubId: {
+          type: DataTypes.INTEGER,
+          field: "club_id",
+          allowNull: false,
+        },
       },
       {
         tableName: "posts",
@@ -39,6 +44,10 @@ module.exports = function(sequelize, DataTypes) {
     Post.belongsTo(models.User, {
       foreignKey: "author_id",
       as: "author",
+    });
+    Post.belongsTo(models.Club, {
+      foreignKey: "club_id",
+      as: "club",
     });
   };
 

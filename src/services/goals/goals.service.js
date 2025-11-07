@@ -1,8 +1,8 @@
 import { apiCall } from '../apiHelpers';
 
 // Goals CRUD functions
-export const getGoals = async (userId, options = {}) => {
-  const params = new URLSearchParams({ userId });
+export const getGoals = async (userId, clubId, options = {}) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
   if (options.type) params.append('type', options.type);
   if (options.completed !== undefined) params.append('completed', options.completed.toString());
   if (options.sort) params.append('sort', options.sort);
@@ -11,8 +11,8 @@ export const getGoals = async (userId, options = {}) => {
   return goals;
 };
 
-export const addGoal = async (userId, goal) => {
-  const params = new URLSearchParams({ userId });
+export const addGoal = async (userId, clubId, goal) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
   const result = await apiCall(`/v1/goals?${params}`, {
     method: 'POST',
     body: JSON.stringify(goal),
@@ -20,8 +20,8 @@ export const addGoal = async (userId, goal) => {
   return result; // Return the full goal object from API
 };
 
-export const updateGoal = async (userId, goalId, updates) => {
-  const params = new URLSearchParams({ userId });
+export const updateGoal = async (userId, clubId, goalId, updates) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
   const result = await apiCall(`/v1/goals/${goalId}?${params}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
@@ -29,8 +29,8 @@ export const updateGoal = async (userId, goalId, updates) => {
   return result; // Return the full updated goal object from API
 };
 
-export const deleteGoal = async (userId, goalId) => {
-  const params = new URLSearchParams({ userId });
+export const deleteGoal = async (userId, clubId, goalId) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
   await apiCall(`/v1/goals/${goalId}?${params}`, {
     method: 'DELETE',
   });

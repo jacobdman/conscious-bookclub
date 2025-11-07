@@ -171,14 +171,20 @@ const evaluateGoal = async (userId, goalId, period = "current", timestamp = null
 const getGoals = async (req, res, next) => {
   try {
     const userId = req.query.userId;
+    const clubId = req.query.clubId;
     if (!userId) {
       const error = new Error("userId is required");
       error.status = 400;
       throw error;
     }
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
 
     // Build where clause
-    const whereClause = {userId};
+    const whereClause = {userId, clubId: parseInt(clubId)};
 
     // Apply filters
     if (req.query.type) {
@@ -248,8 +254,14 @@ const getGoals = async (req, res, next) => {
 const createGoal = async (req, res, next) => {
   try {
     const userId = req.query.userId;
+    const clubId = req.query.clubId;
     if (!userId) {
       const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!clubId) {
+      const error = new Error("clubId is required");
       error.status = 400;
       throw error;
     }
@@ -287,6 +299,7 @@ const createGoal = async (req, res, next) => {
     const goal = await db.Goal.create({
       ...goalData,
       userId,
+      clubId: parseInt(clubId),
       createdAt: new Date(),
     });
 
@@ -324,17 +337,25 @@ const createGoal = async (req, res, next) => {
 const updateGoal = async (req, res, next) => {
   try {
     const userId = req.query.userId;
+    const clubId = req.query.clubId;
     if (!userId) {
       const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!clubId) {
+      const error = new Error("clubId is required");
       error.status = 400;
       throw error;
     }
 
     const {goalId} = req.params;
     const updates = req.body;
+    // Ensure clubId is not changed
+    delete updates.clubId;
 
-    // Verify goal belongs to userId
-    const goal = await db.Goal.findOne({where: {id: goalId, userId}});
+    // Verify goal belongs to userId and clubId
+    const goal = await db.Goal.findOne({where: {id: goalId, userId, clubId: parseInt(clubId)}});
     if (!goal) {
       const error = new Error("Goal not found");
       error.status = 404;
@@ -347,7 +368,7 @@ const updateGoal = async (req, res, next) => {
     const isMilestoneGoal = updates.type === "milestone" || goal.type === "milestone";
 
     // Update the goal itself
-    await db.Goal.update(goalUpdates, {where: {id: goalId, userId}});
+    await db.Goal.update(goalUpdates, {where: {id: goalId, userId, clubId: parseInt(clubId)}});
 
     // Handle milestones if provided and this is a milestone goal
     if (isMilestoneGoal && milestones && Array.isArray(milestones)) {
@@ -399,16 +420,22 @@ const updateGoal = async (req, res, next) => {
 const deleteGoal = async (req, res, next) => {
   try {
     const userId = req.query.userId;
+    const clubId = req.query.clubId;
     if (!userId) {
       const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!clubId) {
+      const error = new Error("clubId is required");
       error.status = 400;
       throw error;
     }
 
     const {goalId} = req.params;
 
-    // Verify goal belongs to userId
-    const goal = await db.Goal.findOne({where: {id: goalId, userId}});
+    // Verify goal belongs to userId and clubId
+    const goal = await db.Goal.findOne({where: {id: goalId, userId, clubId: parseInt(clubId)}});
     if (!goal) {
       const error = new Error("Goal not found");
       error.status = 404;
@@ -416,7 +443,7 @@ const deleteGoal = async (req, res, next) => {
     }
 
     // Cascade delete will handle entries and milestones
-    await db.Goal.destroy({where: {id: goalId, userId}});
+    await db.Goal.destroy({where: {id: goalId, userId, clubId: parseInt(clubId)}});
     res.sendStatus(204);
   } catch (e) {
     next(e);

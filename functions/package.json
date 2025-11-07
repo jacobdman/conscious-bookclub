@@ -10,6 +10,7 @@
     "logs": "firebase functions:log",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
     "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
     "migrate:status": "sequelize-cli db:migrate:status"
   },

@@ -57,6 +57,11 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.DATE,
           field: "completed_at",
         },
+        clubId: {
+          type: DataTypes.INTEGER,
+          field: "club_id",
+          allowNull: false,
+        },
       },
       {
         tableName: "goals",
@@ -70,6 +75,10 @@ module.exports = function(sequelize, DataTypes) {
     Goal.belongsTo(models.User, {
       foreignKey: "user_id",
       as: "user",
+    });
+    Goal.belongsTo(models.Club, {
+      foreignKey: "club_id",
+      as: "club",
     });
     Goal.hasMany(models.GoalCompletion, {
       foreignKey: "goal_id",

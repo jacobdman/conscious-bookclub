@@ -10,20 +10,40 @@ import {
 } from '@mui/material';
 import { LocationOn } from '@mui/icons-material';
 import { fetchCalendarEvents } from 'services/calendarService';
+import useClubContext from 'contexts/Club';
 import moment from 'moment';
 
 const NextMeetingCard = () => {
+  const { currentClub } = useClubContext();
   const [nextEvent, setNextEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const getNextEvent = async () => {
+      if (!currentClub) {
+        setLoading(false);
+        setError(null);
+        setNextEvent(null);
+        return;
+      }
+
+      // Check if config exists and has googleCalendarId
+      const config = currentClub.config || {};
+      const googleCalendarId = config.googleCalendarId;
+      
+      if (!googleCalendarId) {
+        setError('Google Calendar is not configured for this club. Please contact the club owner to configure it in Club Management.');
+        setLoading(false);
+        setNextEvent(null);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
         
-        const events = await fetchCalendarEvents();
+        const events = await fetchCalendarEvents(googleCalendarId);
         
         // Find the next upcoming event
         const now = new Date();
@@ -37,14 +57,16 @@ const NextMeetingCard = () => {
           setNextEvent(null);
         }
       } catch (err) {
-        setError('Failed to fetch next meeting');
+        setError(err.message || 'Failed to fetch next meeting');
+        console.error('Error fetching next meeting:', err);
+        setNextEvent(null);
       } finally {
         setLoading(false);
       }
     };
 
     getNextEvent();
-  }, []);
+  }, [currentClub]);
 
   const formatEventTime = (event) => {
     if (event.allDay) {
@@ -71,7 +93,10 @@ const NextMeetingCard = () => {
     return (
       <Card>
         <CardContent sx={{ py: 1 }}>
-          <Alert severity="error" size="small">
+          <Typography variant="h6" gutterBottom>
+            Next Meeting
+          </Typography>
+          <Alert severity="info" size="small">
             {error}
           </Alert>
         </CardContent>

@@ -2,12 +2,16 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotification';
+import ClubProvider from './contexts/Club/ClubProvider';
 import { setGlobalErrorHandler } from './services/apiHelpers';
+import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './views/Dashboard';
 import ClubView from './views/ClubView';
+import ClubManagement from './views/ClubManagement';
 import Books from './views/Books';
 import Calendar from './views/Calendar';
 import Goals from './views/Goals';
+import NoClub from './views/NoClub';
 import Login from './Login';
 import { CircularProgress, Box } from '@mui/material';
 
@@ -40,16 +44,62 @@ function AppContent() {
   }
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/club" element={<ClubView />} />
-        <Route path="/books" element={<Books />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/goals" element={<Goals />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+    <ClubProvider>
+      <Router>
+        <Routes>
+          <Route path="/join-club" element={<NoClub />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/club"
+            element={
+              <ProtectedRoute>
+                <ClubView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/club/manage"
+            element={
+              <ProtectedRoute>
+                <ClubManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/books"
+            element={
+              <ProtectedRoute>
+                <Books />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <Calendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/goals"
+            element={
+              <ProtectedRoute>
+                <Goals />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </ClubProvider>
   );
 }
 
