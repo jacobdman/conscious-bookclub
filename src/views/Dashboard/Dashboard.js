@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { getPosts, addPost } from 'services/posts/posts.service';
 import { getBooks } from 'services/books/books.service';
 import { useAuth } from 'AuthContext';
@@ -109,6 +109,11 @@ const Dashboard = () => {
     <GoalsProvider>
       <Layout>
         <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {currentClub && (
+            <Typography variant="h5" sx={{ mb: 1 }}>
+              {currentClub.name}
+            </Typography>
+          )}
           <NextMeetingCard />
           
           <QuickGoalCompletion />

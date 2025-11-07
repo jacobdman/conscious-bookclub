@@ -1,28 +1,77 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AppBar,
   Avatar,
   IconButton,
   Toolbar,
   Typography,
+  Menu,
+  MenuItem,
+  Box,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
+import useClubContext from 'contexts/Club';
 
 const Header = ({ user, onMenuClick, onLogout }) => {
+  const { currentClub } = useClubContext();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const menuOpen = Boolean(anchorEl);
+
+  const handleAvatarClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    handleMenuClose();
+    onLogout();
+  };
+
   return (
     <AppBar position="static" color="primary">
       <Toolbar>
         <IconButton edge="start" color="inherit" onClick={onMenuClick}>
           <MenuIcon />
         </IconButton>
-        <Typography variant="h6" sx={{ flexGrow: 1, textAlign: 'center' }}>
-          Welcome, {user?.displayName || user?.email || 'User'}!
-        </Typography>
-        <IconButton color="inherit" onClick={onLogout} sx={{ mr: 1 }}>
-          <LogoutIcon />
+        <Box sx={{ flexGrow: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Typography variant="h6">
+            Welcome, {user?.displayName || user?.email || 'User'}!
+          </Typography>
+          {currentClub && (
+            <Typography variant="caption" sx={{ opacity: 0.9, fontSize: '0.75rem' }}>
+              {currentClub.name}
+            </Typography>
+          )}
+        </Box>
+        <IconButton
+          color="inherit"
+          onClick={handleAvatarClick}
+          sx={{ p: 0 }}
+        >
+          <Avatar src={user?.photoURL} alt={user?.displayName || user?.email} />
         </IconButton>
-        <Avatar src={user?.photoURL} alt={user?.displayName || user?.email} />
+        <Menu
+          anchorEl={anchorEl}
+          open={menuOpen}
+          onClose={handleMenuClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+          }}
+        >
+          <MenuItem onClick={handleLogout}>
+            <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
+            Logout
+          </MenuItem>
+        </Menu>
       </Toolbar>
     </AppBar>
   );
