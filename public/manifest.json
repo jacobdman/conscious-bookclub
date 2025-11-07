@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "CBC",
+  "name": "Conscious Book Club",
+  "description": "Connect with fellow book lovers, track your reading goals, and participate in book club discussions",
   "icons": [
     {
       "src": "favicon.ico",
@@ -8,18 +9,27 @@
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "android-chrome-192x192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
-      "src": "logo512.png",
+      "src": "android-chrome-512x512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#BFA480",
+  "background_color": "#F5F1EA"
 }

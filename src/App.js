@@ -13,6 +13,7 @@ import Calendar from './views/Calendar';
 import Goals from './views/Goals';
 import NoClub from './views/NoClub';
 import Login from './Login';
+import UpdatePrompt from 'components/UpdatePrompt';
 import { CircularProgress, Box } from '@mui/material';
 
 function AppContent() {
@@ -108,6 +109,7 @@ function App() {
     <AuthProvider>
       <ErrorNotificationProvider>
         <AppContent />
+        <UpdatePrompt />
       </ErrorNotificationProvider>
     </AuthProvider>
   );
