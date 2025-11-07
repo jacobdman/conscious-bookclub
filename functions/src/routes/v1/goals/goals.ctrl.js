@@ -87,7 +87,7 @@ const getPeriodBoundaries = (
 };
 
 // Helper function to evaluate goal
-const evaluateGoal = async (userId, goalId, timestamp = null) => {
+const evaluateGoal = async (userId, goalId, period = "current", timestamp = null) => {
   const goal = await db.Goal.findOne({where: {id: goalId, userId}});
   if (!goal) {
     throw new Error("Goal not found");
@@ -119,7 +119,30 @@ const evaluateGoal = async (userId, goalId, timestamp = null) => {
     throw new Error("Goal must have cadence for evaluation");
   }
 
-  const {start, end} = getPeriodBoundaries(goalData.cadence, timestamp);
+  let start = null;
+  let end = null;
+
+  if (period === "current") {
+    const boundaries = getPeriodBoundaries(goalData.cadence, timestamp);
+    start = boundaries.start;
+    end = boundaries.end;
+  } else if (period === "all") {
+    // No date filtering - start and end remain null
+    start = null;
+    end = null;
+  } else if (period.includes(",")) {
+    // Custom date range: 'YYYY-MM-DD,YYYY-MM-DD'
+    const [startStr, endStr] = period.split(",");
+    start = new Date(startStr);
+    end = new Date(endStr);
+    // Set end to end of day
+    end.setHours(23, 59, 59, 999);
+  } else {
+    throw new Error(
+        `Invalid period: ${period}. Must be 'current', 'all', or 'YYYY-MM-DD,YYYY-MM-DD'`,
+    );
+  }
+
   const entries = await getGoalEntries(userId, goalId, start, end);
 
   if (goalData.measure === "count") {
@@ -144,13 +167,42 @@ const evaluateGoal = async (userId, goalId, timestamp = null) => {
   throw new Error(`Invalid measure: ${goalData.measure}`);
 };
 
-// GET /v1/goals/:userId - Get user's goals
+// GET /v1/goals - Get user's goals
 const getGoals = async (req, res, next) => {
   try {
-    const {userId} = req.params;
+    const userId = req.query.userId;
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    // Build where clause
+    const whereClause = {userId};
+
+    // Apply filters
+    if (req.query.type) {
+      whereClause.type = req.query.type;
+    }
+    if (req.query.completed !== undefined) {
+      whereClause.completed = req.query.completed === "true";
+    }
+
+    // Determine sort order
+    let orderBy = [["created_at", "DESC"]];
+    if (req.query.sort) {
+      const sortField = req.query.sort;
+      if (sortField === "created_at" || sortField === "completed_at") {
+        orderBy = [[sortField, "DESC"]];
+      }
+    }
+
+    // Get period parameter (default to 'current')
+    const period = req.query.period || "current";
+
     const goals = await db.Goal.findAll({
-      where: {userId},
-      order: [["created_at", "DESC"]],
+      where: whereClause,
+      order: orderBy,
       include: [
         {
           model: db.Milestone,
@@ -159,24 +211,49 @@ const getGoals = async (req, res, next) => {
         },
       ],
     });
-    const goalsData = goals.map((goal) => {
-      const goalData = goal.toJSON();
-      // Ensure milestones array exists (will be populated via alias)
-      if (!goalData.milestones) {
-        goalData.milestones = [];
-      }
-      return {id: goal.id, ...goalData};
-    });
+
+    // Compute progress for each goal and build response
+    const goalsData = await Promise.all(
+        goals.map(async (goal) => {
+          const goalData = goal.toJSON();
+          // Ensure milestones array exists (will be populated via alias)
+          if (!goalData.milestones) {
+            goalData.milestones = [];
+          }
+
+          // Calculate progress based on period
+          let progress = null;
+          try {
+            progress = await evaluateGoal(userId, goal.id, period);
+          } catch (err) {
+            // If progress calculation fails, continue without progress
+            console.error(`Error calculating progress for goal ${goal.id}:`, err);
+          }
+
+          return {
+            id: goal.id,
+            ...goalData,
+            progress,
+          };
+        }),
+    );
+
     res.json(goalsData);
   } catch (e) {
     next(e);
   }
 };
 
-// POST /v1/goals/:userId - Create new goal
+// POST /v1/goals - Create new goal
 const createGoal = async (req, res, next) => {
   try {
-    const {userId} = req.params;
+    const userId = req.query.userId;
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
     const goalData = req.body;
 
     // Validate goal type invariants
@@ -226,6 +303,7 @@ const createGoal = async (req, res, next) => {
     }
 
     // Fetch the complete goal with milestones to return all fields
+    // Note: No progress included since new goal has no progress
     const completeGoal = await db.Goal.findByPk(goal.id, {
       include: [
         {
@@ -236,28 +314,35 @@ const createGoal = async (req, res, next) => {
       ],
     });
 
-    res.status(201).json(completeGoal.toJSON());
+    res.status(201).json({id: completeGoal.id, ...completeGoal.toJSON()});
   } catch (e) {
     next(e);
   }
 };
 
-// PUT /v1/goals/:userId/:goalId - Update goal
+// PATCH /v1/goals/:goalId - Update goal
 const updateGoal = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
+    const userId = req.query.userId;
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const {goalId} = req.params;
     const updates = req.body;
 
-    // Remove milestones from updates if present (we'll handle them separately)
-    const {milestones, ...goalUpdates} = updates;
-
-    // Check if this is a milestone goal (either updating to milestone or already is one)
+    // Verify goal belongs to userId
     const goal = await db.Goal.findOne({where: {id: goalId, userId}});
     if (!goal) {
       const error = new Error("Goal not found");
       error.status = 404;
       throw error;
     }
+
+    // Remove milestones from updates if present (we'll handle them separately)
+    const {milestones, ...goalUpdates} = updates;
 
     const isMilestoneGoal = updates.type === "milestone" || goal.type === "milestone";
 
@@ -280,6 +365,7 @@ const updateGoal = async (req, res, next) => {
       }
     }
 
+    // Fetch the updated goal with milestones
     const updatedGoal = await db.Goal.findByPk(goalId, {
       include: [
         {
@@ -290,16 +376,45 @@ const updateGoal = async (req, res, next) => {
       ],
     });
 
-    res.json({id: updatedGoal.id, ...updatedGoal.toJSON()});
+    // Calculate progress with 'current' period
+    let progress = null;
+    try {
+      progress = await evaluateGoal(userId, goalId, "current");
+    } catch (err) {
+      // If progress calculation fails, continue without progress
+      console.error(`Error calculating progress for goal ${goalId}:`, err);
+    }
+
+    res.json({
+      id: updatedGoal.id,
+      ...updatedGoal.toJSON(),
+      progress,
+    });
   } catch (e) {
     next(e);
   }
 };
 
-// DELETE /v1/goals/:userId/:goalId - Delete goal
+// DELETE /v1/goals/:goalId - Delete goal
 const deleteGoal = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
+    const userId = req.query.userId;
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const {goalId} = req.params;
+
+    // Verify goal belongs to userId
+    const goal = await db.Goal.findOne({where: {id: goalId, userId}});
+    if (!goal) {
+      const error = new Error("Goal not found");
+      error.status = 404;
+      throw error;
+    }
+
     // Cascade delete will handle entries and milestones
     await db.Goal.destroy({where: {id: goalId, userId}});
     res.sendStatus(204);
@@ -308,11 +423,18 @@ const deleteGoal = async (req, res, next) => {
   }
 };
 
-// POST /v1/goals/:userId/:goalId/complete - Mark goal as complete
+// POST /v1/goals/:goalId/complete - Mark goal as complete
 const markGoalComplete = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
+    const userId = req.query.userId;
+    const {goalId} = req.params;
     const {periodId} = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
 
     if (periodId) {
       await db.GoalCompletion.upsert({
@@ -335,11 +457,18 @@ const markGoalComplete = async (req, res, next) => {
   }
 };
 
-// DELETE /v1/goals/:userId/:goalId/complete - Mark goal as incomplete
+// DELETE /v1/goals/:goalId/complete - Mark goal as incomplete
 const markGoalIncomplete = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
+    const userId = req.query.userId;
+    const {goalId} = req.params;
     const {periodId} = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
 
     if (periodId) {
       await db.GoalCompletion.destroy({
@@ -353,11 +482,18 @@ const markGoalIncomplete = async (req, res, next) => {
   }
 };
 
-// GET /v1/goals/:userId/:goalId/completion - Check goal completion
+// GET /v1/goals/:goalId/completion - Check goal completion
 const checkGoalCompletion = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
+    const userId = req.query.userId;
+    const {goalId} = req.params;
     const {periodId} = req.query;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
 
     if (!periodId) {
       const error = new Error("periodId is required");
@@ -374,10 +510,18 @@ const checkGoalCompletion = async (req, res, next) => {
   }
 };
 
-// POST /v1/goals/:userId/:goalId/milestone/:milestoneIndex - Mark milestone complete (legacy)
+// POST /v1/goals/:goalId/milestone/:milestoneIndex - Mark milestone complete (legacy)
 const markMilestoneComplete = async (req, res, next) => {
   try {
-    const {userId, goalId, milestoneIndex} = req.params;
+    const userId = req.query.userId;
+    const {goalId, milestoneIndex} = req.params;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
     const goal = await db.Goal.findOne({where: {id: goalId, userId}});
     if (!goal) {
       const error = new Error("Goal not found");
@@ -398,11 +542,19 @@ const markMilestoneComplete = async (req, res, next) => {
   }
 };
 
-// POST /v1/goals/:userId/:goalId/entries - Create entry
+// POST /v1/goals/:goalId/entries - Create entry
 const createGoalEntry = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
+    const userId = req.query.userId;
+    const {goalId} = req.params;
     const entryData = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
     const entry = await db.GoalEntry.create({
       goalId: parseInt(goalId),
       userId,
@@ -415,11 +567,19 @@ const createGoalEntry = async (req, res, next) => {
   }
 };
 
-// GET /v1/goals/:userId/:goalId/entries - Get entries
+// GET /v1/goals/:goalId/entries - Get entries
 const getGoalEntriesHandler = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
+    const userId = req.query.userId;
+    const {goalId} = req.params;
     const {periodStart, periodEnd} = req.query;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
     const entries = await getGoalEntries(
         userId,
         parseInt(goalId),
@@ -432,11 +592,19 @@ const getGoalEntriesHandler = async (req, res, next) => {
   }
 };
 
-// PUT /v1/goals/:userId/:goalId/entries/:entryId - Update entry
+// PUT /v1/goals/:goalId/entries/:entryId - Update entry
 const updateGoalEntry = async (req, res, next) => {
   try {
-    const {userId, entryId} = req.params;
+    const userId = req.query.userId;
+    const {entryId} = req.params;
     const updates = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
     const entry = await db.GoalEntry.findOne({
       where: {id: parseInt(entryId), userId},
     });
@@ -455,10 +623,18 @@ const updateGoalEntry = async (req, res, next) => {
   }
 };
 
-// DELETE /v1/goals/:userId/:goalId/entries/:entryId - Delete entry
+// DELETE /v1/goals/:goalId/entries/:entryId - Delete entry
 const deleteGoalEntry = async (req, res, next) => {
   try {
-    const {userId, entryId} = req.params;
+    const userId = req.query.userId;
+    const {entryId} = req.params;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
     await db.GoalEntry.destroy({where: {id: parseInt(entryId), userId}});
     res.sendStatus(204);
   } catch (e) {
@@ -466,11 +642,20 @@ const deleteGoalEntry = async (req, res, next) => {
   }
 };
 
-// GET /v1/goals/:userId/:goalId/progress - Get current progress
+// GET /v1/goals/:goalId/progress - Get current progress
 const getGoalProgress = async (req, res, next) => {
   try {
-    const {userId, goalId} = req.params;
-    const progress = await evaluateGoal(userId, parseInt(goalId));
+    const userId = req.query.userId;
+    const {goalId} = req.params;
+    const period = req.query.period || "current";
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const progress = await evaluateGoal(userId, parseInt(goalId), period);
     res.json(progress);
   } catch (e) {
     next(e);

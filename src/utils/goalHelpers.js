@@ -346,3 +346,104 @@ export const formatMilestoneDisplay = (goal) => {
   
   return display;
 };
+
+/**
+ * Get display label for a goal type
+ * @param {Object} goal - Goal object
+ * @returns {string} - Formatted type label
+ */
+export const getGoalTypeLabel = (goal) => {
+  const goalType = normalizeGoalType(goal.type);
+  switch (goalType) {
+    case 'habit': 
+      return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Habit` : 'Habit';
+    case 'metric': 
+      return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Metric` : 'Metric';
+    case 'milestone': 
+      return 'Milestone';
+    case 'one_time':
+      return 'One-time';
+    default: 
+      return goal.type || 'Goal';
+  }
+};
+
+/**
+ * Get color for a goal type (for MUI Chip/Button color prop)
+ * @param {string} goalType - Goal type string
+ * @returns {string} - MUI color name
+ */
+export const getGoalTypeColor = (goalType) => {
+  const normalizedType = normalizeGoalType(goalType);
+  switch (normalizedType) {
+    case 'habit': 
+      return 'success';
+    case 'metric': 
+      return 'warning';
+    case 'milestone': 
+      return 'secondary';
+    case 'one_time':
+      return 'primary';
+    default: 
+      return 'default';
+  }
+};
+
+/**
+ * Format a date/timestamp for display
+ * @param {Date|string|number} timestamp - Date to format
+ * @returns {string} - Formatted date string or error message
+ */
+export const formatDate = (timestamp) => {
+  if (!timestamp) return 'No date';
+  try {
+    if (timestamp instanceof Date) return timestamp.toLocaleDateString();
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString();
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
+
+/**
+ * Get progress info text for a goal
+ * @param {Object} goal - Goal object with progress
+ * @returns {string} - Formatted progress info text
+ */
+export const getProgressInfo = (goal) => {
+  const progress = goal.progress;
+  const goalType = normalizeGoalType(goal.type);
+  
+  switch (goalType) {
+    case 'one_time':
+      return goal.completed ? 'Completed' : `Due: ${formatDate(goal.dueAt || goal.due_at)}`;
+    case 'milestone':
+      const completedMilestones = goal.milestones?.filter(m => m.done).length || 0;
+      const totalMilestones = goal.milestones?.length || 0;
+      return `${completedMilestones}/${totalMilestones} milestones`;
+    case 'habit':
+    case 'metric':
+      if (progress) {
+        return getProgressText(goal, progress);
+      }
+      // Fallback to target info
+      if (goalType === 'habit') {
+        return goal.cadence ? `Target: ${goal.targetCount || goal.target_count || 0} times/${goal.cadence}` : 'No target set';
+      } else {
+        return goal.cadence ? `Target: ${goal.targetQuantity || goal.target_quantity || 0} ${goal.unit || ''}/${goal.cadence}` : 'No target set';
+      }
+    default:
+      return 'No progress info';
+  }
+};
+
+/**
+ * Calculate progress bar value (0-100) for a goal
+ * @param {Object} goal - Goal object with progress
+ * @returns {number} - Progress percentage (0-100)
+ */
+export const getProgressBarValue = (goal) => {
+  const progress = goal.progress;
+  if (!progress || !progress.target) return 0;
+  return Math.min((progress.actual / progress.target) * 100, 100);
+};

@@ -20,21 +20,21 @@ const {
 const router = express.Router(); // eslint-disable-line new-cap
 
 router
-    .get("/:userId", getGoals)
-    .post("/:userId", createGoal)
-    .put("/:userId/:goalId", updateGoal)
-    .delete("/:userId/:goalId", deleteGoal)
-    .post("/:userId/:goalId/complete", markGoalComplete)
-    .delete("/:userId/:goalId/complete", markGoalIncomplete)
-    .get("/:userId/:goalId/completion", checkGoalCompletion)
-    .post("/:userId/:goalId/milestone/:milestoneIndex", markMilestoneComplete)
-    .post("/:userId/:goalId/entries", createGoalEntry)
-    .get("/:userId/:goalId/entries", getGoalEntries)
-    .put("/:userId/:goalId/entries/:entryId", updateGoalEntry)
-    .delete("/:userId/:goalId/entries/:entryId", deleteGoalEntry)
-    .get("/:userId/:goalId/progress", getGoalProgress)
-    .post("/:userId/:goalId/milestones", createMilestone)
-    .put("/:userId/:goalId/milestones/:milestoneId", updateMilestone);
+    .get("/", getGoals)
+    .post("/", createGoal)
+    .patch("/:goalId", updateGoal)
+    .delete("/:goalId", deleteGoal)
+    .post("/:goalId/complete", markGoalComplete)
+    .delete("/:goalId/complete", markGoalIncomplete)
+    .get("/:goalId/completion", checkGoalCompletion)
+    .post("/:goalId/milestone/:milestoneIndex", markMilestoneComplete)
+    .post("/:goalId/entries", createGoalEntry)
+    .get("/:goalId/entries", getGoalEntries)
+    .put("/:goalId/entries/:entryId", updateGoalEntry)
+    .delete("/:goalId/entries/:entryId", deleteGoalEntry)
+    .get("/:goalId/progress", getGoalProgress)
+    .post("/:goalId/milestones", createMilestone)
+    .put("/:goalId/milestones/:milestoneId", updateMilestone);
 
 module.exports = router;
 

@@ -28,6 +28,8 @@ import {
   getProgressText,
   formatMilestoneDisplay,
   normalizeGoalType,
+  getGoalTypeLabel,
+  getGoalTypeColor,
 } from 'utils/goalHelpers';
 
 const TodaysGoals = () => {
@@ -65,18 +67,24 @@ const TodaysGoals = () => {
             completionStates[goal.id] = false;
           }
         } else if (goal.type === 'metric') {
-          // For metrics: check if entry exists TODAY (like habits), also get progress for display
+          // For metrics: check if entry exists TODAY (like habits)
+          // Use progress from goal context if available, otherwise fetch
           try {
             const entries = await getGoalEntries(user.uid, goal.id, todayBoundaries.start, todayBoundaries.end);
             const hasToday = hasEntryToday(entries);
             completionStates[goal.id] = hasToday;
             
-            // Also fetch period progress for display
-            const progress = await getGoalProgress(user.uid, goal.id);
-            progressData[goal.id] = progress;
+            // Use progress from goal context if available
+            if (goal.progress) {
+              progressData[goal.id] = goal.progress;
+            } else {
+              // Fallback: fetch progress if not in context
+              const progress = await getGoalProgress(user.uid, goal.id);
+              progressData[goal.id] = progress;
+            }
           } catch (err) {
             completionStates[goal.id] = false;
-            progressData[goal.id] = null;
+            progressData[goal.id] = goal.progress || null;
           }
         } else if (normalizeGoalType(goal.type) === 'one_time') {
           completionStates[goal.id] = goal.completed || false;
@@ -350,31 +358,6 @@ const TodaysGoals = () => {
     return [{ text: goal.title, completed: completionStates[goal.id] || false }];
   };
 
-  const getGoalTypeLabel = (goal) => {
-    switch (goal.type) {
-      case 'habit': 
-        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Habit` : 'Habit';
-      case 'metric': 
-        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Metric` : 'Metric';
-      case 'one_time':
-      case 'one-time':
-        return 'One-time';
-      case 'milestone': return 'Milestone';
-      default: return goal.type || 'Goal';
-    }
-  };
-
-  const getGoalTypeColor = (goal) => {
-    switch (goal.type) {
-      case 'habit': return 'success';
-      case 'metric': return 'warning';
-      case 'one_time':
-      case 'one-time':
-        return 'primary';
-      case 'milestone': return 'secondary';
-      default: return 'default';
-    }
-  };
 
   if (loading) {
     return (
@@ -464,7 +447,7 @@ const TodaysGoals = () => {
                             <>
                               <Chip
                                 label={getGoalTypeLabel(goal)}
-                                color={getGoalTypeColor(goal)}
+                                color={getGoalTypeColor(goal.type)}
                                 size="small"
                                 variant="outlined"
                               />
@@ -535,7 +518,7 @@ const TodaysGoals = () => {
                         </Typography>
                         <Chip
                           label={getGoalTypeLabel(goal)}
-                          color={getGoalTypeColor(goal)}
+                          color={getGoalTypeColor(goal.type)}
                           size="small"
                           variant="outlined"
                         />

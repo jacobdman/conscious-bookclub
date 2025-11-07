@@ -20,12 +20,11 @@ import {
   Collapse,
   Checkbox,
 } from '@mui/material';
-import { Edit, Add, ExpandMore, ExpandLess, Delete } from '@mui/icons-material';
+import { Edit, Add, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useGoalsContext from 'contexts/Goals';
 import { 
   getGoalEntries,
-  getGoalProgress,
   createGoalEntry,
   updateGoalEntry,
   deleteGoalEntry,
@@ -36,7 +35,16 @@ import TodaysGoals from 'components/QuickGoalCompletion';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
 import GoalEntryList from 'components/Goals/GoalEntryList';
 import Layout from 'components/Layout';
-import { getPeriodBoundaries, getProgressText, normalizeGoalType } from 'utils/goalHelpers';
+import { 
+  getPeriodBoundaries, 
+  getProgressText, 
+  normalizeGoalType,
+  getGoalTypeLabel,
+  getGoalTypeColor,
+  formatDate,
+  getProgressInfo,
+  getProgressBarValue,
+} from 'utils/goalHelpers';
 
 const Goals = () => {
   const { user } = useAuth();
@@ -47,16 +55,16 @@ const Goals = () => {
   const [editingGoal, setEditingGoal] = useState(null);
   const [expandedGoals, setExpandedGoals] = useState(new Set());
   const [goalEntries, setGoalEntries] = useState({});
-  const [goalProgress, setGoalProgress] = useState({});
   const [entriesLoading, setEntriesLoading] = useState({});
   const [entryDialog, setEntryDialog] = useState({ open: false, goal: null, entry: null, saving: false, error: null });
 
-  const fetchGoalDetails = async (goal) => {
+  const fetchGoalDetails = useCallback(async (goal) => {
     if (!user) return;
 
     const goalId = goal.id;
     
-    // Only fetch entries and progress for habit/metric goals with cadence
+    // Only fetch entries for habit/metric goals with cadence
+    // Progress now comes from goals context
     if (goal.type === 'habit' || goal.type === 'metric') {
       if (!goal.cadence) return;
       
@@ -69,10 +77,6 @@ const Goals = () => {
         // Fetch entries for current period
         const entries = await getGoalEntries(user.uid, goalId, start, end);
         setGoalEntries(prev => ({ ...prev, [goalId]: entries }));
-
-        // Fetch progress
-        const progress = await getGoalProgress(user.uid, goalId);
-        setGoalProgress(prev => ({ ...prev, [goalId]: progress }));
       } catch (err) {
         console.error('Failed to fetch goal details:', err);
       } finally {
@@ -80,7 +84,7 @@ const Goals = () => {
       }
     }
     // For milestone and one-time goals, we don't need to fetch entries
-  };
+  }, [user]);
 
   const handleToggleExpand = async (goalId) => {
     const newExpanded = new Set(expandedGoals);
@@ -158,14 +162,9 @@ const Goals = () => {
     try {
       await deleteGoalEntry(user.uid, goalId, entryId);
       
-      // Refetch progress only (not full goal details)
-      try {
-        const progress = await getGoalProgress(user.uid, goalId);
-        setGoalProgress(prev => ({ ...prev, [goalId]: progress }));
-      } catch (err) {
-        // If progress fetch fails, refresh full goal details
-        await fetchGoalDetails(goal);
-      }
+      // Progress will be updated in context when goal is refetched
+      // For now, just refresh entries
+      await fetchGoalDetails(goal);
     } catch (err) {
       // Revert on error - refresh entries
       await fetchGoalDetails(goal);
@@ -237,14 +236,9 @@ const Goals = () => {
         });
       }
       
-      // Refetch progress only (not full goal details)
-      try {
-        const progress = await getGoalProgress(user.uid, goalId);
-        setGoalProgress(prev => ({ ...prev, [goalId]: progress }));
-      } catch (err) {
-        // If progress fetch fails, refresh full goal details
-        await fetchGoalDetails(goal);
-      }
+      // Progress will be updated in context when goal is refetched
+      // For now, just refresh entries
+      await fetchGoalDetails(goal);
       
       // Close dialog on success
       setEntryDialog({ open: false, goal: null, entry: null, saving: false, error: null });
@@ -279,7 +273,8 @@ const Goals = () => {
 
     try {
       await updateMilestone(user.uid, goal.id, milestone.id, { done: !milestone.done });
-      // Update the goal in context to reflect milestone change
+      // Update the goal in context to refresh progress
+      // The milestone update will be reflected when we update the goal
       const updatedMilestones = goal.milestones.map(m => 
         m.id === milestone.id 
           ? { ...m, done: !m.done, doneAt: !m.done ? new Date().toISOString() : null }
@@ -307,75 +302,6 @@ const Goals = () => {
     }
   };
 
-  const getTrackingTypeLabel = (goal) => {
-    const goalType = normalizeGoalType(goal.type);
-    switch (goalType) {
-      case 'habit': 
-        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Habit` : 'Habit';
-      case 'metric': 
-        return goal.cadence ? `${goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)} Metric` : 'Metric';
-      case 'milestone': return 'Milestone';
-      case 'one_time':
-        return 'One-time';
-      default: return goal.type || 'Goal';
-    }
-  };
-
-  const getTrackingTypeColor = (type) => {
-    const goalType = normalizeGoalType(type);
-    switch (goalType) {
-      case 'habit': return 'success';
-      case 'metric': return 'warning';
-      case 'milestone': return 'secondary';
-      case 'one_time':
-        return 'primary';
-      default: return 'default';
-    }
-  };
-
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'No date';
-    try {
-      if (timestamp instanceof Date) return timestamp.toLocaleDateString();
-      const date = new Date(timestamp);
-      return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString();
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
-
-  const getProgressInfo = (goal) => {
-    const progress = goalProgress[goal.id];
-    
-    switch (goal.type) {
-      case 'one_time':
-      case 'one-time':
-        return goal.completed ? 'Completed' : `Due: ${formatDate(goal.dueAt || goal.due_at)}`;
-      case 'milestone':
-        const completedMilestones = goal.milestones?.filter(m => m.done).length || 0;
-        const totalMilestones = goal.milestones?.length || 0;
-        return `${completedMilestones}/${totalMilestones} milestones`;
-      case 'habit':
-      case 'metric':
-        if (progress) {
-          return getProgressText(goal, progress);
-        }
-        // Fallback to target info
-        if (goal.type === 'habit') {
-          return goal.cadence ? `Target: ${goal.targetCount || goal.target_count || 0} times/${goal.cadence}` : 'No target set';
-        } else {
-          return goal.cadence ? `Target: ${goal.targetQuantity || goal.target_quantity || 0} ${goal.unit || ''}/${goal.cadence}` : 'No target set';
-        }
-      default:
-        return 'No progress info';
-    }
-  };
-
-  const getProgressBarValue = (goal) => {
-    const progress = goalProgress[goal.id];
-    if (!progress || !progress.target) return 0;
-    return Math.min((progress.actual / progress.target) * 100, 100);
-  };
 
   const filteredGoals = goals.filter(goal => {
     if (showCompleted) return true;
@@ -385,8 +311,7 @@ const Goals = () => {
   const renderExpandedContent = (goal) => {
     if (goal.type === 'habit' || goal.type === 'metric') {
       const entries = goalEntries[goal.id] || [];
-      const progress = goalProgress[goal.id];
-      const loading = entriesLoading[goal.id];
+      const progress = goal.progress;
 
       return (
         <Box sx={{ p: 2 }}>
@@ -581,7 +506,7 @@ const Goals = () => {
               ) : (
                 filteredGoals.map((goal) => {
                   const isExpanded = expandedGoals.has(goal.id);
-                  const progress = goalProgress[goal.id];
+                  const progress = goal.progress;
                   const hasProgress = progress && (goal.type === 'habit' || goal.type === 'metric');
 
                   return (
@@ -604,8 +529,8 @@ const Goals = () => {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            label={getTrackingTypeLabel(goal)}
-                            color={getTrackingTypeColor(goal.type)}
+                            label={getGoalTypeLabel(goal)}
+                            color={getGoalTypeColor(goal.type)}
                             size="small"
                           />
                         </TableCell>
