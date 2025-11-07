@@ -36,6 +36,11 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.DATEONLY,
           field: "discussion_date",
         },
+        clubId: {
+          type: DataTypes.INTEGER,
+          field: "club_id",
+          allowNull: false,
+        },
       },
       {
         tableName: "books",
@@ -46,6 +51,10 @@ module.exports = function(sequelize, DataTypes) {
   );
 
   Book.associate = (models) => {
+    Book.belongsTo(models.Club, {
+      foreignKey: "club_id",
+      as: "club",
+    });
     Book.hasMany(models.Meeting, {
       foreignKey: "book_id",
       as: "meetings",

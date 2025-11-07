@@ -15,20 +15,28 @@ import {
 } from '@mui/material';
 import { getTopReaders } from 'services/books/books.service';
 import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
 
 const FinishedBooksLeaderboard = () => {
   const { user } = useAuth();
+  const { currentClub } = useClubContext();
   const [leaderboard, setLeaderboard] = useState([]);
   const [currentUserStats, setCurrentUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
+      if (!currentClub) {
+        setLoading(false);
+        setLeaderboard([]);
+        return;
+      }
+
       try {
         setLoading(true);
         
         // Get top 10 users
-        const topUsers = await getTopReaders(10);
+        const topUsers = await getTopReaders(currentClub.id, 10);
         setLeaderboard(topUsers);
         
         // Only show current user separately if they're NOT in the top 3
@@ -52,7 +60,7 @@ const FinishedBooksLeaderboard = () => {
     };
 
     fetchLeaderboard();
-  }, [user]);
+  }, [user, currentClub]);
 
   const getRankIcon = (index) => {
     switch (index) {

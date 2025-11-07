@@ -27,6 +27,7 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { fetchCalendarEvents } from 'services/calendarService';
+import useClubContext from 'contexts/Club';
 import Layout from 'components/Layout';
 
 // Setup moment localizer for react-big-calendar
@@ -35,6 +36,7 @@ const localizer = momentLocalizer(moment);
 const CalendarComponent = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { currentClub } = useClubContext();
   
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,10 +47,26 @@ const CalendarComponent = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const fetchEvents = async () => {
+    if (!currentClub) {
+      setError('No club selected');
+      setLoading(false);
+      return;
+    }
+
+    // Check if config exists and has googleCalendarId
+    const config = currentClub.config || {};
+    const googleCalendarId = config.googleCalendarId;
+    
+    if (!googleCalendarId) {
+      setError('Google Calendar is not configured for this club. Please contact the club owner to configure it in Club Management.');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const calendarEvents = await fetchCalendarEvents();
+      const calendarEvents = await fetchCalendarEvents(googleCalendarId);
       
       // Transform events for react-big-calendar
       const transformedEvents = calendarEvents.map(event => ({
@@ -65,7 +83,8 @@ const CalendarComponent = () => {
       
       setEvents(transformedEvents);
     } catch (err) {
-      setError('Failed to fetch calendar events');
+      console.error('Error fetching calendar events:', err);
+      setError(err.message || 'Failed to fetch calendar events');
     } finally {
       setLoading(false);
     }
@@ -73,7 +92,8 @@ const CalendarComponent = () => {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentClub]);
 
   const handleViewChange = (event, newView) => {
     if (newView !== null) {

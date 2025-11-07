@@ -1,6 +1,3 @@
-// Configuration - Replace with your Google Calendar ID
-const GOOGLE_CALENDAR_ID = '99d5640c339ece5cf6b5abb26854d93f2cf4b8fc4b87e4a5aa0ca6bb4bc49020@group.calendar.google.com'; // Replace this with your actual calendar ID
-
 // Parse iCal text to extract calendar events
 const parseICalFeed = (icalText) => {
   const events = [];
@@ -93,14 +90,14 @@ const parseICalFeed = (icalText) => {
 };
 
 // Fetch calendar events from Google Calendar iCal feed
-export const fetchCalendarEvents = async () => {
+export const fetchCalendarEvents = async (googleCalendarId) => {
   try {
-    if (GOOGLE_CALENDAR_ID === 'YOUR_CALENDAR_ID_HERE') {
-      throw new Error('Please configure your Google Calendar ID in calendarService.js');
+    if (!googleCalendarId) {
+      throw new Error('Google Calendar ID is not configured for this club');
     }
     
     // Construct iCal feed URL with CORS proxy
-    const icalUrl = `https://calendar.google.com/calendar/ical/${encodeURIComponent(GOOGLE_CALENDAR_ID)}/public/basic.ics`;
+    const icalUrl = `https://calendar.google.com/calendar/ical/${encodeURIComponent(googleCalendarId)}/public/basic.ics`;
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(icalUrl)}`;
     
     const response = await fetch(proxyUrl);
@@ -115,26 +112,9 @@ export const fetchCalendarEvents = async () => {
     return events;
     
   } catch (error) {
-    // Return mock data as fallback if RSS feed fails
-    return [
-      {
-        id: 'mock-1',
-        title: 'Book Club Meeting',
-        description: 'Discussion of "Atomic Habits" by James Clear',
-        start: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-        end: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
-        location: 'Community Center Room A',
-        allDay: false
-      },
-      {
-        id: 'mock-2',
-        title: 'Reading Group Planning',
-        description: 'Plan next month\'s book selections',
-        start: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000).toISOString(),
-        location: 'Online - Zoom',
-        allDay: false
-      }
-    ];
+    // Re-throw the error instead of returning mock data
+    // This allows the component to handle the error appropriately
+    console.error('Error fetching calendar events:', error);
+    throw error;
   }
 };

@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { getPosts, addPost } from 'services/posts/posts.service';
 import { getBooks } from 'services/books/books.service';
 import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
 import GoalsProvider from 'contexts/Goals/GoalsProvider';
 import Layout from 'components/Layout';
 import NextMeetingCard from 'components/NextMeetingCard';
@@ -13,6 +14,7 @@ import FeedSection from 'components/FeedSection';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { currentClub } = useClubContext();
   const [posts, setPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [errorPosts, setErrorPosts] = useState(null);
@@ -21,9 +23,11 @@ const Dashboard = () => {
   const [goals] = useState([]);
 
   const fetchPosts = async () => {
+    if (!currentClub) return;
+    
     try {
       setLoadingPosts(true);
-      const posts = await getPosts();
+      const posts = await getPosts(currentClub.id);
       const postsData = posts.map(post => ({ id: post.id, ...post }));
       setPosts(postsData);
     } catch (err) {
@@ -35,11 +39,11 @@ const Dashboard = () => {
 
   const fetchBooks = useCallback(async () => {
     try {
-      if (!user) {
+      if (!user || !currentClub) {
         return;
       }
       
-      const books = await getBooks();
+      const books = await getBooks(currentClub.id);
       
       const allBooksData = books.map(book => ({ id: book.id, ...book }));
       
@@ -72,7 +76,7 @@ const Dashboard = () => {
     } catch (err) {
       // Error fetching books
     }
-  }, [user]);
+  }, [user, currentClub]);
 
 
   useEffect(() => {
@@ -83,7 +87,7 @@ const Dashboard = () => {
   }, [user, fetchBooks]);
 
   const handleCreatePost = async () => {
-    if (!newPostText.trim() || !user) return;
+    if (!newPostText.trim() || !user || !currentClub) return;
 
     try {
       const newPost = {
@@ -93,7 +97,7 @@ const Dashboard = () => {
         createdAt: new Date(),
         reactionCounts: { thumbsUp: 0, thumbsDown: 0, heart: 0, laugh: 0 },
       };
-      await addPost(newPost);
+      await addPost(currentClub.id, newPost);
       setNewPostText('');
       fetchPosts();
     } catch (err) {
@@ -110,8 +114,6 @@ const Dashboard = () => {
           <QuickGoalCompletion />
           
           <CurrentBooksSection books={currentBooks} />
-          
-          <GoalsCard goals={goals} />
           
           <FeedSection 
             posts={posts}

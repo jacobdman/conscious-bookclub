@@ -13,8 +13,10 @@ import {
   Button
 } from '@mui/material';
 import { getBooksProgress } from 'services/books/books.service';
+import useClubContext from 'contexts/Club';
 
 const InFlightBooksProgress = () => {
+  const { currentClub } = useClubContext();
   const [booksData, setBooksData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userPages, setUserPages] = useState({}); // Track current page per book
@@ -23,9 +25,15 @@ const InFlightBooksProgress = () => {
 
   useEffect(() => {
     const fetchBooksProgress = async () => {
+      if (!currentClub) {
+        setLoading(false);
+        setBooksData([]);
+        return;
+      }
+
       try {
         setLoading(true);
-        const result = await getBooksProgress(1, 10);
+        const result = await getBooksProgress(currentClub.id, 1, 10);
         
         if (result && result.books) {
           setBooksData(result.books);
@@ -55,7 +63,7 @@ const InFlightBooksProgress = () => {
     };
 
     fetchBooksProgress();
-  }, []);
+  }, [currentClub]);
 
   const formatDiscussionDate = (date) => {
     if (!date) return 'No date set';
@@ -105,11 +113,11 @@ const InFlightBooksProgress = () => {
   };
 
   const loadMoreUsers = useCallback(async (bookId) => {
-    if (!hasMoreUsers[bookId]) return;
+    if (!hasMoreUsers[bookId] || !currentClub) return;
     
     try {
       const nextPage = (userPages[bookId] || 1) + 1;
-      const result = await getBooksProgress(nextPage, 10, bookId);
+      const result = await getBooksProgress(currentClub.id, nextPage, 10, bookId);
       
       if (result && result.book) {
         const book = result.book;
@@ -137,7 +145,7 @@ const InFlightBooksProgress = () => {
       console.error('Error loading more users:', error);
       setHasMoreUsers(prev => ({ ...prev, [bookId]: false }));
     }
-  }, [userPages, hasMoreUsers]);
+  }, [userPages, hasMoreUsers, currentClub]);
 
   if (loading) {
     return (

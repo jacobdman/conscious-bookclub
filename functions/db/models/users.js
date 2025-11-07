@@ -54,6 +54,12 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "user_id",
       as: "bookProgresses",
     });
+    User.belongsToMany(models.Club, {
+      through: models.ClubMember,
+      foreignKey: "user_id",
+      otherKey: "club_id",
+      as: "clubs",
+    });
   };
 
   return User;

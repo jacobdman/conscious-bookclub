@@ -11,9 +11,9 @@ export const getUserStats = async (userId) => {
   throw new Error('getUserStats endpoint has been removed. Please use books/progress endpoint instead.');
 };
 
-export const getTopFinishedBooksUsers = async (limitCount = 10) => {
+export const getTopFinishedBooksUsers = async (clubId, limitCount = 10) => {
   // Redirect to new books/top-readers endpoint
-  return getTopReaders(limitCount);
+  return getTopReaders(clubId, limitCount);
 };
 
 export const getBookStats = async (bookId) => {

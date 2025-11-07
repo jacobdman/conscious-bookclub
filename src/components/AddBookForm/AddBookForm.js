@@ -24,8 +24,10 @@ import {
 } from '@mui/material';
 import { addBook, updateBook, deleteBook } from 'services/books/books.service';
 import { debouncedSearchBooks } from 'services/googleBooksService';
+import useClubContext from 'contexts/Club';
 
 const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = null }) => {
+  const { currentClub } = useClubContext();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -234,13 +236,18 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         description: formData.description.trim() || null
       };
 
+      if (!currentClub) {
+        setSubmitError('No club selected');
+        return;
+      }
+
       if (editingBook) {
         // Update existing book
-        await updateBook(editingBook.id, bookData);
+        await updateBook(currentClub.id, editingBook.id, bookData);
         onBookAdded(); // No new book data for updates
       } else {
         // Add new book
-        const newBookRef = await addBook(bookData);
+        const newBookRef = await addBook(currentClub.id, bookData);
         const newBook = { id: newBookRef.id, ...bookData };
         onBookAdded(newBook); // Pass the new book data
       }
@@ -278,11 +285,16 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     }
     
     if (window.confirm(`Are you sure you want to delete "${editingBook.title}"? This action cannot be undone.`)) {
+      if (!currentClub) {
+        setSubmitError('No club selected');
+        return;
+      }
+
       setLoading(true);
       setSubmitError('');
       
       try {
-        await deleteBook(editingBook.id);
+        await deleteBook(currentClub.id, editingBook.id);
         onBookDeleted(editingBook.id);
         onClose();
       } catch (error) {

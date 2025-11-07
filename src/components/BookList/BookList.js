@@ -25,11 +25,13 @@ import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
 import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata, getAllDiscussedBooks } from 'services/books/books.service';
 import { getUserBookProgress, updateUserBookProgress } from 'services/progress/progress.service';
 import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
 import Layout from 'components/Layout';
 import AddBookForm from 'components/AddBookForm';
 
 const BookList = () => {
   const { user } = useAuth();
+  const { currentClub } = useClubContext();
   const [books, setBooks] = useState([]);           // Current page books only
   const [currentPage, setCurrentPage] = useState(1);
   const [totalBookCount, setTotalBookCount] = useState(0);
@@ -82,13 +84,15 @@ const BookList = () => {
 
   // Load metadata (total count)
   const loadMetadata = useCallback(async () => {
+    if (!currentClub) return;
+    
     try {
-      const metadata = await getBookMetadata();
+      const metadata = await getBookMetadata(currentClub.id);
       let totalCount = metadata.totalCount;
       
       // If metadata shows 0 but we might have books, initialize it
       if (totalCount === 0) {
-        totalCount = await initializeBookMetadata();
+        totalCount = await initializeBookMetadata(currentClub.id);
       }
       
       setTotalBookCount(totalCount);
@@ -96,7 +100,7 @@ const BookList = () => {
     } catch (err) {
       // Error loading metadata
     }
-  }, [pageSize]);
+  }, [pageSize, currentClub]);
 
   // Load a specific page
   const loadPage = useCallback(async (pageNumber, theme = 'all', filter = 'all', size = pageSize) => {
@@ -135,15 +139,21 @@ const BookList = () => {
       }
       
       // Fetch books with progress included if userId is available
+      if (!currentClub) {
+        setError('No club selected');
+        setLoading(false);
+        return;
+      }
+
       const userId = user?.uid || null;
       let result;
       if (theme !== 'all') {
         // Theme-filtered pagination
-        result = await getBooksPageFiltered(theme, pageNumber, size, 'createdAt', 'desc', userId);
+        result = await getBooksPageFiltered(currentClub.id, theme, pageNumber, size, 'createdAt', 'desc', userId);
         setFilteredCount(result.totalCount);
       } else if (filter === 'discussed') {
         // Filter by discussed books - get ALL discussed books first
-        const allDiscussedBooks = await getAllDiscussedBooks();
+        const allDiscussedBooks = await getAllDiscussedBooks(currentClub.id);
         setFilteredCount(allDiscussedBooks.length);
         
         // Then paginate the results
@@ -157,7 +167,7 @@ const BookList = () => {
         };
       } else {
         // Regular pagination (no filter)
-        result = await getBooksPage(pageNumber, size, 'createdAt', 'desc', userId);
+        result = await getBooksPage(currentClub.id, pageNumber, size, 'createdAt', 'desc', userId);
         setFilteredCount(0); // Not filtering
       }
       

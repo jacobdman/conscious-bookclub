@@ -14,8 +14,13 @@ const mapOrderByField = (field) => {
 };
 
 // Helper function to get books page
-const getBooksPage = async (pageNumber, pageSize, orderByField, orderDirection, userId) => {
+const getBooksPage = async (pageNumber, pageSize, orderByField, orderDirection, userId, clubId) => {
   const offset = (pageNumber - 1) * pageSize;
+
+  const whereClause = {};
+  if (clubId) {
+    whereClause.clubId = parseInt(clubId);
+  }
 
   const includeOptions = [];
   if (userId) {
@@ -29,6 +34,7 @@ const getBooksPage = async (pageNumber, pageSize, orderByField, orderDirection, 
   }
 
   const queryOptions = {
+    where: whereClause,
     order: [[orderByField, orderDirection]],
     limit: pageSize,
     offset,
@@ -63,12 +69,18 @@ const getBooksPageFiltered = async (
     orderByField,
     orderDirection,
     userId,
+    clubId,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
   let whereClause = {};
 
+  if (clubId) {
+    whereClause.clubId = parseInt(clubId);
+  }
+
   if (theme === "no-theme") {
     whereClause = {
+      ...whereClause,
       [db.Op.or]: [
         {theme: null},
         {theme: []},
@@ -76,6 +88,7 @@ const getBooksPageFiltered = async (
     };
   } else if (theme !== "all") {
     whereClause = {
+      ...whereClause,
       theme: {
         [db.Op.contains]: [theme],
       },
@@ -130,7 +143,13 @@ const getBooks = async (req, res, next) => {
       orderBy = "created_at",
       orderDirection = "desc",
       userId,
+      clubId,
     } = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
     const mappedOrderBy = mapOrderByField(orderBy);
     const result = await getBooksPage(
         parseInt(page),
@@ -138,6 +157,7 @@ const getBooks = async (req, res, next) => {
         mappedOrderBy,
         orderDirection.toUpperCase(),
         userId || null,
+        clubId,
     );
     res.json(result);
   } catch (e) {
@@ -148,8 +168,15 @@ const getBooks = async (req, res, next) => {
 // GET /v1/books/discussed - Get books with discussion dates
 const getDiscussedBooks = async (req, res, next) => {
   try {
+    const {clubId} = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
     const books = await db.Book.findAll({
       where: {
+        clubId: parseInt(clubId),
         discussionDate: {
           [db.Op.ne]: null,
         },
@@ -171,7 +198,13 @@ const getFilteredBooks = async (req, res, next) => {
       orderBy = "created_at",
       orderDirection = "desc",
       userId,
+      clubId,
     } = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
     const mappedOrderBy = mapOrderByField(orderBy);
     const result = await getBooksPageFiltered(
         theme,
@@ -180,6 +213,7 @@ const getFilteredBooks = async (req, res, next) => {
         mappedOrderBy,
         orderDirection.toUpperCase(),
         userId || null,
+        clubId,
     );
     res.json(result);
   } catch (e) {
@@ -191,7 +225,15 @@ const getFilteredBooks = async (req, res, next) => {
 const getBook = async (req, res, next) => {
   try {
     const {id} = req.params;
-    const book = await db.Book.findByPk(id);
+    const {clubId} = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+    const book = await db.Book.findOne({
+      where: {id, clubId: parseInt(clubId)},
+    });
 
     if (!book) {
       const error = new Error("Book not found");
@@ -208,9 +250,16 @@ const getBook = async (req, res, next) => {
 // POST /v1/books - Create new book
 const createBook = async (req, res, next) => {
   try {
+    const {clubId} = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
     const bookData = req.body;
     const book = await db.Book.create({
       ...bookData,
+      clubId: parseInt(clubId),
       createdAt: new Date(),
     });
     res.status(201).json({id: book.id, ...book.toJSON()});
@@ -223,10 +272,23 @@ const createBook = async (req, res, next) => {
 const updateBook = async (req, res, next) => {
   try {
     const {id} = req.params;
+    const {clubId} = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
     const updates = req.body;
+    // Ensure clubId is not changed
+    delete updates.clubId;
 
-    await db.Book.update(updates, {where: {id}});
+    await db.Book.update(updates, {where: {id, clubId: parseInt(clubId)}});
     const book = await db.Book.findByPk(id);
+    if (!book || book.clubId !== parseInt(clubId)) {
+      const error = new Error("Book not found");
+      error.status = 404;
+      throw error;
+    }
     res.json({id: book.id, ...book.toJSON()});
   } catch (e) {
     next(e);
@@ -237,7 +299,13 @@ const updateBook = async (req, res, next) => {
 const deleteBook = async (req, res, next) => {
   try {
     const {id} = req.params;
-    await db.Book.destroy({where: {id}});
+    const {clubId} = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+    await db.Book.destroy({where: {id, clubId: parseInt(clubId)}});
     res.sendStatus(204);
   } catch (e) {
     next(e);
@@ -247,7 +315,12 @@ const deleteBook = async (req, res, next) => {
 // GET /v1/books/progress - Get books with upcoming discussions and their progress
 const getBooksProgress = async (req, res, next) => {
   try {
-    const {bookId, page = 1, pageSize = 10} = req.query;
+    const {bookId, page = 1, pageSize = 10, clubId} = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
     const pageNum = parseInt(page, 10);
     const pageSizeNum = parseInt(pageSize, 10);
 
@@ -264,7 +337,9 @@ const getBooksProgress = async (req, res, next) => {
         throw error;
       }
 
-      const book = await db.Book.findByPk(bookIdInt);
+      const book = await db.Book.findOne({
+        where: {id: bookIdInt, clubId: parseInt(clubId)},
+      });
       if (!book) {
         const error = new Error("Book not found");
         error.status = 404;
@@ -354,6 +429,7 @@ const getBooksProgress = async (req, res, next) => {
     // For DATEONLY fields, Sequelize handles the date comparison automatically
     const books = await db.Book.findAll({
       where: {
+        clubId: parseInt(clubId),
         discussionDate: {
           [db.Op.gte]: today,
         },
@@ -476,7 +552,12 @@ const getBooksProgress = async (req, res, next) => {
 // GET /v1/books/top-readers - Get top readers by finished books
 const getTopReaders = async (req, res, next) => {
   try {
-    const {limit = 10} = req.query;
+    const {limit = 10, clubId} = req.query;
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
     const limitCount = parseInt(limit, 10);
 
     const results = await db.BookProgress.findAll({
@@ -493,12 +574,21 @@ const getTopReaders = async (req, res, next) => {
       ],
       order: [[db.sequelize.fn("COUNT", db.sequelize.col("BookProgress.id")), "DESC"]],
       limit: limitCount,
-      include: [{
-        model: db.User,
-        as: "user",
-        attributes: ["uid", "displayName", "photoUrl"],
-        required: true,
-      }],
+      include: [
+        {
+          model: db.User,
+          as: "user",
+          attributes: ["uid", "displayName", "photoUrl"],
+          required: true,
+        },
+        {
+          model: db.Book,
+          as: "book",
+          attributes: [], // Don't select any book attributes, just use for filtering
+          where: {clubId: parseInt(clubId)},
+          required: true,
+        },
+      ],
     });
 
     const leaderboard = results.map((result) => ({

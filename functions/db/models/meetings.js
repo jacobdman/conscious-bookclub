@@ -22,6 +22,11 @@ module.exports = function(sequelize, DataTypes) {
         notes: {
           type: DataTypes.TEXT,
         },
+        clubId: {
+          type: DataTypes.INTEGER,
+          field: "club_id",
+          allowNull: false,
+        },
       },
       {
         tableName: "meetings",
@@ -35,6 +40,10 @@ module.exports = function(sequelize, DataTypes) {
     Meeting.belongsTo(models.Book, {
       foreignKey: "book_id",
       as: "book",
+    });
+    Meeting.belongsTo(models.Club, {
+      foreignKey: "club_id",
+      as: "club",
     });
   };
 
