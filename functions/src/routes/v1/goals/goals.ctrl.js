@@ -12,7 +12,7 @@ const getMilestones = async (goalId) => {
 };
 
 // Helper function to get goal entries
-const getGoalEntries = async (userId, goalId, periodStart, periodEnd) => {
+const getGoalEntries = async (userId, goalId, periodStart, periodEnd, limit = null, offset = 0) => {
   const whereClause = {
     goalId,
     userId,
@@ -25,10 +25,17 @@ const getGoalEntries = async (userId, goalId, periodStart, periodEnd) => {
     };
   }
 
-  const entries = await db.GoalEntry.findAll({
+  const queryOptions = {
     where: whereClause,
     order: [["occurred_at", "DESC"]],
-  });
+  };
+
+  if (limit !== null) {
+    queryOptions.limit = limit;
+    queryOptions.offset = offset;
+  }
+
+  const entries = await db.GoalEntry.findAll(queryOptions);
   return entries.map((entry) => ({id: entry.id, ...entry.toJSON()}));
 };
 
@@ -599,7 +606,7 @@ const getGoalEntriesHandler = async (req, res, next) => {
   try {
     const userId = req.query.userId;
     const {goalId} = req.params;
-    const {periodStart, periodEnd} = req.query;
+    const {periodStart, periodEnd, limit, offset} = req.query;
 
     if (!userId) {
       const error = new Error("userId is required");
@@ -607,11 +614,16 @@ const getGoalEntriesHandler = async (req, res, next) => {
       throw error;
     }
 
+    const limitNum = limit ? parseInt(limit) : null;
+    const offsetNum = offset ? parseInt(offset) : 0;
+
     const entries = await getGoalEntries(
         userId,
         parseInt(goalId),
         periodStart ? new Date(periodStart) : null,
         periodEnd ? new Date(periodEnd) : null,
+        limitNum,
+        offsetNum,
     );
     res.json(entries);
   } catch (e) {

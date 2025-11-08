@@ -76,10 +76,12 @@ export const createGoalEntry = async (userId, goalId, entryData) => {
   });
 };
 
-export const getGoalEntries = async (userId, goalId, periodStart = null, periodEnd = null) => {
+export const getGoalEntries = async (userId, goalId, periodStart = null, periodEnd = null, limit = null, offset = 0) => {
   const params = new URLSearchParams({ userId });
   if (periodStart) params.append('periodStart', periodStart.toISOString());
   if (periodEnd) params.append('periodEnd', periodEnd.toISOString());
+  if (limit !== null) params.append('limit', limit.toString());
+  if (offset > 0) params.append('offset', offset.toString());
   return apiCall(`/v1/goals/${goalId}/entries?${params}`);
 };
 

@@ -123,6 +123,12 @@ const getPreviousPeriodBoundaries = (cadence, currentStart) => {
   return {start: prevStart, end: prevEnd};
 };
 
+// Calculate habit weight based on position among habits only
+const calculateHabitWeight = (habitPosition) => {
+  // weight_n = 1 / log2(n + 1)
+  return 1 / Math.log2(habitPosition + 1);
+};
+
 // Calculate consistency score for a habit goal over date range
 const calculateHabitConsistency = async (userId, goal, startDate, endDate) => {
   if (goal.type !== "habit" || !goal.cadence) {
@@ -278,26 +284,55 @@ const getClubGoalsReport = async (req, res, next) => {
 
       const memberGoals = goals.map((g) => g.toJSON());
 
-      // Calculate habit consistency
+      // Calculate weighted habit consistency
       const habitGoals = memberGoals.filter((g) => g.type === "habit");
-      const habitConsistencies = [];
+      
+      // Calculate consistency rate for each habit and sort by consistency rate
+      const habitsWithConsistency = await Promise.all(
+          habitGoals.map(async (goal) => {
+            const consistency = await calculateHabitConsistency(
+                memberUserId,
+                goal,
+                effectiveStartDate,
+                effectiveEndDate,
+            );
+            return {
+              goal,
+              consistencyRate: consistency ? consistency.consistencyRate : 0,
+              consistency,
+            };
+          }),
+      );
+
+      // Sort by consistency rate (descending), then by creation date (oldest first) for tie-breaking
+      habitsWithConsistency.sort((a, b) => {
+        if (b.consistencyRate !== a.consistencyRate) {
+          return b.consistencyRate - a.consistencyRate;
+        }
+        // Tie-breaking: sort by creation date (oldest first)
+        const dateA = new Date(a.goal.created_at || a.goal.createdAt || 0);
+        const dateB = new Date(b.goal.created_at || b.goal.createdAt || 0);
+        return dateA - dateB;
+      });
+
+      // Calculate weighted average
+      let weightedSum = 0;
+      let totalWeight = 0;
       let longestStreak = 0;
 
-      for (const goal of habitGoals) {
-        const consistency = await calculateHabitConsistency(
-            memberUserId,
-            goal,
-            effectiveStartDate,
-            effectiveEndDate,
-        );
+      for (let i = 0; i < habitsWithConsistency.length; i++) {
+        const {consistencyRate, consistency} = habitsWithConsistency[i];
+        const habitPosition = i + 1; // Position among habits only (1, 2, 3...)
+        const weight = calculateHabitWeight(habitPosition);
+
         if (consistency) {
-          habitConsistencies.push(consistency.consistencyRate);
+          weightedSum += consistencyRate * weight;
+          totalWeight += weight;
           longestStreak = Math.max(longestStreak, consistency.streak);
         }
       }
 
-      const avgConsistency = habitConsistencies.length > 0 ?
-        habitConsistencies.reduce((a, b) => a + b, 0) / habitConsistencies.length : 0;
+      const avgConsistency = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
       // Calculate metric progress
       const metricGoals = memberGoals.filter((g) => g.type === "metric");
