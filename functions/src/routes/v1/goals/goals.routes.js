@@ -16,11 +16,13 @@ const {
   createMilestone,
   updateMilestone,
 } = require("./goals.ctrl");
+const {getPersonalGoalsReport} = require("./goalsReport.ctrl");
 
 const router = express.Router(); // eslint-disable-line new-cap
 
 router
     .get("/", getGoals)
+    .get("/report", getPersonalGoalsReport)
     .post("/", createGoal)
     .patch("/:goalId", updateGoal)
     .delete("/:goalId", deleteGoal)
