@@ -41,6 +41,11 @@ module.exports = function(sequelize, DataTypes) {
           field: "notify_one_week_before",
           defaultValue: false,
         },
+        duration: {
+          type: DataTypes.INTEGER,
+          allowNull: true,
+          defaultValue: 120, // Default to 2 hours (120 minutes)
+        },
       },
       {
         tableName: "meetings",

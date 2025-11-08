@@ -31,6 +31,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
   const [formData, setFormData] = useState({
     date: null,
     startTime: '',
+    duration: 120, // Default to 2 hours (120 minutes)
     location: '',
     bookId: '',
     notes: '',
@@ -62,6 +63,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
         setFormData({
           date: editingMeeting.date ? new Date(editingMeeting.date) : null,
           startTime: editingMeeting.startTime || '',
+          duration: editingMeeting.duration || 120,
           location: editingMeeting.location || '',
           bookId: editingMeeting.bookId || '',
           notes: editingMeeting.notes || '',
@@ -74,6 +76,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
         setFormData({
           date: null,
           startTime: '',
+          duration: 120, // Default to 2 hours
           location: '',
           bookId: '',
           notes: '',
@@ -107,6 +110,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
       const meetingData = {
         date: formData.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
         startTime: formData.startTime || null,
+        duration: formData.duration || 120,
         location: formData.location || null,
         bookId: formData.bookId || null,
         notes: formData.notes || null,
@@ -169,6 +173,44 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
               }}
               helperText="Leave empty for all-day event"
             />
+
+            {formData.startTime && (
+              <TextField
+                label="Duration (minutes)"
+                type="number"
+                value={formData.duration === undefined || formData.duration === null ? '' : formData.duration}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow any input while typing - no validation during typing
+                  if (value === '') {
+                    handleInputChange('duration', '');
+                  } else {
+                    const numValue = parseInt(value, 10);
+                    // Accept any number, even if less than 15 (validation happens on blur)
+                    if (!isNaN(numValue)) {
+                      handleInputChange('duration', numValue);
+                    } else {
+                      // Store as string if not a valid number (allows partial input)
+                      handleInputChange('duration', value);
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  const value = formData.duration;
+                  // Validate and set default only when user leaves the field
+                  const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
+                  if (value === '' || value === undefined || value === null || isNaN(numValue) || numValue < 15) {
+                    handleInputChange('duration', 120);
+                  } else {
+                    // Ensure it's stored as a number
+                    handleInputChange('duration', numValue);
+                  }
+                }}
+                fullWidth
+                inputProps={{ min: 15, step: 15 }}
+                helperText="Meeting duration in minutes (default: 120 minutes / 2 hours)"
+              />
+            )}
 
             <TextField
               label="Location"

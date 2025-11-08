@@ -58,6 +58,7 @@ const createMeeting = async (req, res, next) => {
     const meeting = await db.Meeting.create({
       date: meetingData.date,
       startTime: meetingData.startTime || null,
+      duration: meetingData.duration || 120, // Default to 2 hours if not provided
       location: meetingData.location || null,
       bookId: meetingData.bookId || null,
       notes: meetingData.notes || null,
@@ -124,6 +125,9 @@ const updateMeeting = async (req, res, next) => {
     }
     if (updates.startTime !== undefined) {
       meeting.startTime = updates.startTime || null;
+    }
+    if (updates.duration !== undefined) {
+      meeting.duration = updates.duration || 120;
     }
     if (updates.location !== undefined) {
       meeting.location = updates.location;
@@ -235,9 +239,10 @@ const getMeetingsICal = async (req, res, next) => {
         // Create date using local time (month is 0-indexed in Date constructor)
         startDateTime = new Date(year, month - 1, day, hours, minutes, seconds || 0);
 
-        // End time is 2 hours after start (default meeting duration)
+        // End time is based on duration (default to 120 minutes / 2 hours if not set)
+        const durationMinutes = meeting.duration || 120;
         endDateTime = new Date(startDateTime);
-        endDateTime.setHours(endDateTime.getHours() + 2);
+        endDateTime.setMinutes(endDateTime.getMinutes() + durationMinutes);
 
         isAllDay = false;
       } else {
