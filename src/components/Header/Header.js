@@ -8,13 +8,17 @@ import {
   Menu,
   MenuItem,
   Box,
+  Divider,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
+import PersonIcon from '@mui/icons-material/Person';
+import { useNavigate } from 'react-router-dom';
 import useClubContext from 'contexts/Club';
 
 const Header = ({ user, onMenuClick, onLogout }) => {
   const { currentClub } = useClubContext();
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
   const menuOpen = Boolean(anchorEl);
 
@@ -24,6 +28,11 @@ const Header = ({ user, onMenuClick, onLogout }) => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleProfile = () => {
+    handleMenuClose();
+    navigate('/profile');
   };
 
   const handleLogout = () => {
@@ -67,6 +76,11 @@ const Header = ({ user, onMenuClick, onLogout }) => {
             horizontal: 'right',
           }}
         >
+          <MenuItem onClick={handleProfile}>
+            <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
+            Profile
+          </MenuItem>
+          <Divider />
           <MenuItem onClick={handleLogout}>
             <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
             Logout

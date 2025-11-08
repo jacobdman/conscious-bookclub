@@ -12,6 +12,10 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.DATEONLY,
           allowNull: false,
         },
+        startTime: {
+          type: DataTypes.TIME,
+          field: "start_time",
+        },
         location: {
           type: DataTypes.STRING(255),
         },
@@ -26,6 +30,16 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.INTEGER,
           field: "club_id",
           allowNull: false,
+        },
+        notifyOneDayBefore: {
+          type: DataTypes.BOOLEAN,
+          field: "notify_one_day_before",
+          defaultValue: false,
+        },
+        notifyOneWeekBefore: {
+          type: DataTypes.BOOLEAN,
+          field: "notify_one_week_before",
+          defaultValue: false,
         },
       },
       {

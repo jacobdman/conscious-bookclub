@@ -24,6 +24,7 @@ import {
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
 import { getBookMetadata, getBooksPage, getBooksPageFiltered, initializeBookMetadata, getAllDiscussedBooks } from 'services/books/books.service';
 import { getUserBookProgress, updateUserBookProgress } from 'services/progress/progress.service';
+import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import Layout from 'components/Layout';
@@ -50,6 +51,7 @@ const BookList = () => {
   // Progress tracking state
   const [bookProgress, setBookProgress] = useState({});
   const [loadingProgress, setLoadingProgress] = useState({});
+  const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
 
   // Cache helper functions
   const getCacheKey = (page, theme, filter, size) => {
@@ -303,6 +305,32 @@ const BookList = () => {
     return 'Mark as Started';
   };
 
+  // Load meetings to get discussion dates
+  useEffect(() => {
+    const loadMeetings = async () => {
+      if (!currentClub) return;
+      
+      try {
+        const meetings = await getMeetings(currentClub.id);
+        // Create a map of bookId -> earliest meeting date
+        const datesMap = {};
+        meetings.forEach(meeting => {
+          if (meeting.bookId) {
+            const meetingDate = new Date(meeting.date);
+            if (!datesMap[meeting.bookId] || meetingDate < new Date(datesMap[meeting.bookId])) {
+              datesMap[meeting.bookId] = meeting.date;
+            }
+          }
+        });
+        setMeetingDates(datesMap);
+      } catch (error) {
+        console.error('Error loading meetings:', error);
+      }
+    };
+
+    loadMeetings();
+  }, [currentClub]);
+
   useEffect(() => {
     const initializeData = async () => {
       await loadMetadata();
@@ -502,7 +530,7 @@ const BookList = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {formatDate(book.discussionDate)}
+                      {formatDate(meetingDates[book.id])}
                     </Typography>
                   </TableCell>
                   <TableCell>

@@ -7,3 +7,27 @@ export const getMeetings = async (clubId) => {
   return meetings;
 };
 
+export const createMeeting = async (userId, clubId, meetingData) => {
+  const params = new URLSearchParams({ 
+    userId, 
+    clubId: clubId.toString() 
+  });
+  const meeting = await apiCall(`/v1/meetings?${params}`, {
+    method: 'POST',
+    body: JSON.stringify(meetingData),
+  });
+  return meeting;
+};
+
+export const updateMeeting = async (userId, clubId, meetingId, meetingData) => {
+  const params = new URLSearchParams({ 
+    userId, 
+    clubId: clubId.toString() 
+  });
+  const meeting = await apiCall(`/v1/meetings/${meetingId}?${params}`, {
+    method: 'PATCH',
+    body: JSON.stringify(meetingData),
+  });
+  return meeting;
+};
+

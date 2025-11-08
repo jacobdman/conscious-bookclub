@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
 import { getPosts, addPost } from 'services/posts/posts.service';
 import { getBooks } from 'services/books/books.service';
+import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import GoalsProvider from 'contexts/Goals/GoalsProvider';
@@ -45,31 +46,42 @@ const Dashboard = () => {
         return;
       }
       
-      const books = await getBooks(currentClub.id);
+      // Fetch both books and meetings
+      const [books, meetings] = await Promise.all([
+        getBooks(currentClub.id),
+        getMeetings(currentClub.id)
+      ]);
       
       const allBooksData = books.map(book => ({ id: book.id, ...book }));
       
-      // Filter books that have discussion dates and are today or in the future
+      // Create a map of bookId -> earliest upcoming meeting date
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Start of today
       
-      const upcomingBooks = allBooksData.filter(book => {
-        if (!book.discussionDate) {
-          return false; // Skip books without discussion dates
+      const bookMeetingDates = {};
+      meetings.forEach(meeting => {
+        if (meeting.bookId) {
+          const meetingDate = new Date(meeting.date);
+          meetingDate.setHours(0, 0, 0, 0);
+          
+          // Only include meetings that are today or in the future
+          if (meetingDate >= today) {
+            if (!bookMeetingDates[meeting.bookId] || meetingDate < new Date(bookMeetingDates[meeting.bookId])) {
+              bookMeetingDates[meeting.bookId] = meeting.date;
+            }
+          }
         }
-        
-        const discussionDate = new Date(book.discussionDate);
-        
-        // Set time to start of day for comparison
-        discussionDate.setHours(0, 0, 0, 0);
-        
-        return discussionDate >= today;
       });
       
-      // Sort by discussion date (earliest first)
+      // Filter books that have upcoming meetings
+      const upcomingBooks = allBooksData.filter(book => {
+        return bookMeetingDates[book.id] !== undefined;
+      });
+      
+      // Sort by meeting date (earliest first)
       upcomingBooks.sort((a, b) => {
-        const dateA = new Date(a.discussionDate);
-        const dateB = new Date(b.discussionDate);
+        const dateA = new Date(bookMeetingDates[a.id]);
+        const dateB = new Date(bookMeetingDates[b.id]);
         
         return dateA - dateB;
       });

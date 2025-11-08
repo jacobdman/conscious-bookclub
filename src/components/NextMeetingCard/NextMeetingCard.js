@@ -9,7 +9,7 @@ import {
   Alert,
 } from '@mui/material';
 import { LocationOn } from '@mui/icons-material';
-import { fetchCalendarEvents } from 'services/calendarService';
+import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
 import moment from 'moment';
 
@@ -28,31 +28,38 @@ const NextMeetingCard = () => {
         return;
       }
 
-      // Check if config exists and has googleCalendarId
-      const config = currentClub.config || {};
-      const googleCalendarId = config.googleCalendarId;
-      
-      if (!googleCalendarId) {
-        setError('Google Calendar is not configured for this club. Please contact the club owner to configure it in Club Management.');
-        setLoading(false);
-        setNextEvent(null);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
         
-        const events = await fetchCalendarEvents(googleCalendarId);
+        const meetings = await getMeetings(currentClub.id);
         
-        // Find the next upcoming event
+        // Find the next upcoming meeting
         const now = new Date();
-        const upcomingEvents = events
-          .filter(event => new Date(event.start) > now)
-          .sort((a, b) => new Date(a.start) - new Date(b.start));
+        now.setHours(0, 0, 0, 0); // Reset to start of day for DATEONLY comparison
         
-        if (upcomingEvents.length > 0) {
-          setNextEvent(upcomingEvents[0]);
+        const upcomingMeetings = meetings
+          .filter(meeting => {
+            const meetingDate = new Date(meeting.date);
+            meetingDate.setHours(0, 0, 0, 0);
+            return meetingDate >= now;
+          })
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        if (upcomingMeetings.length > 0) {
+          const nextMeeting = upcomingMeetings[0];
+          // Transform meeting to event-like format for compatibility
+          const meetingDate = new Date(nextMeeting.date);
+          setNextEvent({
+            id: nextMeeting.id,
+            title: nextMeeting.book ? 
+              `${nextMeeting.book.title}${nextMeeting.book.author ? ` - ${nextMeeting.book.author}` : ''}` : 
+              'Book Club Meeting',
+            start: meetingDate.toISOString(),
+            location: nextMeeting.location || '',
+            description: nextMeeting.notes || '',
+            allDay: true
+          });
         } else {
           setNextEvent(null);
         }

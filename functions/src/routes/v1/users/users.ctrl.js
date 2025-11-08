@@ -45,9 +45,89 @@ const createUser = async (req, res, next) => {
   }
 };
 
+// PATCH /v1/users/:userId/notification-preferences - Update user notification preferences
+const updateNotificationPreferences = async (req, res, next) => {
+  try {
+    const {userId} = req.params;
+    const {dailyGoalNotificationTime, dailyGoalNotificationsEnabled, timezone} = req.body;
+
+    const user = await db.User.findByPk(userId);
+
+    if (!user) {
+      const error = new Error("User not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const updateData = {};
+    if (dailyGoalNotificationTime !== undefined) {
+      updateData.dailyGoalNotificationTime = dailyGoalNotificationTime;
+    }
+    if (dailyGoalNotificationsEnabled !== undefined) {
+      updateData.dailyGoalNotificationsEnabled = dailyGoalNotificationsEnabled;
+    }
+    if (timezone !== undefined) {
+      updateData.timezone = timezone;
+    }
+
+    await user.update(updateData);
+
+    res.json({id: userId, ...user.toJSON()});
+  } catch (e) {
+    next(e);
+  }
+};
+
+// PATCH /v1/users/:userId/profile - Update user profile (displayName, photoUrl)
+const updateProfile = async (req, res, next) => {
+  try {
+    const {userId} = req.params;
+    const {displayName, photoUrl} = req.body;
+
+    // Verify userId is provided in query for security (user can only update their own profile)
+    const requestUserId = req.query.userId;
+    if (!requestUserId) {
+      const error = new Error("userId is required in query");
+      error.status = 400;
+      throw error;
+    }
+
+    // Security check: userId in params must match userId in query
+    if (userId !== requestUserId) {
+      const error = new Error("You can only update your own profile");
+      error.status = 403;
+      throw error;
+    }
+
+    const user = await db.User.findByPk(userId);
+
+    if (!user) {
+      const error = new Error("User not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const updateData = {};
+    if (displayName !== undefined) {
+      updateData.displayName = displayName;
+    }
+    if (photoUrl !== undefined) {
+      updateData.photoUrl = photoUrl;
+    }
+
+    await user.update(updateData);
+
+    res.json({id: userId, ...user.toJSON()});
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   getUsers,
   getUser,
   createUser,
+  updateNotificationPreferences,
+  updateProfile,
 };
 

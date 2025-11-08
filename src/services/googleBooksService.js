@@ -14,6 +14,42 @@ const debounce = (func, wait) => {
   };
 };
 
+// Helper function to improve image quality by increasing zoom parameter
+// Google Books API URLs often have zoom=1 (low quality), we can increase to zoom=3 for better quality
+// Export this so components can use it for existing books in the database
+export const improveImageQuality = (imageUrl) => {
+  // Return as-is if no URL provided (preserve null/undefined)
+  if (!imageUrl) return imageUrl;
+  
+  // Only process string URLs
+  if (typeof imageUrl !== 'string') return imageUrl;
+  
+  // Only modify Google Books URLs - leave other URLs unchanged
+  if (!imageUrl.includes('books.google.com')) {
+    return imageUrl;
+  }
+  
+  try {
+    // If URL contains zoom parameter, increase it to 3 for better quality
+    if (imageUrl.includes('zoom=')) {
+      return imageUrl.replace(/zoom=\d+/, 'zoom=3');
+    }
+    
+    // If URL doesn't have zoom parameter but is a Google Books URL, add it
+    if (imageUrl.includes('printsec=frontcover') || imageUrl.includes('img=')) {
+      const separator = imageUrl.includes('?') ? '&' : '?';
+      return `${imageUrl}${separator}zoom=3`;
+    }
+  } catch (error) {
+    // If anything goes wrong, return the original URL
+    console.warn('Error improving image quality:', error);
+    return imageUrl;
+  }
+  
+  // Return unchanged if we can't safely modify it
+  return imageUrl;
+};
+
 // Map Google Books categories to our genre list
 const mapCategoryToGenre = (categories) => {
   if (!categories || !Array.isArray(categories)) return '';
@@ -164,7 +200,17 @@ const parseBookData = (item) => {
     description: volumeInfo.description || '',
     categories: volumeInfo.categories || [],
     genre: mapCategoryToGenre(volumeInfo.categories),
-    coverImage: volumeInfo.imageLinks?.thumbnail || volumeInfo.imageLinks?.smallThumbnail || '',
+    // Prefer larger image sizes for better quality
+    // Google Books API provides: smallThumbnail, thumbnail, small, medium, large, extraLarge
+    // Since covers are displayed at 300px height, use medium or larger for better quality
+    // Note: We improve quality when displaying, not when storing
+    coverImage: volumeInfo.imageLinks?.extraLarge || 
+                volumeInfo.imageLinks?.large || 
+                volumeInfo.imageLinks?.medium || 
+                volumeInfo.imageLinks?.small || 
+                volumeInfo.imageLinks?.thumbnail || 
+                volumeInfo.imageLinks?.smallThumbnail || 
+                '',
     publishedDate: volumeInfo.publishedDate || '',
     pageCount: volumeInfo.pageCount || null,
     language: volumeInfo.language || 'en',
@@ -173,14 +219,40 @@ const parseBookData = (item) => {
 };
 
 // Search books using Google Books API
-export const searchBooks = async (query, maxResults = 10) => {
-  if (!query || query.trim().length < 2) {
+// Supports searching by title, author, or both
+// Legacy support: if only title is provided (author is empty), works as before
+export const searchBooks = async (title = '', author = '', maxResults = 10) => {
+  const trimmedTitle = (title || '').trim();
+  const trimmedAuthor = (author || '').trim();
+  
+  // Need at least 2 characters in title or author to search
+  if (trimmedTitle.length < 2 && trimmedAuthor.length < 2) {
     return [];
   }
 
   try {
-    const searchQuery = encodeURIComponent(query.trim());
-    const url = `${GOOGLE_BOOKS_API_BASE}?q=${searchQuery}&maxResults=${maxResults}&printType=books`;
+    let searchQuery;
+    
+    // Google Books API: + = AND, space = OR
+    // intitle: searches title, inauthor: searches author
+    
+    if (trimmedTitle && trimmedAuthor) {
+      // Both title and author provided: search for both together
+      // This finds books with the title AND the author
+      searchQuery = `intitle:${trimmedTitle}+inauthor:${trimmedAuthor}`;
+    } else if (trimmedTitle) {
+      // Only title provided: search in title and general (for numeric titles like "1984")
+      // Use general search first (searches all fields), then title-specific
+      searchQuery = `${trimmedTitle} intitle:${trimmedTitle}`;
+    } else if (trimmedAuthor) {
+      // Only author provided: search in author field
+      searchQuery = `inauthor:${trimmedAuthor}`;
+    } else {
+      return [];
+    }
+    
+    const encodedQuery = encodeURIComponent(searchQuery);
+    const url = `${GOOGLE_BOOKS_API_BASE}?q=${encodedQuery}&maxResults=${maxResults}&printType=books`;
     
     const response = await fetch(url);
     
@@ -200,11 +272,29 @@ export const searchBooks = async (query, maxResults = 10) => {
   }
 };
 
-// Debounced search function to avoid excessive API calls
-export const debouncedSearchBooks = debounce(async (query, callback) => {
+// Create debounced functions for both API styles
+const debouncedSearchBooksOld = debounce(async (query, callback) => {
   const results = await searchBooks(query);
   callback(results);
 }, 300);
+
+const debouncedSearchBooksNew = debounce(async (title, author, callback) => {
+  const results = await searchBooks(title, author);
+  callback(results);
+}, 300);
+
+// Debounced search function to avoid excessive API calls
+// Supports both old API (single query) and new API (title, author, callback)
+export const debouncedSearchBooks = (titleOrQuery, authorOrCallback, callback) => {
+  // Handle both old and new API signatures
+  if (typeof authorOrCallback === 'function') {
+    // Old API: debouncedSearchBooks(query, callback)
+    debouncedSearchBooksOld(titleOrQuery, authorOrCallback);
+  } else {
+    // New API: debouncedSearchBooks(title, author, callback)
+    debouncedSearchBooksNew(titleOrQuery, authorOrCallback, callback);
+  }
+};
 
 // Get book details by ID (for future use)
 export const getBookById = async (bookId) => {

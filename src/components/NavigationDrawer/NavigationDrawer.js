@@ -22,20 +22,23 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
   const location = useLocation();
   const { currentClub, userClubs, setCurrentClub, loading: clubsLoading } = useClubContext();
 
-  const menuItems = [
+  // Organize menu items into logical groups
+  const clubManagementItems = currentClub?.role === 'owner' ? [
+    { name: 'Manage Club', path: '/club/manage' },
+    { name: 'Meetings', path: '/meetings' },
+  ] : [];
+
+  const mainNavigationItems = [
     { name: 'Dashboard', path: '/' },
     { name: 'Club', path: '/club' },
     { name: 'Book List', path: '/books' },
     { name: 'Calendar', path: '/calendar' },
     { name: 'Goals', path: '/goals' },
-    { name: 'Feed - (Coming Soon)', path: '/feed', disabled: true },
-    { name: 'Profile', path: '/profile' },
   ];
 
-  // Add "Manage Club" if user is owner
-  if (currentClub?.role === 'owner') {
-    menuItems.splice(2, 0, { name: 'Manage Club', path: '/club/manage' });
-  }
+  const comingSoonItems = [
+    { name: 'Feed - (Coming Soon)', path: '/feed', disabled: true },
+  ];
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -105,18 +108,76 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
         
         {/* Main navigation items */}
         <Box sx={{ flex: 1, overflow: 'auto' }}>
-          <List>
-            {menuItems.map((item) => (
+          {/* Club Management Section (Owner Only) */}
+          {clubManagementItems.length > 0 && (
+            <>
+              <Typography variant="caption" sx={{ px: 2, py: 1, color: 'text.secondary', fontWeight: 'medium', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Club Management
+              </Typography>
+              <List sx={{ py: 0, mb: 1 }}>
+                {clubManagementItems.map((item) => (
+                  <ListItem 
+                    button 
+                    key={item.name}
+                    onClick={() => handleNavigation(item.path)}
+                    selected={location.pathname === item.path}
+                    sx={{
+                      bgcolor: location.pathname === item.path ? 'action.selected' : 'action.hover',
+                      borderRadius: 1,
+                      mb: 0.5,
+                      '&:hover': {
+                        bgcolor: 'action.hover',
+                      },
+                    }}
+                  >
+                    <ListItemText primary={item.name} />
+                  </ListItem>
+                ))}
+              </List>
+              <Divider sx={{ my: 1 }} />
+            </>
+          )}
+
+          {/* Main Navigation Section */}
+          <Typography variant="caption" sx={{ px: 2, py: 1, color: 'text.secondary', fontWeight: 'medium', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Navigation
+          </Typography>
+          <List sx={{ py: 0, mb: 1 }}>
+            {mainNavigationItems.map((item) => (
               <ListItem 
                 button 
                 key={item.name}
                 onClick={() => handleNavigation(item.path)}
                 selected={location.pathname === item.path}
-                disabled={item.disabled}
               >
-                <ListItemText primary={item.name} sx={{ color: item.disabled ? 'text.secondary' : 'inherit' }} />
+                <ListItemText primary={item.name} />
               </ListItem>
             ))}
+          </List>
+
+          {/* Coming Soon Section */}
+          {comingSoonItems.length > 0 && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <List sx={{ py: 0, mb: 1 }}>
+                {comingSoonItems.map((item) => (
+                  <ListItem 
+                    button 
+                    key={item.name}
+                    onClick={() => handleNavigation(item.path)}
+                    selected={location.pathname === item.path}
+                    disabled={item.disabled}
+                  >
+                    <ListItemText primary={item.name} sx={{ color: 'text.secondary' }} />
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
+
+          {/* Sign Out */}
+          <Divider sx={{ my: 1 }} />
+          <List sx={{ py: 0 }}>
             <ListItem button onClick={onLogout}>
               <ListItemText primary="Sign Out" sx={{ color: 'text.secondary' }} />
             </ListItem>

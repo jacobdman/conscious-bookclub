@@ -19,8 +19,7 @@ import {
   Checkbox,
   Autocomplete,
   CircularProgress,
-  Avatar,
-  Tooltip
+  Avatar
 } from '@mui/material';
 import { addBook, updateBook, deleteBook } from 'services/books/books.service';
 import { debouncedSearchBooks } from 'services/googleBooksService';
@@ -38,20 +37,12 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     genre: '',
     coverImage: '',
     fiction: false,
-    discussionDate: '',
     description: ''
   });
 
   // Update form data when editingBook changes
   React.useEffect(() => {
     if (editingBook) {
-      // Format discussion date for input field (YYYY-MM-DD)
-      let formattedDate = '';
-      if (editingBook.discussionDate) {
-        const discussionDate = new Date(editingBook.discussionDate);
-        formattedDate = discussionDate.toISOString().split('T')[0];
-      }
-
       // Clean up theme data - remove any escaped quotes or malformed entries
       let cleanTheme = [];
       if (Array.isArray(editingBook.theme)) {
@@ -73,7 +64,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: editingBook.genre || '',
         coverImage: editingBook.coverImage || '',
         fiction: Boolean(editingBook.fiction),
-        discussionDate: formattedDate,
         description: editingBook.description || ''
       };
       setFormData(newFormData);
@@ -96,7 +86,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: '',
         coverImage: '',
         fiction: false,
-        discussionDate: '',
         description: ''
       });
       setSelectedBook(null);
@@ -155,11 +144,15 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     setFormData(prev => ({ ...prev, [field]: event.target.checked }));
   };
 
-  // Autocomplete handlers
-  const handleBookSearch = useCallback((query) => {
-    if (query && query.length >= 2) {
+  // Autocomplete handlers - search using both title and author fields
+  const handleBookSearch = useCallback((title, author) => {
+    const titleTrimmed = (title || '').trim();
+    const authorTrimmed = (author || '').trim();
+    
+    // Search if we have at least 2 characters in title or author
+    if (titleTrimmed.length >= 2 || authorTrimmed.length >= 2) {
       setAutocompleteLoading(true);
-      debouncedSearchBooks(query, (results) => {
+      debouncedSearchBooks(titleTrimmed, authorTrimmed, (results) => {
         setBookSuggestions(results);
         setAutocompleteLoading(false);
       });
@@ -186,12 +179,29 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
   };
 
   const handleTitleInputChange = (event, value) => {
-    setFormData(prev => ({ ...prev, title: value }));
-    handleBookSearch(value);
+    setFormData(prev => {
+      // Search with both title and current author value
+      handleBookSearch(value, prev.author);
+      return { ...prev, title: value };
+    });
     
     // Clear error when user starts typing
     if (errors.title) {
       setErrors(prev => ({ ...prev, title: '' }));
+    }
+  };
+
+  const handleAuthorChange = (event) => {
+    const value = event.target.value;
+    setFormData(prev => {
+      // Search with both current title and author value
+      handleBookSearch(prev.title, value);
+      return { ...prev, author: value };
+    });
+    
+    // Clear error when user starts typing
+    if (errors.author) {
+      setErrors(prev => ({ ...prev, author: '' }));
     }
   };
 
@@ -232,7 +242,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: formData.genre || null,
         coverImage: formData.coverImage.trim() || null,
         fiction: formData.fiction || false, // Ensure it's always a boolean
-        discussionDate: formData.discussionDate ? new Date(formData.discussionDate) : null,
         description: formData.description.trim() || null
       };
 
@@ -260,7 +269,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: '',
         coverImage: '',
         fiction: false,
-        discussionDate: '',
         description: ''
       });
       setSelectedBook(null);
@@ -276,13 +284,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
 
   const handleDelete = async () => {
     if (!editingBook || !editingBook.id) return;
-    
-    const hasDiscussionDate = editingBook.discussionDate;
-    
-    if (hasDiscussionDate) {
-      setSubmitError('Cannot delete a book that has a scheduled discussion date. Please remove the discussion date first.');
-      return;
-    }
     
     if (window.confirm(`Are you sure you want to delete "${editingBook.title}"? This action cannot be undone.`)) {
       if (!currentClub) {
@@ -410,7 +411,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
             <TextField
               label="Author *"
               value={formData.author}
-              onChange={handleChange('author')}
+              onChange={handleAuthorChange}
               error={!!errors.author}
               helperText={errors.author}
               fullWidth
@@ -488,39 +489,20 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
               label="Fiction"
             />
 
-            <TextField
-              label="Discussion Date"
-              type="date"
-              value={formData.discussionDate}
-              onChange={handleChange('discussionDate')}
-              fullWidth
-              disabled={loading}
-              InputLabelProps={{
-                shrink: true,
-              }}
-              helperText="Optional: When will this book be discussed?"
-            />
           </Box>
         </DialogContent>
 
         <DialogActions sx={{ p: 2, gap: 1 }}>
           {editingBook && (
-            <Tooltip 
-              title={editingBook.discussionDate ? "Cannot delete a book with a scheduled discussion date" : "Delete this book"}
-              arrow
+            <Button
+              onClick={handleDelete}
+              disabled={loading}
+              variant="outlined"
+              color="error"
+              sx={{ mr: 'auto' }}
             >
-              <span>
-                <Button
-                  onClick={handleDelete}
-                  disabled={loading || (editingBook && editingBook.discussionDate)}
-                  variant="outlined"
-                  color="error"
-                  sx={{ mr: 'auto' }}
-                >
-                  Delete
-                </Button>
-              </span>
-            </Tooltip>
+              Delete
+            </Button>
           )}
           <Button
             onClick={handleClose}
