@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   signInWithPopup, 
   signOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  getRedirectResult 
 } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 import { createUserDocument } from './services/users/users.service';
@@ -39,6 +40,35 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    // Clear any pending redirect results on app initialization
+    // This prevents "missing initial state" errors
+    getRedirectResult(auth)
+      .then((result) => {
+        // If there's a redirect result, handle it
+        if (result && result.user) {
+          // User signed in via redirect
+          createUserDocument(result.user).catch(() => {
+            // Error creating user document
+          });
+        }
+      })
+      .catch((error) => {
+        // Ignore errors about missing state - this is expected if no redirect was initiated
+        // Common error codes: 'auth/missing-or-invalid-nonce', 'auth/argument-error'
+        // The error message typically contains "missing initial state" or "sessionStorage"
+        const errorMessage = error.message || '';
+        const isMissingStateError = 
+          error.code === 'auth/missing-or-invalid-nonce' ||
+          error.code === 'auth/argument-error' ||
+          errorMessage.includes('missing initial state') ||
+          errorMessage.includes('sessionStorage');
+        
+        if (!isMissingStateError) {
+          console.error('Error processing redirect result:', error);
+        }
+        // Silently ignore missing state errors - they're harmless
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Create or update user document
