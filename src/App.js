@@ -14,6 +14,7 @@ import Goals from './views/Goals';
 import Profile from './views/Profile';
 import Meetings from './views/Meetings';
 import NoClub from './views/NoClub';
+import Landing from './views/Landing';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
 import { CircularProgress, Box } from '@mui/material';
@@ -42,99 +43,137 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <Login />;
-  }
-
   return (
-    <ClubProvider>
-      <Router>
-        <Routes>
-          <Route path="/join-club" element={<NoClub />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/club"
-            element={
-              <ProtectedRoute>
-                <ClubView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/club/books"
-            element={
-              <ProtectedRoute>
-                <ClubView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/club/goals"
-            element={
-              <ProtectedRoute>
-                <ClubView />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/club/manage"
-            element={
-              <ProtectedRoute>
-                <ClubManagement />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/books"
-            element={
-              <ProtectedRoute>
-                <Books />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/calendar"
-            element={
-              <ProtectedRoute>
-                <Calendar />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/goals"
-            element={
-              <ProtectedRoute>
-                <Goals />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/meetings"
-            element={
-              <ProtectedRoute>
-                <Meetings />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </ClubProvider>
+    <Router>
+      <Routes>
+        {/* Public routes */}
+        <Route
+          path="/landing"
+          element={user ? <Navigate to="/" replace /> : <Landing />}
+        />
+        <Route
+          path="/login"
+          element={user ? <Navigate to="/" replace /> : <Login />}
+        />
+        
+        {/* Authenticated routes */}
+        {user ? (
+          <>
+            <Route
+              path="/join-club"
+              element={
+                <ClubProvider>
+                  <NoClub />
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/club"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <ClubView />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/club/books"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <ClubView />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/club/goals"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <ClubView />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/club/manage"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <ClubManagement />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/books"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Books />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Calendar />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/goals"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Goals />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/meetings"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Meetings />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        ) : (
+          <Route path="*" element={<Navigate to="/landing" replace />} />
+        )}
+      </Routes>
+    </Router>
   );
 }
 

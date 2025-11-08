@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -11,15 +11,24 @@ import Layout from 'components/Layout';
 import useClubContext from 'contexts/Club';
 import { useAuth } from 'AuthContext';
 import { joinClubByInviteCode } from 'services/clubs/clubs.service';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const NoClub = () => {
   const { user } = useAuth();
   const { refreshClubs, setCurrentClub } = useClubContext();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Get invite code from URL params
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('inviteCode');
+    if (codeFromUrl) {
+      setInviteCode(codeFromUrl);
+    }
+  }, [searchParams]);
 
   const handleJoinClub = async () => {
     if (!inviteCode.trim()) {

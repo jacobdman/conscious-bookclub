@@ -15,7 +15,8 @@ const verifyMembership = async (clubId, userId) => {
 };
 
 
-// GET /v1/clubs/:clubId/goals-report?userId=xxx&startDate=xxx&endDate=xxx&includeAnalytics=true&includeWeeklyTrend=true - Get club goals report
+// GET /v1/clubs/:clubId/goals-report?userId=xxx&startDate=xxx&endDate=xxx
+// &includeAnalytics=true&includeWeeklyTrend=true - Get club goals report
 const getClubGoalsReport = async (req, res, next) => {
   try {
     const {clubId} = req.params;
@@ -116,7 +117,8 @@ const getClubGoalsReport = async (req, res, next) => {
           }),
       );
 
-      // Sort by consistency rate (descending), then by creation date (oldest first) for tie-breaking
+      // Sort by consistency rate (descending), then by creation date
+      // (oldest first) for tie-breaking
       habitsWithConsistency.sort((a, b) => {
         if (b.consistencyRate !== a.consistencyRate) {
           return b.consistencyRate - a.consistencyRate;
@@ -319,12 +321,14 @@ const getClubGoalsReport = async (req, res, next) => {
 
           if (habitGoals.length > 0) {
             // Calculate consistency for each habit
+            // Capture currentWeekStart to avoid unsafe reference in loop
+            const weekStart = currentWeekStart;
             const habitsWithConsistency = await Promise.all(
                 habitGoals.map(async (goal) => {
                   const consistency = await calculateHabitConsistency(
                       memberUserId,
                       goal,
-                      currentWeekStart,
+                      weekStart,
                       weekEnd,
                       false, // includeStreak - not needed for weekly trend
                   );

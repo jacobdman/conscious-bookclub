@@ -122,8 +122,10 @@ const calculateHabitWeight = (habitPosition) => {
 };
 
 // Calculate consistency score for a habit goal over date range
-// includeStreak: if true, calculates streak (consecutive completed periods from most recent)
-const calculateHabitConsistency = async (userId, goal, startDate, endDate, includeStreak = true) => {
+// includeStreak: if true, calculates streak (consecutive completed periods
+// from most recent)
+const calculateHabitConsistency = async (
+    userId, goal, startDate, endDate, includeStreak = true) => {
   if (goal.type !== "habit" || !goal.cadence) {
     return null;
   }

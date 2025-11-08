@@ -1,7 +1,6 @@
 const db = require("../../../../db/models/index");
 const {
   getGoalEntries,
-  getPeriodBoundaries,
   calculateHabitWeight,
   calculateHabitConsistency,
 } = require("../../../../utils/goalHelpers");

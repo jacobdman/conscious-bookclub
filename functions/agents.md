@@ -312,6 +312,12 @@ app.use((err, req, res, next) => {
 
 ### Code Style
 
+- **Follow ESLint Configuration**: All code must pass ESLint checks defined in `.eslintrc.js`
+  - Run `npm run lint` before committing
+  - Maximum line length: 100 characters
+  - Use double quotes for strings (template literals allowed)
+  - Prefer arrow callbacks
+  - Follow Google JavaScript style guide (extends `eslint:recommended` and `google`)
 - Use `async/await` for asynchronous operations
 - Use `const` and `let` (avoid `var`)
 - Use ES6+ features (arrow functions, destructuring, etc.)
@@ -347,11 +353,13 @@ app.use(cors({origin: true}));
 
 ### Best Practices
 
-1. **Always use async/await** - Avoid callback patterns
-2. **Handle errors properly** - Always catch and pass to error middleware
-3. **Validate input** - Use model validation and custom validation
-4. **Use soft deletes** - Never hard-delete records
-5. **Follow naming conventions** - Consistent naming makes code more maintainable
-6. **Extract reusable logic** - Use helper functions and services
-7. **Document complex logic** - Add comments for non-obvious code
-8. **Use allowedFields** - Prevent mass assignment vulnerabilities
+1. **Follow ESLint rules** - Run `npm run lint` and fix all errors before committing
+2. **Always use async/await** - Avoid callback patterns
+3. **Handle errors properly** - Always catch and pass to error middleware
+4. **Validate input** - Use model validation and custom validation
+5. **Use soft deletes** - Never hard-delete records
+6. **Follow naming conventions** - Consistent naming makes code more maintainable
+7. **Extract reusable logic** - Use helper functions and services
+8. **Document complex logic** - Add comments for non-obvious code
+9. **Use allowedFields** - Prevent mass assignment vulnerabilities
+10. **Keep lines under 100 characters** - Break long lines for readability
