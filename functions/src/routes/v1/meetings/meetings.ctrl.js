@@ -153,21 +153,25 @@ const updateMeeting = async (req, res, next) => {
   }
 };
 
-// Helper function to format date for iCal (YYYYMMDD or YYYYMMDDTHHMMSSZ)
+// Helper function to format date for iCal (YYYYMMDD or YYYYMMDDTHHMMSS)
+// Uses floating time (no timezone) for timed events to preserve local time
 const formatICalDate = (date, isAllDay = true) => {
   const d = new Date(date);
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
+  // Use local time components for all parts to maintain consistency
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
 
   if (isAllDay) {
     return `${year}${month}${day}`;
   }
 
-  const hour = String(d.getUTCHours()).padStart(2, "0");
-  const minute = String(d.getUTCMinutes()).padStart(2, "0");
-  const second = String(d.getUTCSeconds()).padStart(2, "0");
-  return `${year}${month}${day}T${hour}${minute}${second}Z`;
+  // For timed events, use local time components (floating time, no timezone)
+  // This preserves the time as entered by the user
+  const hour = String(d.getHours()).padStart(2, "0");
+  const minute = String(d.getMinutes()).padStart(2, "0");
+  const second = String(d.getSeconds()).padStart(2, "0");
+  return `${year}${month}${day}T${hour}${minute}${second}`;
 };
 
 // Helper function to escape iCal text (escape commas, semicolons, backslashes, newlines)
@@ -215,27 +219,31 @@ const getMeetingsICal = async (req, res, next) => {
     lines.push("METHOD:PUBLISH");
 
     meetings.forEach((meeting) => {
-      const meetingDate = new Date(meeting.date);
-      let startDateTime = meetingDate;
-      let endDateTime = new Date(meetingDate);
+      // Parse the date string (YYYY-MM-DD format)
+      const dateParts = meeting.date.split("-").map((v) => parseInt(v, 10));
+      const [year, month, day] = dateParts;
+
+      let startDateTime;
+      let endDateTime;
       let isAllDay = true;
 
-      // If startTime is provided, combine date and time
+      // If startTime is provided, combine date and time using local time
       if (meeting.startTime) {
         const timeParts = meeting.startTime.split(":").map((v) => parseInt(v, 10) || 0);
         const [hours, minutes, seconds] = timeParts;
-        startDateTime = new Date(meetingDate);
-        startDateTime.setUTCHours(hours, minutes, seconds || 0, 0);
+
+        // Create date using local time (month is 0-indexed in Date constructor)
+        startDateTime = new Date(year, month - 1, day, hours, minutes, seconds || 0);
 
         // End time is 2 hours after start (default meeting duration)
         endDateTime = new Date(startDateTime);
-        endDateTime.setUTCHours(endDateTime.getUTCHours() + 2);
+        endDateTime.setHours(endDateTime.getHours() + 2);
 
         isAllDay = false;
       } else {
-        // For all-day events, use same date for start and end
-        endDateTime = new Date(meetingDate);
-        endDateTime.setUTCDate(endDateTime.getUTCDate() + 1);
+        // For all-day events, create date at midnight local time
+        startDateTime = new Date(year, month - 1, day, 0, 0, 0);
+        endDateTime = new Date(year, month - 1, day + 1, 0, 0, 0);
       }
 
       // Generate unique ID for the event

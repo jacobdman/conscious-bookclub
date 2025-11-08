@@ -12,6 +12,7 @@ import CurrentBooksSection from 'components/CurrentBooksSection';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import FeedSection from 'components/FeedSection';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
+import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
 
 const Dashboard = () => {
@@ -122,6 +123,7 @@ const Dashboard = () => {
       <Layout>
         <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <PWAInstallPrompt />
+          <NotificationPrompt />
           {currentClub && (
             <Typography variant="h5" sx={{ mb: 1 }}>
               {currentClub.name}
