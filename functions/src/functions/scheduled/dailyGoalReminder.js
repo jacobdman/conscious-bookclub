@@ -86,7 +86,6 @@ exports.dailyGoalReminder = onSchedule(
 
         const now = new Date();
         const currentHour = now.getUTCHours();
-        const currentMinute = now.getUTCMinutes();
 
         for (const user of users) {
           // Check if it's time to send notification for this user
@@ -95,7 +94,9 @@ exports.dailyGoalReminder = onSchedule(
           }
 
           // Parse notification time (format: "HH:MM:SS" or "HH:MM")
-          const [hours, minutes] = user.dailyGoalNotificationTime.split(":").map(Number);
+          // Since cron runs hourly at minute 0, we only need to check the hour
+          const [hours] = user.dailyGoalNotificationTime.split(":").map(Number);
+          const targetHour = hours;
 
           // Get user's timezone or default to UTC
           const userTimezone = user.timezone || "UTC";
@@ -104,11 +105,6 @@ exports.dailyGoalReminder = onSchedule(
           // For simplicity, we'll check if current UTC time matches
           // In a production system, you'd want to use a timezone library
           // like moment-timezone
-          const targetHour = hours;
-          const targetMinute = minutes || 0;
-
-          // Simple timezone offset calculation
-          // (this is simplified - in production use proper timezone library)
           if (userTimezone !== "UTC") {
             // This is a simplified approach - in production, use a proper
             // timezone library. For now, we'll just check if the hour matches
@@ -116,11 +112,9 @@ exports.dailyGoalReminder = onSchedule(
             // The proper implementation would convert the user's local time to UTC
           }
 
-          // Check if current time matches user's notification time (within 5 minute window)
-          const timeMatch = Math.abs(currentHour - targetHour) === 0 &&
-            Math.abs(currentMinute - targetMinute) <= 5;
-
-          if (!timeMatch) {
+          // Check if current hour matches user's notification hour
+          // Since cron runs at minute 0, we only check the hour
+          if (currentHour !== targetHour) {
             continue;
           }
 

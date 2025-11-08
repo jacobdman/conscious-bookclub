@@ -1,4 +1,41 @@
 const db = require("../../../../db/models/index");
+const webpush = require("web-push");
+
+// Configure web-push with VAPID keys (should be in environment variables)
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@consciousbookclub.com";
+
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
+}
+
+// Helper function to send push notification
+const sendPushNotification = async (subscription, title, body) => {
+  try {
+    const payload = JSON.stringify({
+      title,
+      body,
+      icon: "/android-chrome-192x192.png",
+      badge: "/android-chrome-192x192.png",
+    });
+
+    await webpush.sendNotification(subscription, payload);
+    console.log("Push notification sent successfully");
+    return {success: true};
+  } catch (error) {
+    console.error("Error sending push notification:", error);
+    // If subscription is invalid, delete it
+    if (error.statusCode === 410 || error.statusCode === 404) {
+      await db.PushSubscription.destroy({
+        where: {
+          subscriptionJson: subscription,
+        },
+      });
+    }
+    return {success: false, error: error.message};
+  }
+};
 
 // POST /v1/notifications/subscribe - Register push subscription for user
 const subscribe = async (req, res, next) => {
@@ -94,9 +131,72 @@ const getSubscription = async (req, res, next) => {
   }
 };
 
+// POST /v1/notifications/test - Send a test push notification to user
+const sendTestNotification = async (req, res, next) => {
+  try {
+    const {userId} = req.query;
+    const {title, body} = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    // Check if VAPID keys are configured
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      const error = new Error("VAPID keys not configured");
+      error.status = 500;
+      throw error;
+    }
+
+    // Get user's push subscriptions
+    const subscriptions = await db.PushSubscription.findAll({
+      where: {userId},
+    });
+
+    if (subscriptions.length === 0) {
+      return res.status(404).json({
+        error: "No push subscriptions found for this user",
+      });
+    }
+
+    // Send notification to all subscriptions
+    const notificationTitle = title || "Test Notification";
+    const notificationBody = body || "This is a test push notification from Conscious Book Club";
+
+    const results = [];
+    for (const subscription of subscriptions) {
+      const result = await sendPushNotification(
+          subscription.subscriptionJson,
+          notificationTitle,
+          notificationBody,
+      );
+      results.push({
+        subscriptionId: subscription.id,
+        ...result,
+      });
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.filter((r) => !r.success).length;
+
+    res.json({
+      message: `Sent ${successCount} notification(s), ${failureCount} failed`,
+      total: subscriptions.length,
+      successful: successCount,
+      failed: failureCount,
+      results,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   subscribe,
   unsubscribe,
   getSubscription,
+  sendTestNotification,
 };
 

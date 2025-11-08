@@ -62,3 +62,19 @@ export const deleteProfilePicture = async (imageUrl) => {
   }
 };
 
+/**
+ * Get download URL for any file in Firebase Storage
+ * @param {string} filePath - Path to the file (e.g., "landing_images/dashboard.png")
+ * @returns {Promise<string>} The download URL of the file
+ */
+export const getStorageFileUrl = async (filePath) => {
+  try {
+    const storageRef = ref(storage, filePath);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+  } catch (error) {
+    console.error(`Error getting storage file URL for ${filePath}:`, error);
+    throw error;
+  }
+};
+

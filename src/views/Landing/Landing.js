@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -13,14 +13,18 @@ import {
   createTheme,
   CssBaseline,
   Chip,
+  CircularProgress,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import ClubCreationRequest from 'components/ClubCreationRequest';
 import { theme } from '../../theme';
+import { getStorageFileUrl } from 'services/storage';
 
 const Landing = () => {
   const navigate = useNavigate();
   const [inviteCode, setInviteCode] = useState('');
+  const [imageUrls, setImageUrls] = useState({});
+  const [imagesLoading, setImagesLoading] = useState(true);
 
   const scrollToSection = (sectionId) => {
     const element = document.getElementById(sectionId);
@@ -42,6 +46,40 @@ const Landing = () => {
       navigate(`/login?inviteCode=${encodeURIComponent(inviteCode.trim().toUpperCase())}`);
     }
   };
+
+  // Load landing page images from Firebase Storage
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        setImagesLoading(true);
+        // Map feature sections to their corresponding images
+        const imageMap = {
+          'goals-dashboard': 'landing_images/dashboard.png',
+          'leaderboards': 'landing_images/club_goals.PNG',
+          'calendar-events': 'landing_images/calendar.PNG',
+        };
+
+        const urls = {};
+        await Promise.all(
+          Object.entries(imageMap).map(async ([key, path]) => {
+            try {
+              const url = await getStorageFileUrl(path);
+              if (url) urls[key] = url;
+            } catch (error) {
+              console.warn(`Could not load image: ${path}`, error);
+            }
+          })
+        );
+        setImageUrls(urls);
+      } catch (error) {
+        console.error('Error loading landing images:', error);
+      } finally {
+        setImagesLoading(false);
+      }
+    };
+
+    loadImages();
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>
@@ -153,28 +191,33 @@ const Landing = () => {
             </Typography>
 
             {/* Feature 1: More Than Just Books */}
-            <Grid
-              container
-              spacing={{ xs: 4, md: 8 }}
-              sx={{ mb: { xs: 8, md: 12 }, alignItems: 'center' }}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: { xs: 4, md: 6 },
+                mb: { xs: 8, md: 12 },
+                alignItems: 'center',
+              }}
             >
-              <Grid item xs={12} md={6}>
-                <Box
-                  sx={{
-                    position: 'relative',
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    boxShadow: 8,
-                    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: 12,
-                    },
-                  }}
-                >
+              <Box
+                sx={{
+                  width: { xs: '100%', md: '50%' },
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  boxShadow: 8,
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    boxShadow: 12,
+                  },
+                }}
+              >
+                {imagesLoading || !imageUrls['goals-dashboard'] ? (
                   <Paper
                     sx={{
-                      height: { xs: 300, md: 450 },
+                      width: '100%',
+                      aspectRatio: '4/3',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -182,69 +225,87 @@ const Landing = () => {
                       background: 'linear-gradient(135deg, #E8E3D8 0%, #D4C9B0 100%)',
                     }}
                   >
-                    <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-                      Screenshot: Goals Dashboard
-                    </Typography>
+                    {imagesLoading ? (
+                      <CircularProgress />
+                    ) : (
+                      <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
+                        Screenshot: Goals Dashboard
+                      </Typography>
+                    )}
                   </Paper>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Box sx={{ pl: { md: 4 } }}>
-                  <Typography
-                    variant="h4"
-                    component="h3"
-                    gutterBottom
-                    sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold' }}
-                  >
-                    More Than Just Books
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    color="text.secondary"
-                    sx={{ mb: 3, lineHeight: 1.6, fontSize: '1.1rem' }}
-                  >
-                    Track both personal and reading goals in one place. Build consistent
-                    habits beyond just reading and see your overall progress over time.
-                  </Typography>
+                ) : (
                   <Box
+                    component="img"
+                    src={imageUrls['goals-dashboard']}
+                    alt="Goals Dashboard"
                     sx={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 2,
-                      mt: 3,
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block',
                     }}
-                  >
-                    <Chip label="Goal Tracking" sx={{ bgcolor: 'primary.main', color: 'white' }} />
-                    <Chip label="Progress Analytics" sx={{ bgcolor: 'secondary.main', color: 'white' }} />
-                    <Chip label="Habit Building" sx={{ bgcolor: 'primary.main', color: 'white', opacity: 0.8 }} />
-                  </Box>
+                  />
+                )}
+              </Box>
+              <Box sx={{ width: { xs: '100%', md: '50%' }, pl: { md: 4 } }}>
+                <Typography
+                  variant="h4"
+                  component="h3"
+                  gutterBottom
+                  sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold' }}
+                >
+                  More Than Just Books
+                </Typography>
+                <Typography
+                  variant="h6"
+                  color="text.secondary"
+                  sx={{ mb: 3, lineHeight: 1.6, fontSize: '1.1rem' }}
+                >
+                  Track both personal and reading goals in one place. Build consistent
+                  habits beyond just reading and see your overall progress over time.
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 2,
+                    mt: 3,
+                  }}
+                >
+                  <Chip label="Goal Tracking" sx={{ bgcolor: 'primary.main', color: 'white' }} />
+                  <Chip label="Progress Analytics" sx={{ bgcolor: 'secondary.main', color: 'white' }} />
+                  <Chip label="Habit Building" sx={{ bgcolor: 'primary.main', color: 'white', opacity: 0.8 }} />
                 </Box>
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
 
             {/* Feature 2: Collaboration & Competition */}
-            <Grid
-              container
-              spacing={{ xs: 4, md: 8 }}
-              sx={{ mb: { xs: 8, md: 12 }, alignItems: 'center', flexDirection: { xs: 'column', md: 'row-reverse' } }}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row-reverse' },
+                gap: { xs: 4, md: 6 },
+                mb: { xs: 8, md: 12 },
+                alignItems: 'center',
+              }}
             >
-              <Grid item xs={12} md={6}>
-                <Box
-                  sx={{
-                    position: 'relative',
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    boxShadow: 8,
-                    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: 12,
-                    },
-                  }}
-                >
+              <Box
+                sx={{
+                  width: { xs: '100%', md: '50%' },
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  boxShadow: 8,
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    boxShadow: 12,
+                  },
+                }}
+              >
+                {imagesLoading || !imageUrls['leaderboards'] ? (
                   <Paper
                     sx={{
-                      height: { xs: 300, md: 450 },
+                      width: '100%',
+                      aspectRatio: '4/3',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -252,70 +313,88 @@ const Landing = () => {
                       background: 'linear-gradient(135deg, #E8E3D8 0%, #D4C9B0 100%)',
                     }}
                   >
-                    <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-                      Screenshot: Leaderboards
-                    </Typography>
+                    {imagesLoading ? (
+                      <CircularProgress />
+                    ) : (
+                      <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
+                        Screenshot: Leaderboards
+                      </Typography>
+                    )}
                   </Paper>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Box sx={{ pr: { md: 4 } }}>
-                  <Typography
-                    variant="h4"
-                    component="h3"
-                    gutterBottom
-                    sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold' }}
-                  >
-                    Collaboration & Competition
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    color="text.secondary"
-                    sx={{ mb: 3, lineHeight: 1.6, fontSize: '1.1rem' }}
-                  >
-                    Compete with your book club members on reading metrics, streaks, and
-                    goal completion. Stay motivated through friendly competition and see
-                    how you stack up against your peers.
-                  </Typography>
+                ) : (
                   <Box
+                    component="img"
+                    src={imageUrls['leaderboards']}
+                    alt="Leaderboards"
                     sx={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 2,
-                      mt: 3,
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block',
                     }}
-                  >
-                    <Chip label="Leaderboards" sx={{ bgcolor: 'primary.main', color: 'white' }} />
-                    <Chip label="Streaks" sx={{ bgcolor: 'secondary.main', color: 'white' }} />
-                    <Chip label="Metrics" sx={{ bgcolor: 'primary.main', color: 'white', opacity: 0.8 }} />
-                  </Box>
+                  />
+                )}
+              </Box>
+              <Box sx={{ width: { xs: '100%', md: '50%' }, pr: { md: 4 } }}>
+                <Typography
+                  variant="h4"
+                  component="h3"
+                  gutterBottom
+                  sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold' }}
+                >
+                  Collaboration & Competition
+                </Typography>
+                <Typography
+                  variant="h6"
+                  color="text.secondary"
+                  sx={{ mb: 3, lineHeight: 1.6, fontSize: '1.1rem' }}
+                >
+                  Compete with your book club members on reading metrics, streaks, and
+                  goal completion. Stay motivated through friendly competition and see
+                  how you stack up against your peers.
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 2,
+                    mt: 3,
+                  }}
+                >
+                  <Chip label="Leaderboards" sx={{ bgcolor: 'primary.main', color: 'white' }} />
+                  <Chip label="Streaks" sx={{ bgcolor: 'secondary.main', color: 'white' }} />
+                  <Chip label="Metrics" sx={{ bgcolor: 'primary.main', color: 'white', opacity: 0.8 }} />
                 </Box>
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
 
             {/* Feature 3: Custom Calendars & Events */}
-            <Grid
-              container
-              spacing={{ xs: 4, md: 8 }}
-              sx={{ mb: { xs: 4, md: 6 }, alignItems: 'center' }}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: { xs: 4, md: 6 },
+                mb: { xs: 4, md: 6 },
+                alignItems: 'center',
+              }}
             >
-              <Grid item xs={12} md={6}>
-                <Box
-                  sx={{
-                    position: 'relative',
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    boxShadow: 8,
-                    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: 12,
-                    },
-                  }}
-                >
+              <Box
+                sx={{
+                  width: { xs: '100%', md: '50%' },
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  boxShadow: 8,
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    boxShadow: 12,
+                  },
+                }}
+              >
+                {imagesLoading || !imageUrls['calendar-events'] ? (
                   <Paper
                     sx={{
-                      height: { xs: 300, md: 450 },
+                      width: '100%',
+                      aspectRatio: '4/3',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -323,45 +402,58 @@ const Landing = () => {
                       background: 'linear-gradient(135deg, #E8E3D8 0%, #D4C9B0 100%)',
                     }}
                   >
-                    <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-                      Screenshot: Calendar & Events
-                    </Typography>
+                    {imagesLoading ? (
+                      <CircularProgress />
+                    ) : (
+                      <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
+                        Screenshot: Calendar & Events
+                      </Typography>
+                    )}
                   </Paper>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Box sx={{ pl: { md: 4 } }}>
-                  <Typography
-                    variant="h4"
-                    component="h3"
-                    gutterBottom
-                    sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold' }}
-                  >
-                    Custom Calendars & Events
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    color="text.secondary"
-                    sx={{ mb: 3, lineHeight: 1.6, fontSize: '1.1rem' }}
-                  >
-                    Create custom calendars for meetings, track book lists, and manage
-                    events. Everything you need to organize your book club in one place.
-                  </Typography>
+                ) : (
                   <Box
+                    component="img"
+                    src={imageUrls['calendar-events']}
+                    alt="Calendar & Events"
                     sx={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 2,
-                      mt: 3,
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block',
                     }}
-                  >
-                    <Chip label="Calendar" sx={{ bgcolor: 'primary.main', color: 'white' }} />
-                    <Chip label="Book Lists" sx={{ bgcolor: 'secondary.main', color: 'white' }} />
-                    <Chip label="Events" sx={{ bgcolor: 'primary.main', color: 'white', opacity: 0.8 }} />
-                  </Box>
+                  />
+                )}
+              </Box>
+              <Box sx={{ width: { xs: '100%', md: '50%' }, pl: { md: 4 } }}>
+                <Typography
+                  variant="h4"
+                  component="h3"
+                  gutterBottom
+                  sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold' }}
+                >
+                  Custom Calendars & Events
+                </Typography>
+                <Typography
+                  variant="h6"
+                  color="text.secondary"
+                  sx={{ mb: 3, lineHeight: 1.6, fontSize: '1.1rem' }}
+                >
+                  Create custom calendars for meetings, track book lists, and manage
+                  events. Everything you need to organize your book club in one place.
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 2,
+                    mt: 3,
+                  }}
+                >
+                  <Chip label="Calendar" sx={{ bgcolor: 'primary.main', color: 'white' }} />
+                  <Chip label="Book Lists" sx={{ bgcolor: 'secondary.main', color: 'white' }} />
+                  <Chip label="Events" sx={{ bgcolor: 'primary.main', color: 'white', opacity: 0.8 }} />
                 </Box>
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           </Container>
         </Box>
 

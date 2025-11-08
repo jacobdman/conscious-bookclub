@@ -1,2 +1,2 @@
-export { uploadProfilePicture, deleteProfilePicture } from './storage.service';
+export { uploadProfilePicture, deleteProfilePicture, getStorageFileUrl } from './storage.service';
 

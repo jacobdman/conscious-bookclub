@@ -26,3 +26,13 @@ export const getSubscriptionStatus = async (userId) => {
   return subscriptions;
 };
 
+// Send a test push notification
+export const sendTestNotification = async (userId, title, body) => {
+  const params = new URLSearchParams({ userId });
+  const result = await apiCall(`/v1/notifications/test?${params}`, {
+    method: 'POST',
+    body: JSON.stringify({ title, body }),
+  });
+  return result;
+};
+

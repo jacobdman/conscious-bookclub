@@ -1,0 +1,14 @@
+[
+  {
+    "origin": [
+      "https://jacobdayton.com",
+      "https://www.jacobdayton.com",
+      "http://localhost:3000",
+      "http://localhost:5002"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Authorization", "Content-Length", "User-Agent", "x-goog-resumable"]
+  }
+]
+
