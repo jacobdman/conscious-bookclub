@@ -54,7 +54,7 @@ module.exports = {
           type: Sequelize.TIME,
           allowNull: true,
           defaultValue: "09:00:00",
-        }
+        },
     );
 
     await addColumnIfNotExists(
@@ -64,7 +64,7 @@ module.exports = {
           type: Sequelize.BOOLEAN,
           allowNull: false,
           defaultValue: false,
-        }
+        },
     );
 
     await addColumnIfNotExists(
@@ -73,7 +73,7 @@ module.exports = {
         {
           type: Sequelize.STRING(100),
           allowNull: true,
-        }
+        },
     );
   },
 

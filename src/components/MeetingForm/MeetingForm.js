@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -42,6 +42,19 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  const loadBooks = useCallback(async () => {
+    try {
+      setLoading(true);
+      const clubBooks = await getBooks(currentClub.id);
+      setBooks(clubBooks || []);
+    } catch (err) {
+      console.error('Error loading books:', err);
+      setError('Failed to load books');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentClub]);
+
   useEffect(() => {
     if (open && currentClub) {
       loadBooks();
@@ -70,20 +83,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
       }
       setError(null);
     }
-  }, [open, editingMeeting, currentClub]);
-
-  const loadBooks = async () => {
-    try {
-      setLoading(true);
-      const clubBooks = await getBooks(currentClub.id);
-      setBooks(clubBooks || []);
-    } catch (err) {
-      console.error('Error loading books:', err);
-      setError('Failed to load books');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [open, editingMeeting, currentClub, loadBooks]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

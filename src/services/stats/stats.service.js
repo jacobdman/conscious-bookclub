@@ -1,4 +1,3 @@
-import { apiCall } from '../apiHelpers';
 import { getTopReaders } from '../books/books.service';
 
 // Stats functions - redirecting to new endpoints

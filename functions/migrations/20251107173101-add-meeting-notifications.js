@@ -19,7 +19,7 @@ module.exports = {
           type: Sequelize.BOOLEAN,
           allowNull: false,
           defaultValue: false,
-        }
+        },
     );
 
     await addColumnIfNotExists(
@@ -29,7 +29,7 @@ module.exports = {
           type: Sequelize.BOOLEAN,
           allowNull: false,
           defaultValue: false,
-        }
+        },
     );
   },
 

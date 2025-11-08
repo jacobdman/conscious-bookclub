@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -17,7 +17,6 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
   Alert,
   CircularProgress,
   FormControlLabel,
@@ -29,7 +28,6 @@ import useClubContext from 'contexts/Club';
 import { useAuth } from 'AuthContext';
 import {
   updateClub,
-  getClubMembers,
   addClubMember,
   removeClubMember,
   updateMemberRole,
@@ -41,7 +39,7 @@ import { useNavigate } from 'react-router-dom';
 const ClubManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { currentClub, refreshClubs, refreshClubMembers, clubMembers } = useClubContext();
+  const { currentClub, refreshClubs, refreshClubMembers } = useClubContext();
   const [editingName, setEditingName] = useState(false);
   const [clubName, setClubName] = useState('');
   const [editingCalendarId, setEditingCalendarId] = useState(false);
@@ -56,17 +54,7 @@ const ClubManagement = () => {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [rotateDialog, setRotateDialog] = useState(false);
 
-  useEffect(() => {
-    if (currentClub) {
-      setClubName(currentClub.name);
-      setGoogleCalendarId(currentClub.config?.googleCalendarId || '');
-      setDefaultNotifyOneDay(currentClub.config?.defaultMeetingNotifyOneDayBefore || false);
-      setDefaultNotifyOneWeek(currentClub.config?.defaultMeetingNotifyOneWeekBefore || false);
-      loadMembers();
-    }
-  }, [currentClub]);
-
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     if (!currentClub || !user) return;
 
     try {
@@ -80,7 +68,17 @@ const ClubManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentClub, user, refreshClubMembers]);
+
+  useEffect(() => {
+    if (currentClub) {
+      setClubName(currentClub.name);
+      setGoogleCalendarId(currentClub.config?.googleCalendarId || '');
+      setDefaultNotifyOneDay(currentClub.config?.defaultMeetingNotifyOneDayBefore || false);
+      setDefaultNotifyOneWeek(currentClub.config?.defaultMeetingNotifyOneWeekBefore || false);
+      loadMembers();
+    }
+  }, [currentClub, loadMembers]);
 
   const handleSaveName = async () => {
     if (!currentClub || !user) return;

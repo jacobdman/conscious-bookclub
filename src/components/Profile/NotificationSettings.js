@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
   Switch,
   FormControlLabel,
-  TextField,
   Alert,
   CircularProgress,
   Button,
@@ -16,7 +15,7 @@ import { useAuth } from 'AuthContext';
 import { getUserDocument, updateNotificationPreferences } from 'services/users/users.service';
 import { getSubscriptionStatus } from 'services/notifications/notifications.service';
 import NotificationPermission from 'components/NotificationPermission';
-import { format, parse } from 'date-fns';
+import { format } from 'date-fns';
 
 const NotificationSettings = () => {
   const { user } = useAuth();
@@ -30,16 +29,7 @@ const NotificationSettings = () => {
   const [timezone, setTimezone] = useState('UTC');
   const [hasSubscription, setHasSubscription] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadUserPreferences();
-      checkSubscriptionStatus();
-      // Detect timezone
-      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-    }
-  }, [user]);
-
-  const loadUserPreferences = async () => {
+  const loadUserPreferences = useCallback(async () => {
     try {
       setLoading(true);
       const userData = await getUserDocument(user.uid);
@@ -69,16 +59,25 @@ const NotificationSettings = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const checkSubscriptionStatus = async () => {
+  const checkSubscriptionStatus = useCallback(async () => {
     try {
       const subscriptions = await getSubscriptionStatus(user.uid);
       setHasSubscription(subscriptions && subscriptions.length > 0);
     } catch (err) {
       console.error('Error checking subscription status:', err);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadUserPreferences();
+      checkSubscriptionStatus();
+      // Detect timezone
+      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    }
+  }, [user, loadUserPreferences, checkSubscriptionStatus]);
 
   const handleSave = async () => {
     if (!user) return;

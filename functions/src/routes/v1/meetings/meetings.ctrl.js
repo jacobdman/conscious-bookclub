@@ -222,7 +222,8 @@ const getMeetingsICal = async (req, res, next) => {
 
       // If startTime is provided, combine date and time
       if (meeting.startTime) {
-        const [hours, minutes, seconds] = meeting.startTime.split(':').map((v) => parseInt(v, 10) || 0);
+        const timeParts = meeting.startTime.split(":").map((v) => parseInt(v, 10) || 0);
+        const [hours, minutes, seconds] = timeParts;
         startDateTime = new Date(meetingDate);
         startDateTime.setUTCHours(hours, minutes, seconds || 0, 0);
 
@@ -264,8 +265,10 @@ const getMeetingsICal = async (req, res, next) => {
 
       lines.push("BEGIN:VEVENT");
       lines.push(`UID:${uid}`);
-      lines.push(`DTSTART${isAllDay ? ";VALUE=DATE" : ""}:${formatICalDate(startDateTime, isAllDay)}`);
-      lines.push(`DTEND${isAllDay ? ";VALUE=DATE" : ""}:${formatICalDate(endDateTime, isAllDay)}`);
+      const dtStartValue = isAllDay ? ";VALUE=DATE" : "";
+      lines.push(`DTSTART${dtStartValue}:${formatICalDate(startDateTime, isAllDay)}`);
+      const dtEndValue = isAllDay ? ";VALUE=DATE" : "";
+      lines.push(`DTEND${dtEndValue}:${formatICalDate(endDateTime, isAllDay)}`);
       lines.push(`DTSTAMP:${formatICalDate(new Date(), false)}`);
       lines.push(`SUMMARY:${escapeICalText(title)}`);
       if (description) {
@@ -283,7 +286,8 @@ const getMeetingsICal = async (req, res, next) => {
 
     // Set proper content type for iCal
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${club.name.replace(/[^a-z0-9]/gi, "_")}_meetings.ics"`);
+    const filename = `${club.name.replace(/[^a-z0-9]/gi, "_")}_meetings.ics`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(lines.join("\r\n"));
   } catch (e) {
     next(e);

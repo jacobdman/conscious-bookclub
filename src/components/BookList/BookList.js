@@ -206,7 +206,7 @@ const BookList = () => {
     } finally {
       setLoading(false);
     }
-  }, [pageSize, pageCache, loadProgressForBooks, user]);
+  }, [pageSize, pageCache, loadProgressForBooks, user, currentClub]);
 
   // Pagination handler
   const handlePageChange = (event, page) => {

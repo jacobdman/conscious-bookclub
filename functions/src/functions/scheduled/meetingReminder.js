@@ -135,7 +135,9 @@ exports.meetingReminder = onSchedule(
           const bookTitle = meeting.book ? meeting.book.title : "your book club";
           const meetingDateFormatted = formatDate(meeting.date);
           const title = "Meeting Reminder";
-          const body = `Your book club meeting for "${bookTitle}" is in ${daysText} on ${meetingDateFormatted}`;
+          const body =
+            `Your book club meeting for "${bookTitle}" is in ${daysText} ` +
+            `on ${meetingDateFormatted}`;
 
           // Send notifications to all users
           for (const user of usersToNotify) {

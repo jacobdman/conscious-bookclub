@@ -1,5 +1,11 @@
 const express = require("express");
-const {getUsers, getUser, createUser, updateNotificationPreferences, updateProfile} = require("./users.ctrl");
+const {
+  getUsers,
+  getUser,
+  createUser,
+  updateNotificationPreferences,
+  updateProfile,
+} = require("./users.ctrl");
 
 const router = express.Router(); // eslint-disable-line new-cap
 

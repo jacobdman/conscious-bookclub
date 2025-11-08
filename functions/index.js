@@ -77,5 +77,7 @@ app.use((err, req, res, next) => {
 exports.api = onRequest(app);
 
 // Export scheduled functions
-exports.dailyGoalReminder = require("./src/functions/scheduled/dailyGoalReminder").dailyGoalReminder;
-exports.meetingReminder = require("./src/functions/scheduled/meetingReminder").meetingReminder;
+exports.dailyGoalReminder =
+  require("./src/functions/scheduled/dailyGoalReminder").dailyGoalReminder;
+exports.meetingReminder =
+  require("./src/functions/scheduled/meetingReminder").meetingReminder;

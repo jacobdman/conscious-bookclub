@@ -102,14 +102,17 @@ exports.dailyGoalReminder = onSchedule(
 
           // Convert user's local time to UTC
           // For simplicity, we'll check if current UTC time matches
-          // In a production system, you'd want to use a timezone library like moment-timezone
-          let targetHour = hours;
-          let targetMinute = minutes || 0;
+          // In a production system, you'd want to use a timezone library
+          // like moment-timezone
+          const targetHour = hours;
+          const targetMinute = minutes || 0;
 
-          // Simple timezone offset calculation (this is simplified - in production use proper timezone library)
+          // Simple timezone offset calculation
+          // (this is simplified - in production use proper timezone library)
           if (userTimezone !== "UTC") {
-            // This is a simplified approach - in production, use a proper timezone library
-            // For now, we'll just check if the hour matches (assuming user set time in their local timezone)
+            // This is a simplified approach - in production, use a proper
+            // timezone library. For now, we'll just check if the hour matches
+            // (assuming user set time in their local timezone).
             // The proper implementation would convert the user's local time to UTC
           }
 
@@ -159,7 +162,9 @@ exports.dailyGoalReminder = onSchedule(
 
           // Send notification to all subscriptions
           const title = "Daily Goals Reminder";
-          const body = `Don't forget to check off your ${incompleteGoals.length} daily goal${incompleteGoals.length > 1 ? "s" : ""} today!`;
+          const goalText = incompleteGoals.length > 1 ? "s" : "";
+          const body =
+            `Don't forget to check off your ${incompleteGoals.length} daily goal${goalText} today!`;
 
           for (const subscription of subscriptions) {
             await sendPushNotification(

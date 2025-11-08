@@ -9,7 +9,6 @@ import GoalsProvider from 'contexts/Goals/GoalsProvider';
 import Layout from 'components/Layout';
 import NextMeetingCard from 'components/NextMeetingCard';
 import CurrentBooksSection from 'components/CurrentBooksSection';
-import GoalsCard from 'components/Goals/GoalsCard';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import FeedSection from 'components/FeedSection';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
@@ -23,9 +22,8 @@ const Dashboard = () => {
   const [errorPosts, setErrorPosts] = useState(null);
   const [newPostText, setNewPostText] = useState('');
   const [currentBooks, setCurrentBooks] = useState([]);
-  const [goals] = useState([]);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     if (!currentClub) return;
     
     try {
@@ -38,7 +36,7 @@ const Dashboard = () => {
     } finally {
       setLoadingPosts(false);
     }
-  };
+  }, [currentClub]);
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -98,7 +96,7 @@ const Dashboard = () => {
       fetchPosts();
       fetchBooks();
     }
-  }, [user, fetchBooks]);
+  }, [user, fetchBooks, fetchPosts]);
 
   const handleCreatePost = async () => {
     if (!newPostText.trim() || !user || !currentClub) return;

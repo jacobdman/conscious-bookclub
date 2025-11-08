@@ -26,13 +26,13 @@ const HabitConsistencyLeaderboardWithData = ({
   const [error, setError] = useState(null);
   
   // Date range state - default to current quarter
-  const [startDate, setStartDate] = useState(() => {
+  const [startDate] = useState(() => {
     if (propStartDate) return propStartDate;
     const now = new Date();
     const quarter = Math.floor(now.getMonth() / 3);
     return new Date(now.getFullYear(), quarter * 3, 1);
   });
-  const [endDate, setEndDate] = useState(() => {
+  const [endDate] = useState(() => {
     if (propEndDate) return propEndDate;
     const now = new Date();
     const quarter = Math.floor(now.getMonth() / 3);

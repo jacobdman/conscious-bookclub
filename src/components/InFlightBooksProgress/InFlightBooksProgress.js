@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -23,7 +23,6 @@ const InFlightBooksProgress = () => {
   const [userPages, setUserPages] = useState({}); // Track current page per book
   const [hasMoreUsers, setHasMoreUsers] = useState({}); // Track if more users available per book
   const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
-  const observerRef = useRef(null);
 
   useEffect(() => {
     const fetchBooksProgress = async () => {
@@ -102,23 +101,6 @@ const InFlightBooksProgress = () => {
       weekday: 'short',
       month: 'short',
       day: 'numeric'
-    });
-  };
-
-  const sortUsersByProgress = (users) => {
-    return users.sort((a, b) => {
-      // First sort by status: finished > reading > not_started
-      const statusOrder = { 'finished': 0, 'reading': 1, 'not_started': 2 };
-      const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-      
-      if (statusDiff !== 0) return statusDiff;
-      
-      // Within same status, sort by percentage (descending)
-      if (a.status === 'reading' && b.status === 'reading') {
-        return (b.percentComplete || 0) - (a.percentComplete || 0);
-      }
-      
-      return 0;
     });
   };
 
