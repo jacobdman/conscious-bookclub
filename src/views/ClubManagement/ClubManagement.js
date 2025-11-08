@@ -20,6 +20,8 @@ import {
   InputLabel,
   Alert,
   CircularProgress,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { Delete, Edit, Add, Save, Cancel, ContentCopy, Refresh } from '@mui/icons-material';
 import Layout from 'components/Layout';
@@ -44,6 +46,8 @@ const ClubManagement = () => {
   const [clubName, setClubName] = useState('');
   const [editingCalendarId, setEditingCalendarId] = useState(false);
   const [googleCalendarId, setGoogleCalendarId] = useState('');
+  const [defaultNotifyOneDay, setDefaultNotifyOneDay] = useState(false);
+  const [defaultNotifyOneWeek, setDefaultNotifyOneWeek] = useState(false);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -56,6 +60,8 @@ const ClubManagement = () => {
     if (currentClub) {
       setClubName(currentClub.name);
       setGoogleCalendarId(currentClub.config?.googleCalendarId || '');
+      setDefaultNotifyOneDay(currentClub.config?.defaultMeetingNotifyOneDayBefore || false);
+      setDefaultNotifyOneWeek(currentClub.config?.defaultMeetingNotifyOneWeekBefore || false);
       loadMembers();
     }
   }, [currentClub]);
@@ -104,6 +110,24 @@ const ClubManagement = () => {
     } catch (err) {
       setError('Failed to update Google Calendar ID');
       console.error('Error updating Google Calendar ID:', err);
+    }
+  };
+
+  const handleSaveMeetingDefaults = async () => {
+    if (!currentClub || !user) return;
+
+    try {
+      const currentConfig = currentClub.config || {};
+      const updatedConfig = {
+        ...currentConfig,
+        defaultMeetingNotifyOneDayBefore: defaultNotifyOneDay,
+        defaultMeetingNotifyOneWeekBefore: defaultNotifyOneWeek,
+      };
+      await updateClub(currentClub.id, user.uid, { config: updatedConfig });
+      await refreshClubs();
+    } catch (err) {
+      setError('Failed to update meeting notification defaults');
+      console.error('Error updating meeting notification defaults:', err);
     }
   };
 
@@ -332,6 +356,43 @@ const ClubManagement = () => {
             >
               Rotate
             </Button>
+          </Box>
+        </Paper>
+
+        {/* Default Meeting Notifications Section */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Default Meeting Notifications</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Set default notification preferences for new meetings. These will be pre-selected when creating meetings, but can be changed per meeting.
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={defaultNotifyOneWeek}
+                  onChange={(e) => setDefaultNotifyOneWeek(e.target.checked)}
+                />
+              }
+              label="Notify members 1 week before meeting (default)"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={defaultNotifyOneDay}
+                  onChange={(e) => setDefaultNotifyOneDay(e.target.checked)}
+                />
+              }
+              label="Notify members 1 day before meeting (default)"
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+              <Button
+                variant="contained"
+                onClick={handleSaveMeetingDefaults}
+                size="small"
+              >
+                Save Defaults
+              </Button>
+            </Box>
           </Box>
         </Paper>
 

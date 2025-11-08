@@ -24,6 +24,18 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.DATE,
           field: "last_login_at",
         },
+        dailyGoalNotificationTime: {
+          type: DataTypes.TIME,
+          field: "daily_goal_notification_time",
+        },
+        dailyGoalNotificationsEnabled: {
+          type: DataTypes.BOOLEAN,
+          field: "daily_goal_notifications_enabled",
+          defaultValue: false,
+        },
+        timezone: {
+          type: DataTypes.STRING(100),
+        },
       },
       {
         tableName: "users",
@@ -59,6 +71,10 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "user_id",
       otherKey: "club_id",
       as: "clubs",
+    });
+    User.hasMany(models.PushSubscription, {
+      foreignKey: "user_id",
+      as: "pushSubscriptions",
     });
   };
 

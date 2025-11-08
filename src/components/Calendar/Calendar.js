@@ -20,15 +20,16 @@ import {
   DialogContent,
   DialogActions,
   useMediaQuery,
-  useTheme
+  useTheme,
 } from '@mui/material';
 import { CalendarToday, List as ListIcon, LocationOn, AccessTime } from '@mui/icons-material';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { fetchCalendarEvents } from 'services/calendarService';
+import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
 import Layout from 'components/Layout';
+import CalendarSubscription from 'components/CalendarSubscription';
 
 // Setup moment localizer for react-big-calendar
 const localizer = momentLocalizer(moment);
@@ -41,7 +42,7 @@ const CalendarComponent = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('month'); // 'month' or 'list'
+  const [view, setView] = useState('list'); // 'month' or 'list'
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -53,38 +54,64 @@ const CalendarComponent = () => {
       return;
     }
 
-    // Check if config exists and has googleCalendarId
-    const config = currentClub.config || {};
-    const googleCalendarId = config.googleCalendarId;
-    
-    if (!googleCalendarId) {
-      setError('Google Calendar is not configured for this club. Please contact the club owner to configure it in Club Management.');
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
-      const calendarEvents = await fetchCalendarEvents(googleCalendarId);
+      const meetings = await getMeetings(currentClub.id);
       
-      // Transform events for react-big-calendar
-      const transformedEvents = calendarEvents.map(event => ({
-        id: event.id,
-        title: event.title,
-        start: new Date(event.start),
-        end: new Date(event.end),
-        resource: {
-          description: event.description,
-          location: event.location,
-          allDay: event.allDay
+      // Transform meetings for react-big-calendar
+      const transformedEvents = meetings.map(meeting => {
+        const meetingDate = new Date(meeting.date);
+        
+        // If startTime is provided, combine date and time
+        let startDateTime = meetingDate;
+        let endDateTime = new Date(meetingDate);
+        let allDay = true;
+        
+        if (meeting.startTime) {
+          // Parse time string (HH:MM:SS or HH:MM)
+          const [hours, minutes] = meeting.startTime.split(':').map(Number);
+          startDateTime = new Date(meetingDate);
+          startDateTime.setHours(hours, minutes || 0, 0, 0);
+          
+          // End time is 2 hours after start (default meeting duration)
+          endDateTime = new Date(startDateTime);
+          endDateTime.setHours(endDateTime.getHours() + 2);
+          
+          allDay = false;
+        } else {
+          // For all-day events, use same date for start and end (not next day)
+          endDateTime = new Date(meetingDate);
+          endDateTime.setHours(23, 59, 59, 999);
         }
-      }));
+        
+        // Build title from book title or default
+        let title = 'Book Club Meeting';
+        if (meeting.book) {
+          title = meeting.book.title;
+          if (meeting.book.author) {
+            title += ` - ${meeting.book.author}`;
+          }
+        }
+        
+        return {
+          id: meeting.id,
+          title: title,
+          start: startDateTime,
+          end: endDateTime,
+          resource: {
+            description: meeting.notes || '',
+            location: meeting.location || '',
+            allDay: allDay,
+            meeting: meeting
+          }
+        };
+      });
       
       setEvents(transformedEvents);
     } catch (err) {
-      console.error('Error fetching calendar events:', err);
-      setError(err.message || 'Failed to fetch calendar events');
+      console.error('Error fetching meetings:', err);
+      setError(err.message || 'Failed to fetch meetings');
     } finally {
       setLoading(false);
     }
@@ -179,6 +206,8 @@ const CalendarComponent = () => {
   return (
     <Layout>
       <Box sx={{ p: 3 }}>
+        <CalendarSubscription />
+
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" gutterBottom>
             Calendar
@@ -199,11 +228,6 @@ const CalendarComponent = () => {
               List
             </ToggleButton>
           </ToggleButtonGroup>
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Typography variant="body2" gutterBottom>View the full calendar here:</Typography>
-          <Button variant="outlined" href="https://calendar.google.com/calendar/embed?src=99d5640c339ece5cf6b5abb26854d93f2cf4b8fc4b87e4a5aa0ca6bb4bc49020%40group.calendar.google.com&ctz=America%2FDenver" target="_blank" size="small">Full Calendar</Button>
         </Box>
 
         {view === 'month' ? (

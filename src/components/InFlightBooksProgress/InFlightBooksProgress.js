@@ -13,6 +13,7 @@ import {
   Button
 } from '@mui/material';
 import { getBooksProgress } from 'services/books/books.service';
+import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
 
 const InFlightBooksProgress = () => {
@@ -21,6 +22,7 @@ const InFlightBooksProgress = () => {
   const [loading, setLoading] = useState(true);
   const [userPages, setUserPages] = useState({}); // Track current page per book
   const [hasMoreUsers, setHasMoreUsers] = useState({}); // Track if more users available per book
+  const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -63,6 +65,32 @@ const InFlightBooksProgress = () => {
     };
 
     fetchBooksProgress();
+  }, [currentClub]);
+
+  // Load meetings to get discussion dates
+  useEffect(() => {
+    const loadMeetings = async () => {
+      if (!currentClub) return;
+      
+      try {
+        const meetings = await getMeetings(currentClub.id);
+        // Create a map of bookId -> earliest meeting date
+        const datesMap = {};
+        meetings.forEach(meeting => {
+          if (meeting.bookId) {
+            const meetingDate = new Date(meeting.date);
+            if (!datesMap[meeting.bookId] || meetingDate < new Date(datesMap[meeting.bookId])) {
+              datesMap[meeting.bookId] = meeting.date;
+            }
+          }
+        });
+        setMeetingDates(datesMap);
+      } catch (error) {
+        console.error('Error loading meetings:', error);
+      }
+    };
+
+    loadMeetings();
   }, [currentClub]);
 
   const formatDiscussionDate = (date) => {
@@ -216,7 +244,7 @@ const InFlightBooksProgress = () => {
                         by {book.author}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Discussion: {formatDiscussionDate(book.discussionDate)}
+                        Discussion: {formatDiscussionDate(meetingDates[book.id])}
                       </Typography>
                     </Box>
                   </Box>

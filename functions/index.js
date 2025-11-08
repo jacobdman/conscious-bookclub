@@ -75,3 +75,7 @@ app.use((err, req, res, next) => {
 
 // Export the API function with CORS enabled
 exports.api = onRequest(app);
+
+// Export scheduled functions
+exports.dailyGoalReminder = require("./src/functions/scheduled/dailyGoalReminder").dailyGoalReminder;
+exports.meetingReminder = require("./src/functions/scheduled/meetingReminder").meetingReminder;

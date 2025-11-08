@@ -22,6 +22,8 @@ const Layout = ({ children }) => {
       '/calendar': 'Calendar',
       '/club': 'Club',
       '/club/manage': 'Manage Club',
+      '/profile': 'Profile',
+      '/meetings': 'Meetings',
     };
 
     const pageTitle = routeTitles[location.pathname] || 'Dashboard';

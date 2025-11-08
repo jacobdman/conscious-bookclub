@@ -11,6 +11,8 @@ import ClubManagement from './views/ClubManagement';
 import Books from './views/Books';
 import Calendar from './views/Calendar';
 import Goals from './views/Goals';
+import Profile from './views/Profile';
+import Meetings from './views/Meetings';
 import NoClub from './views/NoClub';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
@@ -94,6 +96,22 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <Goals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/meetings"
+            element={
+              <ProtectedRoute>
+                <Meetings />
               </ProtectedRoute>
             }
           />

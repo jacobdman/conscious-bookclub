@@ -11,14 +11,44 @@ import {
 } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import { getUserBookProgress, updateUserBookProgress } from 'services/progress/progress.service';
+import { getMeetings } from 'services/meetings/meetings.service';
+import useClubContext from 'contexts/Club';
 
 const CurrentBooksSection = ({ books }) => {
   const { user } = useAuth();
+  const { currentClub } = useClubContext();
   const [bookProgress, setBookProgress] = useState({});
   const [loadingProgress, setLoadingProgress] = useState({});
   const [percentInputs, setPercentInputs] = useState({});
+  const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> meeting date
 
   
+  // Load meetings to get discussion dates
+  useEffect(() => {
+    const loadMeetings = async () => {
+      if (!currentClub) return;
+      
+      try {
+        const meetings = await getMeetings(currentClub.id);
+        // Create a map of bookId -> earliest meeting date
+        const datesMap = {};
+        meetings.forEach(meeting => {
+          if (meeting.bookId) {
+            const meetingDate = new Date(meeting.date);
+            if (!datesMap[meeting.bookId] || meetingDate < new Date(datesMap[meeting.bookId])) {
+              datesMap[meeting.bookId] = meeting.date;
+            }
+          }
+        });
+        setMeetingDates(datesMap);
+      } catch (error) {
+        console.error('Error loading meetings:', error);
+      }
+    };
+
+    loadMeetings();
+  }, [currentClub]);
+
   // Load progress for all books when component mounts or books change
   useEffect(() => {
     if (!user || !books || books.length === 0) return;
@@ -217,7 +247,7 @@ const CurrentBooksSection = ({ books }) => {
               <Typography variant="subtitle1">{book.title}</Typography>
               <Typography variant="body2" color="text.secondary">{book.author}</Typography>
               <Typography variant="caption" display="block">
-                Discussion: {formatDiscussionDate(book.discussionDate)}
+                Discussion: {formatDiscussionDate(meetingDates[book.id])}
               </Typography>
               <Typography variant="caption" display="block" gutterBottom>
                 Theme: {book.theme || 'General'}

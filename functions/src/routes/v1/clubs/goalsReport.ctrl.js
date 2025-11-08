@@ -96,6 +96,9 @@ const getPreviousPeriodBoundaries = (cadence, currentStart) => {
     case "quarter":
       prevStart.setUTCMonth(prevStart.getUTCMonth() - 3);
       break;
+    default:
+      // Invalid cadence, but continue with original date
+      break;
   }
 
   const prevEnd = new Date(prevStart);
@@ -111,6 +114,9 @@ const getPreviousPeriodBoundaries = (cadence, currentStart) => {
       break;
     case "quarter":
       prevEnd.setUTCMonth(prevEnd.getUTCMonth() + 3);
+      break;
+    default:
+      // Invalid cadence, but continue with original date
       break;
   }
 
@@ -144,7 +150,8 @@ const calculateHabitConsistency = async (userId, goal, startDate, endDate) => {
 
       const completed = goal.measure === "count" ?
         entries.length >= goal.targetCount :
-        entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >= parseFloat(goal.targetQuantity);
+        entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
+          parseFloat(goal.targetQuantity);
 
       periods.push({
         period: periodIndex,
@@ -189,38 +196,6 @@ const calculateHabitConsistency = async (userId, goal, startDate, endDate) => {
   };
 };
 
-// Calculate streak for a goal
-const calculateStreak = async (userId, goal) => {
-  if (goal.type !== "habit" || !goal.cadence) {
-    return 0;
-  }
-
-  let streak = 0;
-  let currentBoundaries = getPeriodBoundaries(goal.cadence);
-  let hasMore = true;
-
-  while (hasMore && streak < 100) { // Cap at 100 to prevent infinite loops
-    const entries = await getGoalEntries(
-        userId,
-        goal.id,
-        currentBoundaries.start,
-        currentBoundaries.end,
-    );
-
-    const completed = goal.measure === "count" ?
-      entries.length >= goal.targetCount :
-      entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >= parseFloat(goal.targetQuantity);
-
-    if (completed) {
-      streak++;
-      currentBoundaries = getPreviousPeriodBoundaries(goal.cadence, currentBoundaries.start);
-    } else {
-      hasMore = false;
-    }
-  }
-
-  return streak;
-};
 
 // GET /v1/clubs/:clubId/goals-report?userId=xxx&startDate=xxx&endDate=xxx - Get club goals report
 const getClubGoalsReport = async (req, res, next) => {
@@ -480,7 +455,8 @@ const getClubGoalsReport = async (req, res, next) => {
 
           const completed = goal.measure === "count" ?
             entries.length >= goal.targetCount :
-            entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >= parseFloat(goal.targetQuantity);
+            entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
+              parseFloat(goal.targetQuantity);
 
           if (completed) {
             periodConsistencySum += 100;
