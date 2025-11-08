@@ -2,9 +2,11 @@ import axios from 'axios';
 
 const ENV_IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
+// In production, use relative path which will be proxied by Firebase Hosting
+// In development, use local emulator
 const BASE_URL = ENV_IS_PRODUCTION
-  ? 'http://localhost:5001/conscious-bookclub-87073-9eb71/us-central1/api'
-  : 'https://us-central1-conscious-bookclub-87073-9eb71.cloudfunctions.net/api';
+  ? '/api'
+  : 'http://localhost:5001/conscious-bookclub-87073-9eb71/us-central1/api';
 
 class API {
   get = async (url, config) => {

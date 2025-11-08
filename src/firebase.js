@@ -4,10 +4,11 @@ import {
   GoogleAuthProvider, 
   getRedirectResult,
   onAuthStateChanged, 
-  signOut
+  signOut,
+  connectAuthEmulator
 } from "firebase/auth";
-import { getFunctions } from "firebase/functions";
-import { getStorage } from "firebase/storage";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBmG4u5Kv4nt-5F5XfZhKNsyg9MJ-h96Qo",
@@ -23,6 +24,23 @@ const auth = getAuth(app);
 const functions = getFunctions(app);
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
+
+// Connect to emulators in development
+const isDevelopment = process.env.NODE_ENV === 'development';
+if (isDevelopment) {
+  // Connect to emulators (wrapped in try-catch to prevent errors if already connected)
+  try {
+    connectFunctionsEmulator(functions, "localhost", 5001);
+  } catch (e) {
+    // Already connected, ignore error
+  }
+  
+  try {
+    connectStorageEmulator(storage, "localhost", 9199);
+  } catch (e) {
+    // Already connected, ignore error
+  }
+}
 
 // Export Firebase instances and utilities
 export { auth, onAuthStateChanged, signOut, getRedirectResult, googleProvider, functions, storage };

@@ -9,8 +9,9 @@ const getApiBase = () => {
     return 'http://localhost:5001/conscious-bookclub-87073-9eb71/us-central1/api';
   }
   
-  // Production: use actual Firebase Functions URL
-  return 'https://us-central1-conscious-bookclub-87073-9eb71.cloudfunctions.net/api';
+  // Production: use relative path which will be proxied by Firebase Hosting
+  // This hides the actual Firebase Functions URL for security
+  return '/api';
 };
 
 const API_BASE = getApiBase();

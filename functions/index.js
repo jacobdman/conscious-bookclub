@@ -20,6 +20,15 @@ app.use(cors({
 
 app.use(express.json());
 
+// Strip /api prefix when requests come from Firebase Hosting rewrite
+// This allows the same function to work with direct calls and proxied calls
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    req.url = req.url.replace("/api", "") || "/";
+  }
+  next();
+});
+
 // Import route handlers
 const routes = require("./src/routes");
 

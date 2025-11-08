@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cbc-app-v1';
+const CACHE_NAME = 'cbc-app-v2';
 const VERSION_URL = '/version.json';
 
 // Install event - cache static assets
@@ -56,6 +56,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip service worker and version.json requests
+  if (url.pathname === '/service-worker.js' || url.pathname === '/version.json') {
+    return;
+  }
+
   // Network-first strategy for API calls
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/v1/')) {
     event.respondWith(
@@ -79,13 +84,37 @@ self.addEventListener('fetch', (event) => {
   // Cache-first strategy for static assets
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
+      // If we have a cached response, verify it's not HTML before using it
       if (cachedResponse) {
-        return cachedResponse;
+        const contentType = cachedResponse.headers.get('content-type');
+        // If cached response is HTML but request is for a static asset, fetch fresh
+        if (contentType && contentType.includes('text/html') && 
+            (url.pathname.startsWith('/static/') || 
+             url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/))) {
+          // Bad cache - delete it and fetch fresh
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.delete(request);
+          });
+        } else {
+          return cachedResponse;
+        }
       }
 
       return fetch(request).then((response) => {
         // Don't cache non-successful responses
         if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
+
+        // Don't cache HTML responses for static asset requests
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+          // If this is a static asset request but got HTML, something is wrong
+          if (url.pathname.startsWith('/static/') || 
+              url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+            console.error('Service Worker: Got HTML instead of static asset for:', url.pathname);
+            return response; // Return it but don't cache
+          }
           return response;
         }
 
@@ -96,6 +125,10 @@ self.addEventListener('fetch', (event) => {
         });
 
         return response;
+      }).catch((error) => {
+        console.error('Service Worker: Fetch error:', error);
+        // If fetch fails and we have a cached response, return it
+        return caches.match(request);
       });
     })
   );
