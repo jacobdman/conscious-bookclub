@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Box, Tabs, Tab } from '@mui/material';
 import Layout from 'components/Layout';
 import ClubBooksTab from 'components/ClubBooksTab';
@@ -30,10 +31,39 @@ function a11yProps(index) {
 }
 
 const ClubView = () => {
-  const [tabValue, setTabValue] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Determine tab value from URL path
+  const getTabValueFromPath = () => {
+    if (location.pathname === '/club/goals') return 1;
+    if (location.pathname === '/club/books') return 0;
+    // Default to books if path is just /club
+    return 0;
+  };
+
+  const [tabValue, setTabValue] = useState(getTabValueFromPath());
+
+  // Redirect /club to /club/books for consistency
+  useEffect(() => {
+    if (location.pathname === '/club') {
+      navigate('/club/books', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  // Update tab value when route changes
+  useEffect(() => {
+    setTabValue(getTabValueFromPath());
+  }, [location.pathname]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+    // Navigate to the corresponding route
+    if (newValue === 0) {
+      navigate('/club/books', { replace: true });
+    } else if (newValue === 1) {
+      navigate('/club/goals', { replace: true });
+    }
   };
 
   return (

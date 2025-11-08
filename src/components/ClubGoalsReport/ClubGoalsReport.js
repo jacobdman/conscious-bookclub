@@ -72,10 +72,13 @@ const ClubGoalsReport = () => {
   const { currentClub } = useClubContext();
   const [reportData, setReportData] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [weeklyTrendData, setWeeklyTrendData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [weeklyTrendLoading, setWeeklyTrendLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
+  const weeklyTrendRef = React.useRef(null);
   
   // Date range state - default to current quarter
   const [dateRangePeriod, setDateRangePeriod] = useState('currentQuarter');
@@ -130,10 +133,52 @@ const ClubGoalsReport = () => {
     fetchReport();
   }, [user, currentClub, startDate, endDate]);
 
-  // Reset analytics data when date range changes
+  // Reset analytics and weekly trend data when date range changes
   useEffect(() => {
     setAnalyticsData(null);
+    setWeeklyTrendData(null);
   }, [startDate, endDate]);
+
+  // Lazy load weekly trend when section comes into view
+  useEffect(() => {
+    const currentRef = weeklyTrendRef.current;
+    if (!currentRef || weeklyTrendData || !user || !currentClub) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !weeklyTrendData && !weeklyTrendLoading) {
+          const fetchWeeklyTrend = async () => {
+            try {
+              setWeeklyTrendLoading(true);
+              const data = await getClubGoalsReport(
+                currentClub.id,
+                user.uid,
+                startDate,
+                endDate,
+                false, // Don't include analytics
+                true // Include weekly trend
+              );
+              setWeeklyTrendData(data.weeklyTrendByMember);
+            } catch (err) {
+              console.error('Error fetching weekly trend:', err);
+            } finally {
+              setWeeklyTrendLoading(false);
+            }
+          };
+          fetchWeeklyTrend();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(currentRef);
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [weeklyTrendData, weeklyTrendLoading, user, currentClub, startDate, endDate]);
 
   // Fetch analytics data only when analytics tab is active
   useEffect(() => {
@@ -189,9 +234,11 @@ const ClubGoalsReport = () => {
   const {
     leaderboard,
     streakLeaderboard,
-    weeklyTrendByMember,
     topPerformers,
   } = reportData || {};
+
+  // Use lazy-loaded weekly trend if available, otherwise use from reportData
+  const weeklyTrendByMember = weeklyTrendData || reportData?.weeklyTrendByMember;
 
   const analytics = activeTab === 1 ? (analyticsData || reportData) : null;
   const {
@@ -302,7 +349,7 @@ const ClubGoalsReport = () => {
             </Box>
 
             {/* Weekly Completion Trend by Member */}
-            <Box sx={{ mb: 4 }}>
+            <Box sx={{ mb: 4 }} ref={weeklyTrendRef}>
               <Card 
                 elevation={2}
                 sx={{ 
@@ -317,7 +364,13 @@ const ClubGoalsReport = () => {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                     Consistency over time per member - see who is consistently achieving their goals
                   </Typography>
-                  <WeeklyCompletionTrendByMember weeklyTrendByMember={weeklyTrendByMember} />
+                  {weeklyTrendLoading ? (
+                    <Box display="flex" justifyContent="center" p={3}>
+                      <CircularProgress />
+                    </Box>
+                  ) : (
+                    <WeeklyCompletionTrendByMember weeklyTrendByMember={weeklyTrendByMember} />
+                  )}
                 </CardContent>
               </Card>
             </Box>
