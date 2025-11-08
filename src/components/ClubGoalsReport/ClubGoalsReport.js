@@ -430,6 +430,7 @@ const ClubGoalsReport = () => {
                       </CardContent>
                     </Card>
                   </Grid>
+
                 </Grid>
 
                 {/* Participation Heatmap */}

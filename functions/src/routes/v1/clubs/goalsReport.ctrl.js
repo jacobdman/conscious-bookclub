@@ -22,8 +22,8 @@ const getClubGoalsReport = async (req, res, next) => {
     const userId = req.query.userId;
     const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
-    const includeAnalytics = req.query.includeAnalytics === 'true';
-    const includeWeeklyTrend = req.query.includeWeeklyTrend === 'true';
+    const includeAnalytics = req.query.includeAnalytics === "true";
+    const includeWeeklyTrend = req.query.includeWeeklyTrend === "true";
 
     if (!userId) {
       const error = new Error("userId is required");
@@ -97,7 +97,7 @@ const getClubGoalsReport = async (req, res, next) => {
 
       // Calculate weighted habit consistency
       const habitGoals = memberGoals.filter((g) => g.type === "habit");
-      
+
       // Calculate consistency rate for each habit and sort by consistency rate
       const habitsWithConsistency = await Promise.all(
           habitGoals.map(async (goal) => {
@@ -392,6 +392,7 @@ const getClubGoalsReport = async (req, res, next) => {
     let averageCompletionByType = null;
     let participationHeatmap = null;
     let clubGoalTypeDistribution = null;
+    let bookCompletionPercentage = null;
 
     if (includeAnalytics) {
       // Calculate average completion by goal type
@@ -515,6 +516,44 @@ const getClubGoalsReport = async (req, res, next) => {
           }
         }
       }
+
+      // Calculate book completion percentage
+      // Get all books for the club with past discussion dates
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const pastBooks = await db.Book.findAll({
+        where: {
+          clubId: parseInt(clubId),
+          discussionDate: {
+            [db.Op.lt]: today,
+            [db.Op.ne]: null,
+          },
+        },
+      });
+
+      if (pastBooks.length > 0) {
+        let completedBooks = 0;
+
+        // Check each book to see if at least one member finished it
+        for (const book of pastBooks) {
+          const finishedProgress = await db.BookProgress.findOne({
+            where: {
+              bookId: book.id,
+              status: "finished",
+            },
+          });
+
+          if (finishedProgress) {
+            completedBooks++;
+          }
+        }
+
+        bookCompletionPercentage = (completedBooks / pastBooks.length) * 100;
+      } else {
+        // No past books, set to null or 0
+        bookCompletionPercentage = null;
+      }
     }
 
     // Calculate top performers (uses existing metrics, so it's cheap)
@@ -585,6 +624,7 @@ const getClubGoalsReport = async (req, res, next) => {
       response.averageCompletionByType = averageCompletionByType;
       response.participationHeatmap = participationHeatmap;
       response.clubGoalTypeDistribution = clubGoalTypeDistribution;
+      response.bookCompletionPercentage = bookCompletionPercentage;
     }
 
     res.json(response);
