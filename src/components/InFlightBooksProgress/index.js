@@ -1,1 +1,3 @@
-import InFlightBooksProgress from './InFlightBooksProgress'; export default InFlightBooksProgress;
+import InFlightBooksProgress from './InFlightBooksProgress';
+
+export default InFlightBooksProgress;

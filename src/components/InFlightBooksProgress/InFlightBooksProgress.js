@@ -15,6 +15,7 @@ import {
 import { getBooksProgress } from 'services/books/books.service';
 import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
+import BookProgressRing from './BookProgressRing';
 
 const InFlightBooksProgress = () => {
   const { currentClub } = useClubContext();
@@ -200,12 +201,16 @@ const InFlightBooksProgress = () => {
           (book.stats && book.stats.readerCount > book.users.length)
         );
 
+        // Use average book progress percentage (avgPercent) for the ring
+        // This shows how much of the book the club has read overall
+        const bookProgressPercentage = book.stats?.avgPercent || 0;
+
         return (
           <Card key={book.id} sx={{ mb: 3 }}>
             <CardContent>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={3}>
-                  <Box display="flex" alignItems="center" gap={2}>
+              <Grid container spacing={2} alignItems="flex-start" justifyContent="space-between">
+                <Grid item xs={12} md="auto">
+                  <Box display="flex" alignItems="flex-start" gap={2}>
                     {book.coverImage && (
                       <img
                         src={book.coverImage}
@@ -214,7 +219,8 @@ const InFlightBooksProgress = () => {
                           width: 60,
                           height: 80,
                           objectFit: 'cover',
-                          borderRadius: 4
+                          borderRadius: 4,
+                          flexShrink: 0
                         }}
                       />
                     )}
@@ -231,6 +237,28 @@ const InFlightBooksProgress = () => {
                     </Box>
                   </Box>
                 </Grid>
+                {book.stats && (
+                  <Grid item xs={12} md="auto">
+                    <Box 
+                      display="flex" 
+                      flexDirection="column" 
+                      alignItems="center"
+                      sx={{ 
+                        mt: { xs: 1, md: 0 }
+                      }}
+                    >
+                      <BookProgressRing value={bookProgressPercentage} size={70} />
+                      <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
+                          club
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
+                          progress
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                )}
                 
                 <Grid item xs={12} md={9}>
                   {book.stats && (

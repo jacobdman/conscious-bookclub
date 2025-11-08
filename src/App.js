@@ -68,6 +68,22 @@ function AppContent() {
             }
           />
           <Route
+            path="/club/books"
+            element={
+              <ProtectedRoute>
+                <ClubView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/club/goals"
+            element={
+              <ProtectedRoute>
+                <ClubView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/club/manage"
             element={
               <ProtectedRoute>
