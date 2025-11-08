@@ -7,283 +7,26 @@ import {
   Grid,
   CircularProgress,
   Alert,
-  LinearProgress,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { getClubGoalsReport } from 'services/clubs/goalsReport.service';
 import HabitConsistencyLeaderboard from 'components/HabitConsistencyLeaderboard';
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-
-const HabitConsistencyLineChart = ({ timeSeries }) => {
-  if (!timeSeries || timeSeries.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center">
-        No time series data available
-      </Typography>
-    );
-  }
-
-  const data = timeSeries.map((item, index) => ({
-    period: `Period ${timeSeries.length - index}`,
-    consistency: item.consistency.toFixed(1),
-  }));
-
-  return (
-    <Box sx={{ width: '100%', height: 300 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="period" />
-          <YAxis domain={[0, 100]} />
-          <Tooltip />
-          <Legend />
-          <Line
-            type="monotone"
-            dataKey="consistency"
-            stroke="#0088FE"
-            strokeWidth={2}
-            name="Consistency %"
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </Box>
-  );
-};
-
-const HabitConsistencyBarChart = ({ byMember }) => {
-  if (!byMember || byMember.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center">
-        No member data available
-      </Typography>
-    );
-  }
-
-  // Filter to only show members with consistency score > 0
-  const data = byMember
-    .filter((member) => member.consistencyScore > 0)
-    .map((member) => ({
-      name: member.user.displayName || 'Unknown',
-      consistency: parseFloat(member.consistencyScore.toFixed(1)),
-    }))
-    .sort((a, b) => b.consistency - a.consistency);
-
-  if (data.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center">
-        No members with consistency scores above 0
-      </Typography>
-    );
-  }
-
-  return (
-    <Box sx={{ width: '100%', height: 300 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-          <YAxis domain={[0, 100]} />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="consistency" fill="#0088FE" name="Consistency %" />
-        </BarChart>
-      </ResponsiveContainer>
-    </Box>
-  );
-};
-
-const MetricProgressBarChart = ({ byMember }) => {
-  if (!byMember || byMember.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center">
-        No metric data available
-      </Typography>
-    );
-  }
-
-  // Filter out members with no progress and sort by progress descending
-  // Create a new array to ensure proper sorting
-  const filteredMembers = byMember.filter((member) => {
-    const progress = parseFloat(member.progressPercentage || 0);
-    return progress > 0;
-  });
-  
-  // Sort by progress descending, then map to chart data format
-  const sortedMembers = [...filteredMembers].sort((a, b) => {
-    const progressA = parseFloat(a.progressPercentage || 0);
-    const progressB = parseFloat(b.progressPercentage || 0);
-    return progressB - progressA;
-  });
-  
-  const data = sortedMembers.map((member) => ({
-    name: member.user.displayName || 'Unknown',
-    progress: parseFloat(member.progressPercentage || 0),
-    userId: member.userId,
-  }));
-
-  if (data.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center">
-        No members with metric progress above 0
-      </Typography>
-    );
-  }
-
-  // Custom tooltip to ensure correct data display
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <Box
-          sx={{
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            padding: '8px',
-          }}
-        >
-          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-            {data.name}
-          </Typography>
-          <Typography variant="body2" color="primary">
-            Progress %: {data.progress.toFixed(1)}
-          </Typography>
-        </Box>
-      );
-    }
-    return null;
-  };
-
-  return (
-    <Box sx={{ width: '100%', height: 300 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart 
-          data={data}
-          margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
-          barCategoryGap="20%"
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis 
-            dataKey="name" 
-            angle={-45} 
-            textAnchor="end" 
-            height={80}
-            interval={0}
-            tick={{ fontSize: 12 }}
-          />
-          <YAxis domain={[0, 'auto']} />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend />
-          <Bar 
-            dataKey="progress" 
-            fill="#00C49F" 
-            name="Progress %"
-            isAnimationActive={false}
-          />
-        </BarChart>
-      </ResponsiveContainer>
-    </Box>
-  );
-};
-
-const MilestoneDonutChart = ({ clubWide }) => {
-  if (!clubWide || clubWide.total === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center">
-        No milestone data available
-      </Typography>
-    );
-  }
-
-  const data = [
-    { name: 'Completed', value: clubWide.completed },
-    { name: 'Remaining', value: clubWide.total - clubWide.completed },
-  ];
-
-  return (
-    <Box sx={{ width: '100%', height: 300 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-            outerRadius={80}
-            fill="#8884d8"
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
-    </Box>
-  );
-};
-
-const OneTimeProgressSection = ({ byMember }) => {
-  if (!byMember || byMember.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center">
-        No one-time goal data available
-      </Typography>
-    );
-  }
-
-  // Sort by completion rate (descending)
-  const sortedMembers = [...byMember].sort((a, b) => b.completionRate - a.completionRate);
-
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {sortedMembers.map((member) => (
-        <Box key={member.userId}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography variant="body2">
-              {member.user.displayName || 'Unknown'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {member.completed}/{member.total} ({member.completionRate.toFixed(1)}%)
-            </Typography>
-          </Box>
-          <LinearProgress
-            variant="determinate"
-            value={member.completionRate}
-            sx={{ height: 8, borderRadius: 4 }}
-          />
-        </Box>
-      ))}
-    </Box>
-  );
-};
+import HabitStreaksLeaderboard from 'components/HabitStreaksLeaderboard';
+import WeeklyCompletionTrendByMember from './WeeklyCompletionTrendByMember';
+import AverageCompletionByType from './AverageCompletionByType';
+import ParticipationHeatmap from './ParticipationHeatmap';
+import TopPerformersByCategory from './TopPerformersByCategory';
+import ClubGoalTypeDistribution from './ClubGoalTypeDistribution';
 
 const formatDateRange = (startDate, endDate) => {
   if (!startDate || !endDate) return '';
@@ -328,8 +71,11 @@ const ClubGoalsReport = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [reportData, setReportData] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState(0);
   
   // Date range state - default to current quarter
   const [dateRangePeriod, setDateRangePeriod] = useState('currentQuarter');
@@ -357,6 +103,7 @@ const ClubGoalsReport = () => {
     }
   }, [dateRangePeriod]);
 
+  // Fetch competitive goals data (always loaded)
   useEffect(() => {
     const fetchReport = async () => {
       if (!user || !currentClub) return;
@@ -368,7 +115,8 @@ const ClubGoalsReport = () => {
           currentClub.id,
           user.uid,
           startDate,
-          endDate
+          endDate,
+          false // Don't include expensive analytics
         );
         setReportData(data);
       } catch (err) {
@@ -381,6 +129,36 @@ const ClubGoalsReport = () => {
 
     fetchReport();
   }, [user, currentClub, startDate, endDate]);
+
+  // Reset analytics data when date range changes
+  useEffect(() => {
+    setAnalyticsData(null);
+  }, [startDate, endDate]);
+
+  // Fetch analytics data only when analytics tab is active
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (!user || !currentClub || activeTab !== 1 || analyticsData) return;
+
+      try {
+        setAnalyticsLoading(true);
+        const data = await getClubGoalsReport(
+          currentClub.id,
+          user.uid,
+          startDate,
+          endDate,
+          true // Include expensive analytics
+        );
+        setAnalyticsData(data);
+      } catch (err) {
+        console.error('Error fetching analytics:', err);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [user, currentClub, startDate, endDate, activeTab, analyticsData]);
 
   if (loading) {
     return (
@@ -408,7 +186,19 @@ const ClubGoalsReport = () => {
     );
   }
 
-  const { leaderboard, metrics } = reportData;
+  const {
+    leaderboard,
+    streakLeaderboard,
+    weeklyTrendByMember,
+    topPerformers,
+  } = reportData || {};
+
+  const analytics = activeTab === 1 ? (analyticsData || reportData) : null;
+  const {
+    averageCompletionByType,
+    participationHeatmap,
+    clubGoalTypeDistribution,
+  } = analytics || {};
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -459,101 +249,160 @@ const ClubGoalsReport = () => {
           </Typography>
         </Box>
 
-        {/* Leaderboard Section - At the very top */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h5" gutterBottom>
+        {/* Section 1: Leaderboard Section - At the very top */}
+        <Box sx={{ mb: 5 }}>
+          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
             Habit Consistency Leaderboard
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.65rem' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Average habit completion rate ({formatDateRange(startDate, endDate)})
           </Typography>
           <HabitConsistencyLeaderboard leaderboard={leaderboard} />
         </Box>
 
-        <Typography variant="h4" gutterBottom>
-          Club Goals Report
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-          Track your club's progress and see how everyone is doing with their goals!
-        </Typography>
+        {/* Tabs for Competitive Goals and Analytics */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+          <Tabs 
+            value={activeTab} 
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            sx={{
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontSize: '1rem',
+                fontWeight: 500,
+                minHeight: 48,
+              },
+            }}
+          >
+            <Tab label="Competitive Goals" />
+            <Tab label="Insights & Analytics" />
+          </Tabs>
+        </Box>
 
-      {/* Charts Grid */}
-      <Grid container spacing={3} sx={{ width: '100%', margin: 0 }}>
-        {/* Habit Consistency Over Time */}
-        <Grid item xs={12} sm={6} md={4} lg={3} sx={{ display: 'flex', minWidth: 0, flexGrow: 1 }}>
-          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%', flexGrow: 1 }}>
-            <CardContent sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
-              <Typography variant="h6" gutterBottom>
-                Habit Consistency Over Time
+        {/* Tab Panel: Competitive Goals */}
+        {activeTab === 0 && (
+          <Box>
+            {/* Habit Streaks Leaderboard */}
+            <Box sx={{ mb: 5 }}>
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+                Habit Streaks Leaderboard
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Average consistency rate across all habit goals
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Longest active streaks ({formatDateRange(startDate, endDate)})
               </Typography>
-              <HabitConsistencyLineChart timeSeries={metrics.habit.timeSeries} />
-            </CardContent>
-          </Card>
-        </Grid>
+              <HabitStreaksLeaderboard leaderboard={streakLeaderboard} />
+            </Box>
 
-        {/* Habit Consistency Comparison */}
-        <Grid item xs={12} sm={6} md={4} lg={3} sx={{ display: 'flex', minWidth: 0, flexGrow: 1 }}>
-          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%', flexGrow: 1 }}>
-            <CardContent sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
-              <Typography variant="h6" gutterBottom>
-                Habit Consistency Comparison
+            {/* Top Performers by Category */}
+            <Box sx={{ mb: 5 }}>
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
+                Top Performers by Category
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Current consistency scores by member
-              </Typography>
-              <HabitConsistencyBarChart byMember={metrics.habit.byMember} />
-            </CardContent>
-          </Card>
-        </Grid>
+              <TopPerformersByCategory topPerformers={topPerformers} />
+            </Box>
 
-        {/* Metric Progress Comparison */}
-        <Grid item xs={12} sm={6} md={4} lg={3} sx={{ display: 'flex', minWidth: 0, flexGrow: 1 }}>
-          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%', flexGrow: 1 }}>
-            <CardContent sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
-              <Typography variant="h6" gutterBottom>
-                Metric Progress Comparison
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Average progress percentage for metric goals
-              </Typography>
-              <MetricProgressBarChart byMember={metrics.metric.byMember} />
-            </CardContent>
-          </Card>
-        </Grid>
+            {/* Weekly Completion Trend by Member */}
+            <Box sx={{ mb: 4 }}>
+              <Card 
+                elevation={2}
+                sx={{ 
+                  width: '100%',
+                  borderRadius: 2,
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 1 }}>
+                    Weekly Completion Trend by Member
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Consistency over time per member - see who is consistently achieving their goals
+                  </Typography>
+                  <WeeklyCompletionTrendByMember weeklyTrendByMember={weeklyTrendByMember} />
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+        )}
 
-        {/* Milestone Completion */}
-        <Grid item xs={12} sm={6} md={4} lg={3} sx={{ display: 'flex', minWidth: 0, flexGrow: 1 }}>
-          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%', flexGrow: 1 }}>
-            <CardContent sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
-              <Typography variant="h6" gutterBottom>
-                Milestone Completion
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Club-wide milestone completion status
-              </Typography>
-              <MilestoneDonutChart clubWide={metrics.milestone.clubWide} />
-            </CardContent>
-          </Card>
-        </Grid>
+        {/* Tab Panel: Insights & Analytics */}
+        {activeTab === 1 && (
+          <Box>
+            {analyticsLoading ? (
+              <Box display="flex" justifyContent="center" p={3}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                {/* Average Completion by Goal Type */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                  <Grid item xs={12} sm={6} sx={{ display: 'flex', flexGrow: 1 }}>
+                    <Card 
+                      elevation={2}
+                      sx={{ 
+                        height: '100%', 
+                        width: '100%',
+                        borderRadius: 2,
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 1 }}>
+                          Average Completion by Goal Type
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                          Compare how the club performs on different goal types
+                        </Typography>
+                        <AverageCompletionByType averageCompletionByType={averageCompletionByType} />
+                      </CardContent>
+                    </Card>
+                  </Grid>
 
-        {/* One-Time Goals Completion */}
-        <Grid item xs={12} sm={6} md={4} lg={3} sx={{ display: 'flex', minWidth: 0, flexGrow: 1 }}>
-          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%', flexGrow: 1 }}>
-            <CardContent sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
-              <Typography variant="h6" gutterBottom>
-                One-Time Goals Completion
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Completion rates for one-time goals by member
-              </Typography>
-              <OneTimeProgressSection byMember={metrics.oneTime.byMember} />
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+                  {/* Club Goal Type Distribution */}
+                  <Grid item xs={12} sm={6} sx={{ display: 'flex', flexGrow: 1 }}>
+                    <Card 
+                      elevation={2}
+                      sx={{ 
+                        height: '100%', 
+                        width: '100%',
+                        borderRadius: 2,
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 1 }}>
+                          Club Goal Type Distribution
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                          Overview of active goals by type across the club
+                        </Typography>
+                        <ClubGoalTypeDistribution clubGoalTypeDistribution={clubGoalTypeDistribution} />
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {/* Participation Heatmap */}
+                <Box sx={{ mb: 4 }}>
+                  <Card 
+                    elevation={2}
+                    sx={{ 
+                      width: '100%',
+                      borderRadius: 2,
+                    }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 1 }}>
+                        Participation Heatmap
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        Weekly engagement density across the club per user
+                      </Typography>
+                      <ParticipationHeatmap participationHeatmap={participationHeatmap} />
+                    </CardContent>
+                  </Card>
+                </Box>
+              </>
+            )}
+          </Box>
+        )}
       </Box>
     </LocalizationProvider>
   );

@@ -203,13 +203,14 @@ const calculateHabitConsistency = async (userId, goal, startDate, endDate) => {
 };
 
 
-// GET /v1/clubs/:clubId/goals-report?userId=xxx&startDate=xxx&endDate=xxx - Get club goals report
+// GET /v1/clubs/:clubId/goals-report?userId=xxx&startDate=xxx&endDate=xxx&includeAnalytics=true - Get club goals report
 const getClubGoalsReport = async (req, res, next) => {
   try {
     const {clubId} = req.params;
     const userId = req.query.userId;
     const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+    const includeAnalytics = req.query.includeAnalytics === 'true';
 
     if (!userId) {
       const error = new Error("userId is required");
@@ -248,18 +249,15 @@ const getClubGoalsReport = async (req, res, next) => {
     const leaderboard = [];
     const habitMetrics = {
       byMember: [],
-      timeSeries: [],
     };
     const metricMetrics = {
       byMember: [],
     };
     const milestoneMetrics = {
       byMember: [],
-      clubWide: {completed: 0, total: 0},
     };
     const oneTimeMetrics = {
       byMember: [],
-      clubWide: {completed: 0, total: 0},
     };
 
     // Process each member
@@ -423,8 +421,6 @@ const getClubGoalsReport = async (req, res, next) => {
         completed: completedMilestones,
         total: totalMilestones,
       });
-      milestoneMetrics.clubWide.completed += completedMilestones;
-      milestoneMetrics.clubWide.total += totalMilestones;
 
       oneTimeMetrics.byMember.push({
         userId: memberUserId,
@@ -436,8 +432,6 @@ const getClubGoalsReport = async (req, res, next) => {
         completed: completedOneTime,
         total: oneTimeGoals.length,
       });
-      oneTimeMetrics.clubWide.completed += completedOneTime;
-      oneTimeMetrics.clubWide.total += oneTimeGoals.length;
     }
 
     // Sort leaderboard by consistency score
@@ -446,78 +440,327 @@ const getClubGoalsReport = async (req, res, next) => {
       entry.rank = index + 1;
     });
 
-    // Build time-series data for habit consistency (last 8 periods)
-    // Aggregate across all members for each period
-    const timeSeriesData = [];
-    const allHabitGoals = [];
+    // Create streak leaderboard (sorted by longestStreak)
+    const streakLeaderboard = [...leaderboard].sort((a, b) => b.streak - a.streak);
+    streakLeaderboard.forEach((entry, index) => {
+      entry.rank = index + 1;
+    });
 
-    for (const member of members) {
-      const goals = await db.Goal.findAll({
-        where: {
-          userId: member.userId,
-          clubId: parseInt(clubId),
-          type: "habit",
-          archived: false,
-        },
-      });
-      allHabitGoals.push(...goals.map((g) => g.toJSON()));
-    }
+    // Calculate weekly completion trend by member
+    const weeklyTrendByMember = [];
+    if (members.length > 0) {
+      // Generate weeks in date range
+      let currentWeekStart = new Date(effectiveStartDate);
+      const dayOfWeek = currentWeekStart.getUTCDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      currentWeekStart.setUTCDate(currentWeekStart.getUTCDate() - daysToMonday);
+      currentWeekStart.setUTCHours(0, 0, 0, 0);
 
-    // Get unique cadences
-    const cadences = [...new Set(allHabitGoals.map((g) => g.cadence).filter(Boolean))];
+      while (currentWeekStart <= effectiveEndDate) {
+        const weekEnd = new Date(currentWeekStart);
+        weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
-    for (let periodIndex = 0; periodIndex < 8; periodIndex++) {
-      let periodConsistencySum = 0;
-      let periodCount = 0;
+        const weekData = {
+          weekStart: currentWeekStart.toISOString(),
+          weekEnd: weekEnd.toISOString(),
+          members: [],
+        };
 
-      for (const cadence of cadences) {
-        const goalsForCadence = allHabitGoals.filter((g) => g.cadence === cadence);
-        if (goalsForCadence.length === 0) continue;
+        // Calculate completion rate for each member for this week
+        for (const member of members) {
+          const memberUserId = member.userId;
 
-        let currentBoundaries = getPeriodBoundaries(cadence);
-        // Go back periodIndex periods
-        for (let i = 0; i < periodIndex; i++) {
-          currentBoundaries = getPreviousPeriodBoundaries(cadence, currentBoundaries.start);
+          // Get all habit goals for this member
+          const goals = await db.Goal.findAll({
+            where: {
+              userId: memberUserId,
+              clubId: parseInt(clubId),
+              type: "habit",
+              archived: false,
+            },
+          });
+
+          const habitGoals = goals.map((g) => g.toJSON());
+
+          if (habitGoals.length > 0) {
+            // Calculate consistency for each habit
+            const habitsWithConsistency = await Promise.all(
+                habitGoals.map(async (goal) => {
+                  const consistency = await calculateHabitConsistency(
+                      memberUserId,
+                      goal,
+                      currentWeekStart,
+                      weekEnd,
+                  );
+                  return {
+                    goal,
+                    consistencyRate: consistency ? consistency.consistencyRate : 0,
+                    consistency,
+                  };
+                }),
+            );
+
+            // Sort by consistency rate (descending), then by creation date (oldest first)
+            habitsWithConsistency.sort((a, b) => {
+              if (b.consistencyRate !== a.consistencyRate) {
+                return b.consistencyRate - a.consistencyRate;
+              }
+              const dateA = new Date(a.goal.created_at || a.goal.createdAt || 0);
+              const dateB = new Date(b.goal.created_at || b.goal.createdAt || 0);
+              return dateA - dateB;
+            });
+
+            // Calculate weighted average
+            let weightedSum = 0;
+            let totalWeight = 0;
+
+            for (let i = 0; i < habitsWithConsistency.length; i++) {
+              const {consistencyRate} = habitsWithConsistency[i];
+              const habitPosition = i + 1;
+              const weight = calculateHabitWeight(habitPosition);
+              weightedSum += consistencyRate * weight;
+              totalWeight += weight;
+            }
+
+            const completionRate = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+            weekData.members.push({
+              userId: memberUserId,
+              completionRate,
+              user: {
+                uid: member.user.uid,
+                displayName: member.user.displayName,
+                photoUrl: member.user.photoUrl,
+              },
+            });
+          } else {
+            // Member with no habit goals
+            weekData.members.push({
+              userId: memberUserId,
+              completionRate: 0,
+              user: {
+                uid: member.user.uid,
+                displayName: member.user.displayName,
+                photoUrl: member.user.photoUrl,
+              },
+            });
+          }
         }
 
-        for (const goal of goalsForCadence) {
-          const entries = await getGoalEntries(
-              goal.userId,
-              goal.id,
-              currentBoundaries.start,
-              currentBoundaries.end,
-          );
+        weeklyTrendByMember.push(weekData);
+        currentWeekStart = new Date(weekEnd);
+      }
+    }
 
-          const completed = goal.measure === "count" ?
-            entries.length >= goal.targetCount :
-            entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
-              parseFloat(goal.targetQuantity);
+    // Only calculate expensive analytics if requested
+    let averageCompletionByType = null;
+    let participationHeatmap = null;
+    let clubGoalTypeDistribution = null;
 
-          if (completed) {
-            periodConsistencySum += 100;
+    if (includeAnalytics) {
+      // Calculate average completion by goal type
+      averageCompletionByType = {
+        habit: 0,
+        metric: 0,
+        milestone: 0,
+        oneTime: 0,
+      };
+
+      if (habitMetrics.byMember.length > 0) {
+        const habitSum = habitMetrics.byMember.reduce(
+            (sum, member) => sum + (member.consistencyScore || 0),
+            0,
+        );
+        averageCompletionByType.habit = habitSum / habitMetrics.byMember.length;
+      }
+
+      if (metricMetrics.byMember.length > 0) {
+        const metricSum = metricMetrics.byMember.reduce(
+            (sum, member) => sum + (member.progressPercentage || 0),
+            0,
+        );
+        averageCompletionByType.metric = metricSum / metricMetrics.byMember.length;
+      }
+
+      if (milestoneMetrics.byMember.length > 0) {
+        const milestoneSum = milestoneMetrics.byMember.reduce(
+            (sum, member) => sum + (member.completionRate || 0),
+            0,
+        );
+        averageCompletionByType.milestone = milestoneSum / milestoneMetrics.byMember.length;
+      }
+
+      if (oneTimeMetrics.byMember.length > 0) {
+        const oneTimeSum = oneTimeMetrics.byMember.reduce(
+            (sum, member) => sum + (member.completionRate || 0),
+            0,
+        );
+        averageCompletionByType.oneTime = oneTimeSum / oneTimeMetrics.byMember.length;
+      }
+
+      // Calculate participation heatmap (weekly entry counts per member)
+      participationHeatmap = [];
+      if (members.length > 0) {
+        // Generate weeks in date range
+        let currentWeekStart = new Date(effectiveStartDate);
+        const dayOfWeek = currentWeekStart.getUTCDay();
+        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        currentWeekStart.setUTCDate(currentWeekStart.getUTCDate() - daysToMonday);
+        currentWeekStart.setUTCHours(0, 0, 0, 0);
+
+        while (currentWeekStart <= effectiveEndDate) {
+          const weekEnd = new Date(currentWeekStart);
+          weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+
+          const weekData = {
+            weekStart: currentWeekStart.toISOString(),
+            weekEnd: weekEnd.toISOString(),
+            members: [],
+          };
+
+          // Count total goal entries for each member for this week
+          for (const member of members) {
+            const memberUserId = member.userId;
+
+            // Get all goals for this member
+            const goals = await db.Goal.findAll({
+              where: {
+                userId: memberUserId,
+                clubId: parseInt(clubId),
+                archived: false,
+              },
+            });
+
+            let entryCount = 0;
+
+            // Count entries for all goal types
+            for (const goal of goals) {
+              const entries = await getGoalEntries(
+                  memberUserId,
+                  goal.id,
+                  currentWeekStart,
+                  weekEnd,
+              );
+              entryCount += entries.length;
+            }
+
+            weekData.members.push({
+              userId: memberUserId,
+              entryCount,
+              user: {
+                uid: member.user.uid,
+                displayName: member.user.displayName,
+                photoUrl: member.user.photoUrl,
+              },
+            });
           }
-          periodCount++;
+
+          participationHeatmap.push(weekData);
+          currentWeekStart = new Date(weekEnd);
         }
       }
 
-      const avgConsistency = periodCount > 0 ? periodConsistencySum / periodCount : 0;
-      timeSeriesData.push({
-        period: periodIndex,
-        consistency: avgConsistency,
-      });
+
+      // Calculate club-wide goal type distribution
+      clubGoalTypeDistribution = {
+        habit: 0,
+        metric: 0,
+        milestone: 0,
+        oneTime: 0,
+      };
+
+      for (const member of members) {
+        const goals = await db.Goal.findAll({
+          where: {
+            userId: member.userId,
+            clubId: parseInt(clubId),
+            archived: false,
+          },
+        });
+
+        for (const goal of goals) {
+          const goalType = goal.type;
+          if (goalType === "habit") {
+            clubGoalTypeDistribution.habit++;
+          } else if (goalType === "metric") {
+            clubGoalTypeDistribution.metric++;
+          } else if (goalType === "milestone") {
+            clubGoalTypeDistribution.milestone++;
+          } else if (goalType === "one_time") {
+            clubGoalTypeDistribution.oneTime++;
+          }
+        }
+      }
     }
 
-    habitMetrics.timeSeries = timeSeriesData.reverse(); // Most recent last
+    // Calculate top performers (uses existing metrics, so it's cheap)
+    const topPerformers = {
+      mostConsistent: null,
+      topMetricEarner: null,
+      milestoneMaster: null,
+      streakChampion: null,
+    };
 
-    res.json({
+    // Most Consistent (highest consistencyScore)
+    if (habitMetrics.byMember.length > 0) {
+      const mostConsistent = habitMetrics.byMember.reduce((max, member) => {
+        return (member.consistencyScore || 0) > (max.consistencyScore || 0) ? member : max;
+      }, habitMetrics.byMember[0]);
+      topPerformers.mostConsistent = {
+        userId: mostConsistent.userId,
+        value: mostConsistent.consistencyScore,
+        user: mostConsistent.user,
+      };
+    }
+
+    // Top Metric Earner (highest progressPercentage)
+    if (metricMetrics.byMember.length > 0) {
+      const topMetricEarner = metricMetrics.byMember.reduce((max, member) => {
+        return (member.progressPercentage || 0) > (max.progressPercentage || 0) ? member : max;
+      }, metricMetrics.byMember[0]);
+      topPerformers.topMetricEarner = {
+        userId: topMetricEarner.userId,
+        value: topMetricEarner.progressPercentage,
+        user: topMetricEarner.user,
+      };
+    }
+
+    // Milestone Master (most completed milestones)
+    if (milestoneMetrics.byMember.length > 0) {
+      const milestoneMaster = milestoneMetrics.byMember.reduce((max, member) => {
+        return (member.completed || 0) > (max.completed || 0) ? member : max;
+      }, milestoneMetrics.byMember[0]);
+      topPerformers.milestoneMaster = {
+        userId: milestoneMaster.userId,
+        value: milestoneMaster.completed,
+        user: milestoneMaster.user,
+      };
+    }
+
+    // Streak Champion (longest streak)
+    if (streakLeaderboard.length > 0) {
+      const streakChampion = streakLeaderboard[0]; // Already sorted by streak
+      topPerformers.streakChampion = {
+        userId: streakChampion.userId,
+        value: streakChampion.streak,
+        user: streakChampion.user,
+      };
+    }
+
+    const response = {
       leaderboard,
-      metrics: {
-        habit: habitMetrics,
-        metric: metricMetrics,
-        milestone: milestoneMetrics,
-        oneTime: oneTimeMetrics,
-      },
-    });
+      streakLeaderboard,
+      weeklyTrendByMember,
+      topPerformers,
+    };
+
+    if (includeAnalytics) {
+      response.averageCompletionByType = averageCompletionByType;
+      response.participationHeatmap = participationHeatmap;
+      response.clubGoalTypeDistribution = clubGoalTypeDistribution;
+    }
+
+    res.json(response);
   } catch (e) {
     next(e);
   }
