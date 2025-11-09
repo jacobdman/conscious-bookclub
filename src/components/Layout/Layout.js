@@ -56,7 +56,15 @@ const Layout = ({ children }) => {
         onLogout={handleLogout} 
       />
 
-      <Box component="main">
+      <Box 
+        component="main"
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: 'calc(100vh - 64px)', // AppBar default height
+          overflow: 'hidden',
+        }}
+      >
         {children}
       </Box>
     </ThemeProvider>

@@ -6,6 +6,7 @@ import ClubProvider from './contexts/Club/ClubProvider';
 import { setGlobalErrorHandler } from './services/apiHelpers';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './views/Dashboard';
+import Feed from './views/Feed';
 import ClubView from './views/ClubView';
 import ClubManagement from './views/ClubManagement';
 import Books from './views/Books';
@@ -73,6 +74,16 @@ function AppContent() {
                 <ClubProvider>
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/feed"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Feed />
                   </ProtectedRoute>
                 </ClubProvider>
               }

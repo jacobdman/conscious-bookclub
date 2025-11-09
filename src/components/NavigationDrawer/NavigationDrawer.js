@@ -30,15 +30,14 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
 
   const mainNavigationItems = [
     { name: 'Dashboard', path: '/' },
+    { name: 'Feed', path: '/feed' },
     { name: 'Club', path: '/club' },
     { name: 'Book List', path: '/books' },
     { name: 'Calendar', path: '/calendar' },
     { name: 'Goals', path: '/goals' },
   ];
 
-  const comingSoonItems = [
-    { name: 'Feed - (Coming Soon)', path: '/feed', disabled: true },
-  ];
+  const comingSoonItems = [];
 
   const handleNavigation = (path) => {
     navigate(path);
