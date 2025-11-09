@@ -122,56 +122,83 @@ const Landing = () => {
                 lineHeight: 1.6,
               }}
             >
-              Connect with fellow readers, track your reading goals, and build meaningful
-              reading habits together.
+              Build communities of fellow readers, track goals, and build meaningful
+              habits together.
             </Typography>
             <Box
               sx={{
                 display: 'flex',
-                gap: 3,
-                justifyContent: 'center',
-                flexWrap: 'wrap',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
               }}
             >
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleGetStarted}
+              <Box
                 sx={{
-                  px: 6,
-                  py: 2,
-                  fontSize: '1.2rem',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  boxShadow: 4,
-                  '&:hover': {
-                    boxShadow: 6,
-                    transform: 'translateY(-2px)',
-                  },
-                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  gap: 3,
+                  justifyContent: 'center',
+                  flexWrap: 'wrap',
                 }}
               >
-                Get Started
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={handleLearnMore}
-                sx={{
-                  px: 6,
-                  py: 2,
-                  fontSize: '1.2rem',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  borderWidth: 2,
-                  '&:hover': {
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={handleGetStarted}
+                  sx={{
+                    px: 6,
+                    py: 2,
+                    fontSize: '1.2rem',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    boxShadow: 4,
+                    '&:hover': {
+                      boxShadow: 6,
+                      transform: 'translateY(-2px)',
+                    },
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  Get Started
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={handleLearnMore}
+                  sx={{
+                    px: 6,
+                    py: 2,
+                    fontSize: '1.2rem',
+                    textTransform: 'none',
+                    fontWeight: 600,
                     borderWidth: 2,
-                    transform: 'translateY(-2px)',
+                    '&:hover': {
+                      borderWidth: 2,
+                      transform: 'translateY(-2px)',
+                    },
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  Learn More
+                </Button>
+              </Box>
+              <Button
+                variant="text"
+                size="medium"
+                onClick={() => navigate('/login')}
+                sx={{
+                  fontSize: '0.9rem',
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: 'primary.main',
+                    backgroundColor: 'transparent',
                   },
                   transition: 'all 0.3s ease',
                 }}
               >
-                Learn More
+                Sign In
               </Button>
             </Box>
           </Container>

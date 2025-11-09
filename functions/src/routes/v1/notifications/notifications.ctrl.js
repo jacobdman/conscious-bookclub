@@ -13,6 +13,11 @@ if (vapidPublicKey && vapidPrivateKey) {
 // Helper function to send push notification
 const sendPushNotification = async (subscription, title, body) => {
   try {
+    // Ensure subscription is an object (not a string)
+    const subscriptionObj = typeof subscription === "string" ?
+      JSON.parse(subscription) :
+      subscription;
+
     const payload = JSON.stringify({
       title,
       body,
@@ -20,20 +25,40 @@ const sendPushNotification = async (subscription, title, body) => {
       badge: "/android-chrome-192x192.png",
     });
 
-    await webpush.sendNotification(subscription, payload);
-    console.log("Push notification sent successfully");
-    return {success: true};
+    console.log("Sending push notification to subscription:", {
+      endpoint: subscriptionObj.endpoint ?
+        subscriptionObj.endpoint.substring(0, 50) + "..." :
+        "missing",
+      keys: subscriptionObj.keys ? "present" : "missing",
+    });
+
+    const result = await webpush.sendNotification(subscriptionObj, payload);
+    console.log("Push notification sent successfully, status:", result.statusCode);
+    return {success: true, statusCode: result.statusCode};
   } catch (error) {
-    console.error("Error sending push notification:", error);
+    console.error("Error sending push notification:", {
+      message: error.message,
+      statusCode: error.statusCode,
+      body: error.body,
+    });
+
     // If subscription is invalid, delete it
     if (error.statusCode === 410 || error.statusCode === 404) {
+      const subscriptionObj = typeof subscription === "string" ?
+        JSON.parse(subscription) :
+        subscription;
       await db.PushSubscription.destroy({
         where: {
-          subscriptionJson: subscription,
+          subscriptionJson: subscriptionObj,
         },
       });
+      console.log("Deleted invalid subscription");
     }
-    return {success: false, error: error.message};
+    return {
+      success: false,
+      error: error.message,
+      statusCode: error.statusCode,
+    };
   }
 };
 

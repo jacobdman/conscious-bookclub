@@ -144,7 +144,7 @@ self.addEventListener('message', (event) => {
 
 // Push event - handle incoming push notifications
 self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push notification received');
+  console.log('Service Worker: Push notification received', event);
 
   let notificationData = {
     title: 'Notification',
@@ -156,6 +156,7 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       const data = event.data.json();
+      console.log('Service Worker: Parsed push data:', data);
       notificationData = {
         title: data.title || notificationData.title,
         body: data.body || notificationData.body,
@@ -165,18 +166,38 @@ self.addEventListener('push', (event) => {
       };
     } catch (e) {
       console.error('Service Worker: Error parsing push data:', e);
+      // Try to get text data as fallback
+      try {
+        const text = event.data.text();
+        console.log('Service Worker: Push data as text:', text);
+      } catch (textError) {
+        console.error('Service Worker: Could not read push data:', textError);
+      }
     }
+  } else {
+    console.warn('Service Worker: Push event has no data');
   }
 
+  const notificationOptions = {
+    body: notificationData.body,
+    icon: notificationData.icon,
+    badge: notificationData.badge,
+    data: notificationData.data,
+    tag: 'cbc-notification',
+    requireInteraction: false,
+    vibrate: [200, 100, 200],
+  };
+
+  console.log('Service Worker: Showing notification:', notificationData.title, notificationOptions);
+
   event.waitUntil(
-      self.registration.showNotification(notificationData.title, {
-        body: notificationData.body,
-        icon: notificationData.icon,
-        badge: notificationData.badge,
-        data: notificationData.data,
-        tag: 'cbc-notification',
-        requireInteraction: false,
-      })
+      self.registration.showNotification(notificationData.title, notificationOptions)
+          .then(() => {
+            console.log('Service Worker: Notification displayed successfully');
+          })
+          .catch((error) => {
+            console.error('Service Worker: Error showing notification:', error);
+          })
   );
 });
 

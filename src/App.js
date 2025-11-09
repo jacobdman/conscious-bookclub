@@ -49,7 +49,7 @@ function AppContent() {
         {/* Public routes */}
         <Route
           path="/landing"
-          element={user ? <Navigate to="/" replace /> : <Landing />}
+          element={<Landing />}
         />
         <Route
           path="/login"

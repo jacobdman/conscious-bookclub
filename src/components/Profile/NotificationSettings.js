@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import { getUserDocument, updateNotificationPreferences } from 'services/users/users.service';
-import { getSubscriptionStatus, sendTestNotification } from 'services/notifications/notifications.service';
+import { getSubscriptionStatus, sendTestNotification, subscribeToNotifications } from 'services/notifications/notifications.service';
 import NotificationPermission from 'components/NotificationPermission';
 
 const NotificationSettings = () => {
@@ -30,6 +30,8 @@ const NotificationSettings = () => {
   const [notificationHour, setNotificationHour] = useState(9); // Default to 9 AM
   const [timezone, setTimezone] = useState('UTC');
   const [hasSubscription, setHasSubscription] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState('default');
+  const [reRequesting, setReRequesting] = useState(false);
 
   const loadUserPreferences = useCallback(async () => {
     try {
@@ -74,6 +76,10 @@ const NotificationSettings = () => {
       checkSubscriptionStatus();
       // Detect timezone
       setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+      // Check notification permission status
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+      }
     }
   }, [user, loadUserPreferences, checkSubscriptionStatus]);
 
@@ -107,6 +113,80 @@ const NotificationSettings = () => {
 
   const handleSubscribed = () => {
     checkSubscriptionStatus();
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  };
+
+  const handleReRequestPermission = async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setError('Push notifications are not supported in this browser');
+      return;
+    }
+
+    try {
+      setReRequesting(true);
+      setError(null);
+
+      // Request notification permission
+      const permissionResult = await Notification.requestPermission();
+      setNotificationPermission(permissionResult);
+
+      if (permissionResult !== 'granted') {
+        setError('Notification permission was denied. Please enable it in your browser settings.');
+        setReRequesting(false);
+        return;
+      }
+
+      // Register service worker if not already registered
+      let registration = await navigator.serviceWorker.ready;
+      if (!registration) {
+        registration = await navigator.serviceWorker.register('/service-worker.js');
+        // Wait for service worker to be ready
+        registration = await navigator.serviceWorker.ready;
+      }
+
+      // Get VAPID public key
+      const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        setError('VAPID public key is not configured. Please contact support.');
+        setReRequesting(false);
+        return;
+      }
+
+      // Helper function to convert VAPID key
+      const urlBase64ToUint8Array = (base64String) => {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+          .replace(/-/g, '+')
+          .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      };
+
+      // Get push subscription
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+
+      // Send subscription to backend
+      if (user) {
+        await subscribeToNotifications(user.uid, subscription.toJSON());
+        await checkSubscriptionStatus();
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error('Error re-requesting notification permission:', err);
+      setError(err.message || 'Failed to enable notifications');
+    } finally {
+      setReRequesting(false);
+    }
   };
 
   const handleTestNotification = async () => {
@@ -215,22 +295,45 @@ const NotificationSettings = () => {
               <Box sx={{ mt: 1 }}>
                 <Alert severity="info" sx={{ mb: 2 }}>
                   Push notifications are enabled
-                </Alert>
-                <Button
-                  variant="outlined"
-                  onClick={handleTestNotification}
-                  disabled={testing || saving}
-                  size="small"
-                >
-                  {testing ? (
-                    <>
-                      <CircularProgress size={16} sx={{ mr: 1 }} />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Test Notification'
+                  {notificationPermission !== 'granted' && (
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      Note: Notification permission may need to be re-granted.
+                    </Typography>
                   )}
-                </Button>
+                </Alert>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleTestNotification}
+                    disabled={testing || saving || reRequesting}
+                    size="small"
+                  >
+                    {testing ? (
+                      <>
+                        <CircularProgress size={16} sx={{ mr: 1 }} />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send Test Notification'
+                    )}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    onClick={handleReRequestPermission}
+                    disabled={testing || saving || reRequesting}
+                    size="small"
+                  >
+                    {reRequesting ? (
+                      <>
+                        <CircularProgress size={16} sx={{ mr: 1 }} />
+                        Re-requesting...
+                      </>
+                    ) : (
+                      'Re-request Permission'
+                    )}
+                  </Button>
+                </Box>
                 {testResult && (
                   <Alert 
                     severity={testResult.failed === 0 ? "success" : "warning"} 
