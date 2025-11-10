@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cbc-app-v2';
+const CACHE_NAME = 'cbc-app-v__VERSION__';
 const VERSION_URL = '/version.json';
 
 // Install event - cache static assets

@@ -12,7 +12,8 @@ const emitToClub = async (clubId, event, data) => {
 
     const socketServiceUrl = isEmulator ?
       "http://localhost:3001" : // Local development
-      process.env.SOCKET_SERVICE_URL || "https://socket-service-x3bxvqpcca-uc.a.run.app"; // Production
+      process.env.SOCKET_SERVICE_URL ||
+      "https://socket-service-x3bxvqpcca-uc.a.run.app"; // Production
 
     const room = `club:${clubId}`;
 

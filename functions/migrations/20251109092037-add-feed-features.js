@@ -18,6 +18,7 @@ module.exports = {
     });
 
     await queryInterface.addColumn("posts", "parent_author_name", {
+      // eslint-disable-next-line new-cap
       type: Sequelize.STRING(255),
       allowNull: true,
     });
@@ -42,6 +43,7 @@ module.exports = {
         onDelete: "CASCADE",
       },
       user_id: {
+        // eslint-disable-next-line new-cap
         type: Sequelize.STRING(255),
         allowNull: false,
         references: {
@@ -51,6 +53,7 @@ module.exports = {
         onDelete: "CASCADE",
       },
       emoji: {
+        // eslint-disable-next-line new-cap
         type: Sequelize.STRING(50),
         allowNull: false,
       },

@@ -9,6 +9,7 @@ module.exports = {
         autoIncrement: true,
       },
       user_id: {
+        // eslint-disable-next-line new-cap
         type: Sequelize.STRING(255),
         allowNull: false,
         references: {

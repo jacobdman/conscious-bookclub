@@ -1,5 +1,4 @@
 const db = require("../../../../db/models/index");
-const {Op} = require("sequelize");
 
 // GET /v1/feed/read-status - Get last read timestamp for current user and club
 const getReadStatus = async (req, res, next) => {

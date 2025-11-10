@@ -3,7 +3,7 @@ const {initializeSocket} = require("./socket");
 const http = require("http");
 
 // Check if we're running in the emulator (local development)
-const isEmulator = process.env.FUNCTIONS_EMULATOR === "true" || 
+const isEmulator = process.env.FUNCTIONS_EMULATOR === "true" ||
                    process.env.GCLOUD_PROJECT === "demo-test" ||
                    !process.env.GCLOUD_PROJECT;
 
@@ -11,6 +11,10 @@ const isEmulator = process.env.FUNCTIONS_EMULATOR === "true" ||
 // This prevents multiple initialization attempts when module reloads
 let serverInitialized = false;
 
+/**
+ * Ensures the Socket.io server is initialized and running
+ * @return {Object} Object containing server and io instances
+ */
 function ensureSocketServer() {
   // CRITICAL: Check if server already exists and is listening FIRST
   // This must happen before creating any new server instances
@@ -53,7 +57,7 @@ function ensureSocketServer() {
   // This allows us to restore them if we get EADDRINUSE (port already in use)
   const existingServer = global.socketServer;
   const existingIO = global.socketIO;
-  
+
   // Create new server instance
   const server = http.createServer();
   const io = initializeSocket(server);
@@ -65,9 +69,10 @@ function ensureSocketServer() {
   if (isEmulator) {
     // Start listening on a specific port for local development
     const PORT = process.env.SOCKET_PORT || 3001;
-    
+
     // Check if port is already in use before attempting to listen
-    // This is a best-effort check - the actual listen() call will still error if port is in use
+    // This is a best-effort check - the actual listen() call will still error
+    // if port is in use
     if (!server.listening) {
       try {
         server.listen(PORT, "0.0.0.0", () => {
@@ -76,7 +81,7 @@ function ensureSocketServer() {
           console.log(`   Connect to: http://localhost:${PORT}`);
           console.log(`   Using production Firebase Auth (no emulator)`);
         });
-        
+
         // Handle listen errors gracefully
         server.once("error", (err) => {
           serverInitialized = false; // Reset flag on error so we can retry
@@ -84,16 +89,24 @@ function ensureSocketServer() {
             // Port is in use - this is expected if module reloaded and server is already running
             // Restore the existing server/io instances we had before creating new ones
             if (existingServer && existingIO) {
-              console.log("✅ Socket.io server already running (restoring existing instance after module reload)");
+              console.log(
+                  "✅ Socket.io server already running " +
+                  "(restoring existing instance after module reload)",
+              );
               global.socketServer = existingServer;
               global.socketIO = existingIO;
             } else {
               // Port is in use but we don't have existing server reference
               // This is expected in emulator mode when module reloads
               // The server from previous module load is still running
-              // Silently continue - the server is working, we just can't track it in this module instance
-              // Next call to ensureSocketServer() should find it via global (if it persisted)
-              console.log(`ℹ️  Port ${PORT} is in use (likely from previous module load). Server should still be accessible.`);
+              // Silently continue - the server is working, we just can't track it
+              // in this module instance
+              // Next call to ensureSocketServer() should find it via global
+              // (if it persisted)
+              console.log(
+                  `ℹ️  Port ${PORT} is in use (likely from previous module load). ` +
+                  "Server should still be accessible.",
+              );
             }
           } else if (err.syscall === "listen") {
             console.error(`❌ Error starting Socket.io server on port ${PORT}:`, err.message);
@@ -123,12 +136,13 @@ exports.socket = onRequest({
 }, (req, res) => {
   // Lazy initialization: only start server when function is actually called
   const {io} = ensureSocketServer();
-  
+
   // Health check endpoint
   res.status(200).json({
     message: "Socket.io endpoint",
     connected: io ? io.engine.clientsCount : 0,
-    listening: global.socketServer ? global.socketServer.listening : false,
+    listening: global.socketServer ?
+      global.socketServer.listening : false,
   });
 });
 
