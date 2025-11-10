@@ -205,7 +205,12 @@ const CalendarComponent = () => {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ 
+        p: 3, 
+        height: '100%', 
+        overflowY: 'auto', 
+        overflowX: 'hidden' 
+      }}>
         <CalendarSubscription />
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>

@@ -488,15 +488,19 @@ The app is configured as a Progressive Web App (PWA) with the following features
 
 **IMPORTANT**: Before deploying a new version, you must update the version number to trigger service worker updates:
 
-1. **Update Version**: Increment the version in `public/version.json`
+1. **Update Version**: Increment the version in `public/version.json` (NOT `package.json`)
    - Use semantic versioning (e.g., "1.0.1", "1.1.0", "2.0.0")
-   - This version number is used by the service worker to detect updates
-   - Users with installed PWAs will be prompted to update when the version changes
+   - The version in `package.json` is separate and used for npm package management
+   - The version in `public/version.json` is used by the PWA update system
+   - During build, the version is automatically injected into the service worker file
+   - This ensures the service worker file changes when the version changes, triggering browser update detection
 
 2. **Build and Deploy**: Run the standard deployment command
    ```bash
    npm run deploy
    ```
+   - The build process automatically runs `prebuild` script which injects the version from `public/version.json` into the service worker
+   - The service worker's `CACHE_NAME` includes the version (e.g., `'cbc-app-v0.1.2'`), ensuring the file changes with each version update
 
 3. **Verify**: After deployment, check that:
    - Service worker is registered (check browser DevTools → Application → Service Workers)
@@ -508,12 +512,16 @@ The app is configured as a Progressive Web App (PWA) with the following features
 The version update flow works as follows:
 
 1. Developer increments version in `public/version.json` before deployment
-2. Service worker detects the new version on app load
-3. UpdatePrompt component shows a notification to users
-4. Users can choose to update immediately or later
-5. On update, the service worker activates and the page reloads with the new version
+2. Build process (`prebuild` script) injects the version into `public/service-worker.js`, updating the `CACHE_NAME` constant
+3. The modified service worker file is copied to `build/` directory by react-scripts
+4. Browser detects the service worker file has changed (byte comparison)
+5. New service worker is installed and UpdatePrompt component shows a notification to users
+6. Users can choose to update immediately or later
+7. On update, the service worker activates and the page reloads with the new version
 
 **Note**: The service worker only registers in production builds. Development builds do not use service workers to avoid caching issues during development.
+
+**Important**: Always update `public/version.json` for PWA updates. The `package.json` version is separate and does not affect PWA update detection.
 
 ### PWA Components
 

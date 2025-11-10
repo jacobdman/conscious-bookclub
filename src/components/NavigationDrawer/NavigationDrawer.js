@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -12,15 +12,30 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Badge,
 } from '@mui/material';
 import { OpenInNew } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useClubContext from 'contexts/Club';
+import FeedContext from 'contexts/Feed/FeedContext';
+import { useContext } from 'react';
 
 const NavigationDrawer = ({ open, onClose, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentClub, userClubs, setCurrentClub, loading: clubsLoading } = useClubContext();
+  // FeedContext may not be available if not on Feed page, so use useContext with try/catch
+  const feedContext = useContext(FeedContext);
+  const unreadCount = feedContext?.unreadCount || 0;
+  const [appVersion, setAppVersion] = useState('');
+
+  // Fetch app version
+  useEffect(() => {
+    fetch('/version.json')
+      .then((res) => res.json())
+      .then((data) => setAppVersion(data.version || ''))
+      .catch(() => setAppVersion(''));
+  }, []);
 
   // Organize menu items into logical groups
   const clubManagementItems = currentClub?.role === 'owner' ? [
@@ -30,15 +45,14 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
 
   const mainNavigationItems = [
     { name: 'Dashboard', path: '/' },
+    { name: 'Feed', path: '/feed' },
     { name: 'Club', path: '/club' },
     { name: 'Book List', path: '/books' },
     { name: 'Calendar', path: '/calendar' },
     { name: 'Goals', path: '/goals' },
   ];
 
-  const comingSoonItems = [
-    { name: 'Feed - (Coming Soon)', path: '/feed', disabled: true },
-  ];
+  const comingSoonItems = [];
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -143,16 +157,46 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
             Navigation
           </Typography>
           <List sx={{ py: 0, mb: 1 }}>
-            {mainNavigationItems.map((item) => (
+            {mainNavigationItems.map((item) => {
+              const showBadge = item.name === 'Feed' && unreadCount > 0;
+              return (
               <ListItem 
                 button 
                 key={item.name}
                 onClick={() => handleNavigation(item.path)}
                 selected={location.pathname === item.path}
               >
-                <ListItemText primary={item.name} />
+                  <ListItemText 
+                    primary={
+                      showBadge ? (
+                        <Badge 
+                          badgeContent={unreadCount > 99 ? '99+' : unreadCount} 
+                          color="error"
+                          anchorOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                          }}
+                          sx={{
+                            '& .MuiBadge-badge': {
+                              fontSize: '0.7rem',
+                              minWidth: '18px',
+                              height: '18px',
+                              padding: '0 4px',
+                              top: -4,
+                              right: -8,
+                            },
+                          }}
+                        >
+                          <span>{item.name}</span>
+                        </Badge>
+                      ) : (
+                        item.name
+                      )
+                    } 
+                  />
               </ListItem>
-            ))}
+              );
+            })}
           </List>
 
           {/* Coming Soon Section */}
@@ -234,6 +278,21 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
               />
             </ListItem>
           </List>
+          {appVersion && (
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                display: 'block',
+                textAlign: 'center',
+                color: 'text.secondary',
+                fontSize: '0.65rem',
+                mt: 1,
+                opacity: 0.6
+              }}
+            >
+              v{appVersion}
+            </Typography>
+          )}
         </Box>
       </Box>
     </Drawer>

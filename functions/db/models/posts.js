@@ -21,15 +21,25 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.TEXT,
           allowNull: false,
         },
-        reactionCounts: {
-          type: DataTypes.JSONB,
-          field: "reaction_counts",
-          defaultValue: {thumbsUp: 0, thumbsDown: 0, heart: 0, laugh: 0},
-        },
         clubId: {
           type: DataTypes.INTEGER,
           field: "club_id",
           allowNull: false,
+        },
+        parentPostId: {
+          type: DataTypes.INTEGER,
+          field: "parent_post_id",
+          allowNull: true,
+        },
+        parentPostText: {
+          type: DataTypes.TEXT,
+          field: "parent_post_text",
+          allowNull: true,
+        },
+        parentAuthorName: {
+          type: DataTypes.STRING(255),
+          field: "parent_author_name",
+          allowNull: true,
         },
       },
       {
@@ -48,6 +58,14 @@ module.exports = function(sequelize, DataTypes) {
     Post.belongsTo(models.Club, {
       foreignKey: "club_id",
       as: "club",
+    });
+    Post.belongsTo(models.Post, {
+      foreignKey: "parent_post_id",
+      as: "parentPost",
+    });
+    Post.hasMany(models.PostReaction, {
+      foreignKey: "post_id",
+      as: "reactions",
     });
   };
 

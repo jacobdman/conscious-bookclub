@@ -68,8 +68,14 @@ const ClubView = () => {
 
   return (
     <Layout>
-      <Box sx={{ width: '100%' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <Box sx={{ 
+        width: '100%', 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
           <Tabs 
             value={tabValue} 
             onChange={handleTabChange} 
@@ -81,13 +87,15 @@ const ClubView = () => {
           </Tabs>
         </Box>
         
-        <TabPanel value={tabValue} index={0}>
-          <ClubBooksTab />
-        </TabPanel>
-        
-        <TabPanel value={tabValue} index={1}>
-          <ClubGoalsReport />
-        </TabPanel>
+        <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          <TabPanel value={tabValue} index={0}>
+            <ClubBooksTab />
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={1}>
+            <ClubGoalsReport />
+          </TabPanel>
+        </Box>
       </Box>
     </Layout>
   );

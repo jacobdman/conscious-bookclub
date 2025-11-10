@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
-import { getPosts, addPost } from 'services/posts/posts.service';
-import { getBooks } from 'services/books/books.service';
 import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import GoalsProvider from 'contexts/Goals/GoalsProvider';
+import FeedProvider from 'contexts/Feed/FeedProvider';
 import Layout from 'components/Layout';
 import NextMeetingCard from 'components/NextMeetingCard';
 import CurrentBooksSection from 'components/CurrentBooksSection';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
-import FeedSection from 'components/FeedSection';
+import FeedPreview from 'components/FeedPreview';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
 import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
@@ -18,26 +17,7 @@ import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLead
 const Dashboard = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
-  const [posts, setPosts] = useState([]);
-  const [loadingPosts, setLoadingPosts] = useState(true);
-  const [errorPosts, setErrorPosts] = useState(null);
-  const [newPostText, setNewPostText] = useState('');
   const [currentBooks, setCurrentBooks] = useState([]);
-
-  const fetchPosts = useCallback(async () => {
-    if (!currentClub) return;
-    
-    try {
-      setLoadingPosts(true);
-      const posts = await getPosts(currentClub.id);
-      const postsData = posts.map(post => ({ id: post.id, ...post }));
-      setPosts(postsData);
-    } catch (err) {
-      setErrorPosts('Failed to fetch posts.');
-    } finally {
-      setLoadingPosts(false);
-    }
-  }, [currentClub]);
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -45,45 +25,55 @@ const Dashboard = () => {
         return;
       }
       
-      // Fetch both books and meetings
-      const [books, meetings] = await Promise.all([
-        getBooks(currentClub.id),
-        getMeetings(currentClub.id)
-      ]);
-      
-      const allBooksData = books.map(book => ({ id: book.id, ...book }));
-      
-      // Create a map of bookId -> earliest upcoming meeting date
+      // Get today's date in YYYY-MM-DD format for start_date filter
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Start of today
+      today.setHours(0, 0, 0, 0);
+      const startDate = today.toISOString().split('T')[0];
       
-      const bookMeetingDates = {};
+      // Fetch meetings with user progress included and filtered by start_date
+      const meetings = await getMeetings(currentClub.id, user.uid, startDate);
+      
+      // Extract books from meetings, including progress from the meeting response
+      const bookMap = new Map();
+      
       meetings.forEach(meeting => {
-        if (meeting.bookId) {
-          const meetingDate = new Date(meeting.date);
-          meetingDate.setHours(0, 0, 0, 0);
+        if (meeting.book && meeting.bookId) {
+          const bookId = meeting.book.id || meeting.bookId;
           
-          // Only include meetings that are today or in the future
-          if (meetingDate >= today) {
-            if (!bookMeetingDates[meeting.bookId] || meetingDate < new Date(bookMeetingDates[meeting.bookId])) {
-              bookMeetingDates[meeting.bookId] = meeting.date;
+          // If we haven't seen this book yet, or this meeting is earlier, update it
+          if (!bookMap.has(bookId)) {
+            const bookData = {
+              id: bookId,
+              ...meeting.book,
+              progress: meeting.book.progress || null, // Progress is nested in book.progress
+            };
+            bookMap.set(bookId, {
+              book: bookData,
+              meetingDate: meeting.date,
+            });
+          } else {
+            const existing = bookMap.get(bookId);
+            const meetingDate = new Date(meeting.date);
+            const existingDate = new Date(existing.meetingDate);
+            if (meetingDate < existingDate) {
+              // This meeting is earlier, update the meeting date
+              bookMap.set(bookId, {
+                ...existing,
+                meetingDate: meeting.date,
+              });
             }
           }
         }
       });
       
-      // Filter books that have upcoming meetings
-      const upcomingBooks = allBooksData.filter(book => {
-        return bookMeetingDates[book.id] !== undefined;
-      });
-      
-      // Sort by meeting date (earliest first)
-      upcomingBooks.sort((a, b) => {
-        const dateA = new Date(bookMeetingDates[a.id]);
-        const dateB = new Date(bookMeetingDates[b.id]);
-        
-        return dateA - dateB;
-      });
+      // Convert map to array and sort by meeting date
+      const upcomingBooks = Array.from(bookMap.values())
+        .sort((a, b) => {
+          const aDate = new Date(a.meetingDate);
+          const bDate = new Date(b.meetingDate);
+          return aDate - bDate;
+        })
+        .map(item => item.book);
       
       setCurrentBooks(upcomingBooks);
     } catch (err) {
@@ -94,34 +84,30 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (user) {
-      fetchPosts();
       fetchBooks();
     }
-  }, [user, fetchBooks, fetchPosts]);
+  }, [user, fetchBooks]);
 
-  const handleCreatePost = async () => {
-    if (!newPostText.trim() || !user || !currentClub) return;
-
-    try {
-      const newPost = {
-        authorId: user.uid,
-        authorName: user.displayName || user.email,
-        text: newPostText,
-        createdAt: new Date(),
-        reactionCounts: { thumbsUp: 0, thumbsDown: 0, heart: 0, laugh: 0 },
-      };
-      await addPost(currentClub.id, newPost);
-      setNewPostText('');
-      fetchPosts();
-    } catch (err) {
-      // Error adding post
-    }
-  };
+  // Ensure page starts at top when Dashboard loads
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   return (
     <GoalsProvider>
+      <FeedProvider>
       <Layout>
-        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box 
+            sx={{ 
+              p: 2, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 2,
+              height: '100%',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+            }}
+          >
           <PWAInstallPrompt />
           <NotificationPrompt />
           {currentClub && (
@@ -138,16 +124,10 @@ const Dashboard = () => {
           
           <CurrentBooksSection books={currentBooks} />
           
-          <FeedSection 
-            posts={posts}
-            newPostText={newPostText}
-            onNewPostTextChange={setNewPostText}
-            onCreatePost={handleCreatePost}
-            loadingPosts={loadingPosts}
-            errorPosts={errorPosts}
-          />
+            <FeedPreview />
         </Box>
       </Layout>
+      </FeedProvider>
     </GoalsProvider>
   );
 };

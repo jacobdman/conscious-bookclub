@@ -11,18 +11,70 @@ const verifyOwnership = async (clubId, userId) => {
 // GET /v1/meetings - Get all meetings
 const getMeetings = async (req, res, next) => {
   try {
-    const {clubId} = req.query;
+    const {clubId, userId, start_date} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
       throw error;
     }
+    
+    // Build where clause
+    const whereClause = {clubId: parseInt(clubId)};
+    
+    // Filter by start_date if provided (default to today)
+    if (start_date) {
+      whereClause.date = {
+        [db.Op.gte]: start_date,
+      };
+    } else {
+      // Default to today if no start_date provided
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      whereClause.date = {
+        [db.Op.gte]: today.toISOString().split('T')[0],
+      };
+    }
+    
+    // Build include array for Book
+    const bookInclude = {
+      model: db.Book,
+      as: "book",
+      attributes: ["id", "title", "author", "coverImage"],
+    };
+    
+    // If userId is provided, include user's BookProgress for each book
+    if (userId) {
+      bookInclude.include = [{
+        model: db.BookProgress,
+        as: "bookProgresses",
+        where: {userId: userId},
+        required: false, // LEFT JOIN - include books even if no progress
+        attributes: ["id", "status", "percentComplete", "privacy", "updatedAt"],
+      }];
+    }
+    
     const meetings = await db.Meeting.findAll({
-      where: {clubId: parseInt(clubId)},
+      where: whereClause,
       order: [["date", "ASC"]],
-      include: [{model: db.Book, as: "book", attributes: ["id", "title", "author"]}],
+      include: [bookInclude],
     });
-    res.json(meetings.map((meeting) => ({id: meeting.id, ...meeting.toJSON()})));
+    
+    // Transform the response to nest progress in book.progress
+    const transformedMeetings = meetings.map((meeting) => {
+      const meetingJson = meeting.toJSON();
+      if (meetingJson.book && userId && meetingJson.book.bookProgresses && meetingJson.book.bookProgresses.length > 0) {
+        // User has progress for this book - nest it in book.progress
+        meetingJson.book.progress = meetingJson.book.bookProgresses[0];
+        delete meetingJson.book.bookProgresses;
+      } else if (meetingJson.book && userId) {
+        // User has no progress - set progress to null
+        meetingJson.book.progress = null;
+        delete meetingJson.book.bookProgresses;
+      }
+      return {id: meeting.id, ...meetingJson};
+    });
+    
+    res.json(transformedMeetings);
   } catch (e) {
     next(e);
   }
