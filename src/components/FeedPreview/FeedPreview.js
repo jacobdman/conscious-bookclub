@@ -5,8 +5,8 @@ import {
   Typography,
   Avatar,
   Paper,
-  Badge,
   CircularProgress,
+  Badge,
 } from '@mui/material';
 import useFeedContext from 'contexts/Feed';
 import EmojiInput from 'components/EmojiInput';
@@ -45,28 +45,56 @@ const FeedPreview = () => {
   };
 
   return (
-    <Paper
-      elevation={1}
-      onClick={handleClick}
-      sx={{
-        cursor: 'pointer',
-        p: 2,
-        '&:hover': {
-          boxShadow: 3,
-        },
-        transition: 'box-shadow 0.2s',
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Feed
+    <Box>
+      {/* Feed Header */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          backgroundColor: 'background.paper',
+          borderRadius: 1,
+        }}
+      >
+        <Typography variant="h6" component="h1" sx={{ display: 'inline-flex', alignItems: 'center' }}>
+          {unreadCount > 0 ? (
+            <Badge
+              badgeContent={unreadCount > 99 ? '99+' : unreadCount}
+              color="error"
+              anchorOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              sx={{
+                '& .MuiBadge-badge': {
+                  fontSize: '0.7rem',
+                  minWidth: '18px',
+                  height: '18px',
+                  padding: '0 4px',
+                  top: -4,
+                  right: -8,
+                },
+              }}
+            >
+              <span>Feed</span>
+            </Badge>
+          ) : (
+            'Feed'
+          )}
         </Typography>
-        {unreadCount > 0 && (
-          <Badge badgeContent={unreadCount} color="error">
-            <Box sx={{ width: 8, height: 8 }} />
-          </Badge>
-        )}
       </Box>
+
+      <Paper
+        elevation={1}
+        onClick={handleClick}
+        sx={{
+          cursor: 'pointer',
+          p: 2,
+          '&:hover': {
+            boxShadow: 3,
+          },
+          transition: 'box-shadow 0.2s',
+        }}
+      >
 
       {loading && posts.length === 0 ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
@@ -197,6 +225,7 @@ const FeedPreview = () => {
         </Typography>
       )}
     </Paper>
+    </Box>
   );
 };
 

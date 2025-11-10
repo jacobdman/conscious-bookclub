@@ -7,7 +7,7 @@ export const getMeetings = async (clubId, userId = null, startDate = null) => {
     params.append('userId', userId);
   }
   if (startDate) {
-    params.append('start_date', startDate);
+    params.append('startDate', startDate);
   }
   const meetings = await apiCall(`/v1/meetings?${params}`);
   return meetings;

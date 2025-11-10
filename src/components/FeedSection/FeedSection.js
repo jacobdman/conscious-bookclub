@@ -6,7 +6,6 @@ import {
   IconButton,
   CircularProgress,
   Paper,
-  Badge,
   Fab,
 } from '@mui/material';
 import { Send, KeyboardArrowDown } from '@mui/icons-material';
@@ -14,7 +13,7 @@ import useFeedContext from 'contexts/Feed';
 import PostCard from 'components/PostCard';
 
 const FeedSection = () => {
-  const { posts, loading, loadingMore, error, createPost, unreadCount, hasMore, loadMorePosts } = useFeedContext();
+  const { posts, loading, loadingMore, error, createPost, hasMore, loadMorePosts } = useFeedContext();
   const [newPostText, setNewPostText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -173,44 +172,6 @@ const FeedSection = () => {
         position: 'relative',
       }}
     >
-      {/* Feed Header */}
-      <Box
-        sx={{
-          px: 2,
-          py: 1.5,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-        }}
-      >
-        <Typography variant="h6" component="h1" sx={{ display: 'inline-flex', alignItems: 'center' }}>
-          {unreadCount > 0 ? (
-            <Badge 
-              badgeContent={unreadCount > 99 ? '99+' : unreadCount} 
-              color="error"
-              anchorOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              sx={{
-                '& .MuiBadge-badge': {
-                  fontSize: '0.7rem',
-                  minWidth: '18px',
-                  height: '18px',
-                  padding: '0 4px',
-                  top: -4,
-                  right: -8,
-                },
-              }}
-            >
-              <span>Feed</span>
-            </Badge>
-          ) : (
-            'Feed'
-          )}
-        </Typography>
-      </Box>
-
       {/* Messages Feed - Scrollable */}
       <Box
         ref={scrollContainerRef}

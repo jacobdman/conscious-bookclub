@@ -123,8 +123,8 @@ const Dashboard = () => {
           <QuickGoalCompletion />
           
           <CurrentBooksSection books={currentBooks} />
-          
-            <FeedPreview />
+
+          <FeedPreview />
         </Box>
       </Layout>
       </FeedProvider>
