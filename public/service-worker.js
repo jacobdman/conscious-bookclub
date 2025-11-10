@@ -1,4 +1,6 @@
-const CACHE_NAME = 'cbc-app-v__VERSION__';
+/* eslint-disable no-restricted-globals */
+/* Service Worker file - uses service worker globals (self, caches, clients, location) */
+const CACHE_NAME = 'cbc-app-v0.1.12';
 const VERSION_URL = '/version.json';
 
 // Install event - cache static assets
@@ -11,7 +13,8 @@ self.addEventListener('install', (event) => {
       // Cache the main page and critical assets
       // Note: Static assets with hashed names will be cached on first fetch
       return Promise.all([
-        cache.add('/').catch(() => {}),
+        // Don't cache HTML (index.html) - use network-first strategy instead
+        // This ensures users get the latest version when service worker updates
         cache.add('/manifest.json').catch(() => {}),
         cache.add(VERSION_URL).catch(() => {}),
       ]).catch((error) => {
@@ -37,6 +40,7 @@ self.addEventListener('activate', (event) => {
             console.log('Service Worker: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
+          return Promise.resolve();
         })
       );
     })
@@ -58,6 +62,25 @@ self.addEventListener('fetch', (event) => {
 
   // Skip service worker and version.json requests
   if (url.pathname === '/service-worker.js' || url.pathname === '/version.json') {
+    return;
+  }
+
+  // Network-first strategy for HTML files (index.html, root path, etc.)
+  // This ensures users always get the latest version when the service worker updates
+  // HTML files are NOT cached to prevent serving old versions after updates
+  if (url.pathname === '/' || url.pathname === '/index.html' || 
+      (request.headers.get('accept') && request.headers.get('accept').includes('text/html'))) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Don't cache HTML - always fetch fresh to ensure users get latest version
+          return response;
+        })
+        .catch(() => {
+          // If network fails, try cache as fallback (offline support)
+          return caches.match(request);
+        })
+    );
     return;
   }
 
@@ -106,19 +129,14 @@ self.addEventListener('fetch', (event) => {
           return response;
         }
 
-        // Don't cache HTML responses for static asset requests
+        // Don't cache HTML responses - they should use network-first strategy
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('text/html')) {
-          // If this is a static asset request but got HTML, something is wrong
-          if (url.pathname.startsWith('/static/') || 
-              url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-            console.error('Service Worker: Got HTML instead of static asset for:', url.pathname);
-            return response; // Return it but don't cache
-          }
+          // Don't cache HTML - return it but don't store it
           return response;
         }
 
-        // Clone the response for caching
+        // Clone the response for caching (only for non-HTML static assets)
         const responseToCache = response.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(request, responseToCache);
@@ -209,7 +227,7 @@ self.addEventListener('notificationclick', (event) => {
 
   // Open or focus the app
   event.waitUntil(
-      clients.matchAll({type: 'window', includeUncontrolled: true}).then((clientList) => {
+      self.clients.matchAll({type: 'window', includeUncontrolled: true}).then((clientList) => {
         // If app is already open, focus it
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
@@ -218,8 +236,8 @@ self.addEventListener('notificationclick', (event) => {
           }
         }
         // Otherwise, open a new window
-        if (clients.openWindow) {
-          return clients.openWindow('/');
+        if (self.clients.openWindow) {
+          return self.clients.openWindow('/');
         }
       })
   );

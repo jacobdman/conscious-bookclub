@@ -18,10 +18,11 @@ export const addBook = async (clubId, book) => {
 
 export const updateBook = async (clubId, bookId, updates) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
-  await apiCall(`/v1/books/${bookId}?${params}`, {
+  const result = await apiCall(`/v1/books/${bookId}?${params}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
+  return result;
 };
 
 export const deleteBook = async (clubId, bookId) => {

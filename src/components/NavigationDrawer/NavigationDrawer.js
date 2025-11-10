@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -27,6 +27,15 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
   // FeedContext may not be available if not on Feed page, so use useContext with try/catch
   const feedContext = useContext(FeedContext);
   const unreadCount = feedContext?.unreadCount || 0;
+  const [appVersion, setAppVersion] = useState('');
+
+  // Fetch app version
+  useEffect(() => {
+    fetch('/version.json')
+      .then((res) => res.json())
+      .then((data) => setAppVersion(data.version || ''))
+      .catch(() => setAppVersion(''));
+  }, []);
 
   // Organize menu items into logical groups
   const clubManagementItems = currentClub?.role === 'owner' ? [
@@ -151,12 +160,12 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
             {mainNavigationItems.map((item) => {
               const showBadge = item.name === 'Feed' && unreadCount > 0;
               return (
-                <ListItem 
-                  button 
-                  key={item.name}
-                  onClick={() => handleNavigation(item.path)}
-                  selected={location.pathname === item.path}
-                >
+              <ListItem 
+                button 
+                key={item.name}
+                onClick={() => handleNavigation(item.path)}
+                selected={location.pathname === item.path}
+              >
                   <ListItemText 
                     primary={
                       showBadge ? (
@@ -185,7 +194,7 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
                       )
                     } 
                   />
-                </ListItem>
+              </ListItem>
               );
             })}
           </List>
@@ -269,6 +278,21 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
               />
             </ListItem>
           </List>
+          {appVersion && (
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                display: 'block',
+                textAlign: 'center',
+                color: 'text.secondary',
+                fontSize: '0.65rem',
+                mt: 1,
+                opacity: 0.6
+              }}
+            >
+              v{appVersion}
+            </Typography>
+          )}
         </Box>
       </Box>
     </Drawer>

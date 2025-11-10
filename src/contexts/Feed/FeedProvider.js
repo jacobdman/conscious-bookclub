@@ -152,8 +152,24 @@ const FeedProvider = ({ children }) => {
           
           // Check if post already exists in state before processing
           setPosts(prev => {
-            // Double-check if post already exists in state (avoid duplicates)
-            // Use strict comparison to handle both number and string IDs
+            // First, check if there's an optimistic post to replace
+            // Match by authorId and text (since optimistic posts have temp IDs)
+            const optimisticPost = prev.find(p => 
+              p.isOptimistic && 
+              p.authorId === postData.authorId && 
+              p.text === postData.text
+            );
+            
+            if (optimisticPost) {
+              // Replace optimistic post with real one
+              return prev.map(p => 
+                p.tempId === optimisticPost.tempId 
+                  ? { ...postData, isOptimistic: false }
+                  : p
+              );
+            }
+            
+            // No optimistic post found, check if post already exists (avoid duplicates)
             const existingPost = prev.find(p => {
               const prevId = p.id?.toString();
               return prevId === postId;
@@ -280,6 +296,28 @@ const FeedProvider = ({ children }) => {
   const createPost = useCallback(async (postData) => {
     if (!user || !currentClub) return;
 
+    // Create optimistic post immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticPost = {
+      id: tempId,
+      text: postData.text,
+      authorId: user.uid,
+      authorName: user.displayName || user.email,
+      author: {
+        uid: user.uid,
+        displayName: user.displayName || user.email,
+        photoUrl: user.photoURL || null,
+      },
+      clubId: currentClub.id,
+      created_at: new Date().toISOString(),
+      reactions: [],
+      isOptimistic: true,
+      tempId: tempId, // Store tempId for matching later
+    };
+
+    // Add optimistic post to state immediately
+    setPosts(prev => [optimisticPost, ...prev]);
+
     try {
       const newPost = await createPostService(currentClub.id, {
         ...postData,
@@ -287,11 +325,24 @@ const FeedProvider = ({ children }) => {
         authorName: user.displayName || user.email,
       });
       
-      // Socket.io will handle adding to state via event
-      // No need for optimistic update - Socket.io event will arrive immediately
+      // Socket.io event will replace optimistic post, but if it doesn't arrive,
+      // we'll replace it manually after a short delay
+      setTimeout(() => {
+        setPosts(prev => {
+          // Check if optimistic post still exists (Socket.io didn't replace it)
+          const stillHasOptimistic = prev.some(p => p.tempId === tempId);
+          if (stillHasOptimistic) {
+            // Replace optimistic post with real one
+            return prev.map(p => p.tempId === tempId ? { ...newPost, isOptimistic: false } : p);
+          }
+          return prev;
+        });
+      }, 2000);
       
       return newPost;
     } catch (err) {
+      // Remove optimistic post on error
+      setPosts(prev => prev.filter(p => p.tempId !== tempId));
       setError('Failed to create post');
       console.error('Error creating post:', err);
       throw err;
@@ -301,6 +352,29 @@ const FeedProvider = ({ children }) => {
   const createReply = useCallback(async (parentPostId, replyData) => {
     if (!user || !currentClub) return;
 
+    // Create optimistic reply immediately
+    const tempId = `temp-reply-${Date.now()}`;
+    const optimisticReply = {
+      id: tempId,
+      text: replyData.text,
+      parentPostId,
+      authorId: user.uid,
+      authorName: user.displayName || user.email,
+      author: {
+        uid: user.uid,
+        displayName: user.displayName || user.email,
+        photoUrl: user.photoURL || null,
+      },
+      clubId: currentClub.id,
+      created_at: new Date().toISOString(),
+      reactions: [],
+      isOptimistic: true,
+      tempId: tempId,
+    };
+
+    // Add optimistic reply to state immediately
+    setPosts(prev => [optimisticReply, ...prev]);
+
     try {
       const newReply = await createPostService(currentClub.id, {
         ...replyData,
@@ -309,11 +383,24 @@ const FeedProvider = ({ children }) => {
         parentPostId,
       });
       
-      // Socket.io will handle adding to state via event
-      // No need for optimistic update - Socket.io event will arrive immediately
+      // Socket.io event will replace optimistic reply, but if it doesn't arrive,
+      // we'll replace it manually after a short delay
+      setTimeout(() => {
+        setPosts(prev => {
+          // Check if optimistic reply still exists (Socket.io didn't replace it)
+          const stillHasOptimistic = prev.some(p => p.tempId === tempId);
+          if (stillHasOptimistic) {
+            // Replace optimistic reply with real one
+            return prev.map(p => p.tempId === tempId ? { ...newReply, isOptimistic: false } : p);
+          }
+          return prev;
+        });
+      }, 2000);
       
       return newReply;
     } catch (err) {
+      // Remove optimistic reply on error
+      setPosts(prev => prev.filter(p => p.tempId !== tempId));
       setError('Failed to create reply');
       console.error('Error creating reply:', err);
       throw err;

@@ -252,8 +252,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
 
       if (editingBook) {
         // Update existing book
-        await updateBook(currentClub.id, editingBook.id, bookData);
-        onBookAdded(); // No new book data for updates
+        const updatedBook = await updateBook(currentClub.id, editingBook.id, bookData);
+        onBookAdded(updatedBook); // Pass the updated book data
       } else {
         // Add new book
         const newBookRef = await addBook(currentClub.id, bookData);

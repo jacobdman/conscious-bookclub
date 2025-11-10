@@ -27,9 +27,9 @@ import {
   updateGoalEntry,
   deleteGoalEntry,
   updateMilestone,
-  updateGoal,
 } from 'services/goals/goals.service';
 import useClubContext from 'contexts/Club';
+import useGoalsContext from 'contexts/Goals';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
 import { 
   getPeriodBoundaries, 
@@ -38,9 +38,10 @@ import {
   formatDate,
 } from 'utils/goalHelpers';
 
-const GoalDetailsModal = ({ open, onClose, goal }) => {
+const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
+  const { goals, updateGoal: updateGoalInContext } = useGoalsContext();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -50,6 +51,10 @@ const GoalDetailsModal = ({ open, onClose, goal }) => {
   const currentOffset = useRef(0);
   const INITIAL_LIMIT = 10;
   const LOAD_MORE_LIMIT = 10;
+
+  // Get the current goal from the provider context to ensure we have the latest version
+  // This ensures the UI updates when milestones are toggled
+  const goal = goalProp?.id ? goals.find(g => g.id === goalProp.id) || goalProp : goalProp;
 
   const fetchEntries = useCallback(async (offset = 0, limit = INITIAL_LIMIT, append = false) => {
     if (!user || !goal || (goal.type !== 'habit' && goal.type !== 'metric') || !goal.cadence) {
@@ -66,10 +71,26 @@ const GoalDetailsModal = ({ open, onClose, goal }) => {
       // For habit/metric goals, fetch all entries (no period filter for full history)
       const fetchedEntries = await getGoalEntries(user.uid, goal.id, null, null, limit, offset);
 
+      // Sort entries by occurred_at (habit date) in descending order (most recent first)
+      // Handle both occurred_at and occurredAt field names for compatibility
+      const sortedEntries = fetchedEntries.sort((a, b) => {
+        const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+        const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+        return dateB - dateA; // Descending order (newest first)
+      });
+
       if (append) {
-        setEntries(prev => [...prev, ...fetchedEntries]);
+        setEntries(prev => {
+          // Combine and re-sort all entries
+          const combined = [...prev, ...sortedEntries];
+          return combined.sort((a, b) => {
+            const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+            const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+            return dateB - dateA; // Descending order (newest first)
+          });
+        });
       } else {
-        setEntries(fetchedEntries);
+        setEntries(sortedEntries);
       }
 
       // Check if there are more entries to load
@@ -148,13 +169,28 @@ const GoalDetailsModal = ({ open, onClose, goal }) => {
       let savedEntry;
       if (isUpdate) {
         savedEntry = await updateGoalEntry(user.uid, goal.id, entryDialog.entry.id, entryData);
-        setEntries(prev => prev.map(e => 
-          e.id === entryDialog.entry.id ? { ...e, ...entryData, ...savedEntry } : e
-        ));
+        setEntries(prev => {
+          // Update the entry and re-sort by occurred_at
+          const updated = prev.map(e => 
+            e.id === entryDialog.entry.id ? { ...e, ...entryData, ...savedEntry } : e
+          );
+          return updated.sort((a, b) => {
+            const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+            const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+            return dateB - dateA; // Descending order (newest first)
+          });
+        });
       } else {
         savedEntry = await createGoalEntry(user.uid, goal.id, entryData);
-        // Add to beginning of list (most recent first)
-        setEntries(prev => [savedEntry, ...prev]);
+        // Add entry and sort by occurred_at (most recent first)
+        setEntries(prev => {
+          const combined = [savedEntry, ...prev];
+          return combined.sort((a, b) => {
+            const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+            const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+            return dateB - dateA; // Descending order (newest first)
+          });
+        });
       }
       
       setEntryDialog({ open: false, entry: null, saving: false, error: null });
@@ -168,10 +204,31 @@ const GoalDetailsModal = ({ open, onClose, goal }) => {
   };
 
   const handleToggleMilestone = async (milestone) => {
-    if (!user || !goal) return;
+    if (!user || !goal || !currentClub) return;
+
+    const newDoneState = !milestone.done;
 
     try {
-      await updateMilestone(user.uid, goal.id, milestone.id, { done: !milestone.done });
+      await updateMilestone(user.uid, goal.id, milestone.id, { done: newDoneState });
+      
+      // Update the goal in the context provider so it updates everywhere
+      // Update the milestones array with the new state
+      const updatedMilestones = (goal.milestones || []).map(m => {
+        if (m.id === milestone.id) {
+          return {
+            ...m,
+            done: newDoneState,
+            doneAt: newDoneState ? new Date().toISOString() : null,
+          };
+        }
+        return m;
+      });
+      
+      // Use the context's updateGoal to update the goal, which will update the provider state
+      await updateGoalInContext(goal.id, {
+        milestones: updatedMilestones,
+      });
+      
       // Refresh entries to update any related data
       if (goal.type === 'habit' || goal.type === 'metric') {
         fetchEntries(0, currentOffset.current || INITIAL_LIMIT, false);
@@ -187,11 +244,11 @@ const GoalDetailsModal = ({ open, onClose, goal }) => {
     const newCompleted = !goal.completed;
 
     try {
-      await updateGoal(user.uid, currentClub.id, goal.id, {
+      // Use the context's updateGoal to update the goal, which will update the provider state
+      await updateGoalInContext(goal.id, {
         completed: newCompleted,
         completedAt: newCompleted ? new Date().toISOString() : null,
       });
-      // The goal will be updated in the context automatically
     } catch (err) {
       console.error('Failed to update goal:', err);
     }

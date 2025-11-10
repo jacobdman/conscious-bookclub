@@ -23,16 +23,20 @@ const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null, saving = f
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
 
   useEffect(() => {
-    if (entry) {
-      setFormData({
-        occurred_at: entry.occurred_at ? new Date(entry.occurred_at) : new Date(),
-        quantity: entry.quantity || null,
-      });
-    } else {
-      setFormData({
-        occurred_at: new Date(),
-        quantity: goal?.type === 'metric' ? 0 : null,
-      });
+    if (open) {
+      if (entry) {
+        // Handle both occurred_at and occurredAt field names
+        const occurredAt = entry.occurred_at || entry.occurredAt;
+        setFormData({
+          occurred_at: occurredAt ? new Date(occurredAt) : new Date(),
+          quantity: entry.quantity || null,
+        });
+      } else {
+        setFormData({
+          occurred_at: new Date(),
+          quantity: goal?.type === 'metric' ? 0 : null,
+        });
+      }
     }
   }, [entry, goal, open]);
 

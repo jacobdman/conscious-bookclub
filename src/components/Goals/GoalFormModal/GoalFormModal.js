@@ -47,9 +47,18 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
   // Helper function to convert various date formats to Date object
   const parseDate = (dateValue) => {
     if (!dateValue) return null;
-    if (dateValue instanceof Date) return dateValue;
-    if (typeof dateValue === 'string') return new Date(dateValue);
-    return new Date(dateValue);
+    if (dateValue instanceof Date) {
+      // Check if it's a valid date
+      return isNaN(dateValue.getTime()) ? null : dateValue;
+    }
+    if (typeof dateValue === 'string') {
+      const parsed = new Date(dateValue);
+      // Check if it's a valid date
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+    const parsed = new Date(dateValue);
+    // Check if it's a valid date
+    return isNaN(parsed.getTime()) ? null : parsed;
   };
 
   useEffect(() => {

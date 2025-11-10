@@ -99,7 +99,12 @@ const Meetings = () => {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ 
+        p: 3, 
+        height: '100%', 
+        overflowY: 'auto', 
+        overflowX: 'hidden' 
+      }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4">Meetings</Typography>
           <Button

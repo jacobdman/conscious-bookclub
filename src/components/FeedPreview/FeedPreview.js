@@ -18,7 +18,8 @@ const FeedPreview = () => {
   const [showReactionsMap, setShowReactionsMap] = React.useState({});
 
   // Get latest 3 posts (they're already sorted newest first)
-  const latestPosts = posts.slice(0, 3);
+  // Reverse so latest appears at bottom
+  const latestPosts = posts.slice(0, 3).reverse();
 
   const formatTime = (dateString) => {
     try {

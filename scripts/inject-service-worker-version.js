@@ -1,15 +1,21 @@
 const fs = require('fs');
 const path = require('path');
 
-// Read version from public/version.json
-const versionPath = path.join(__dirname, '..', 'public', 'version.json');
-const versionData = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
-const version = versionData.version;
+// Read version from package.json (source of truth)
+const packageJsonPath = path.join(__dirname, '..', 'package.json');
+const packageData = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+const version = packageData.version;
 
 if (!version) {
-  console.error('Error: Version not found in public/version.json');
+  console.error('Error: Version not found in package.json');
   process.exit(1);
 }
+
+// Update version.json to match package.json
+const versionJsonPath = path.join(__dirname, '..', 'public', 'version.json');
+const versionJsonData = { version };
+fs.writeFileSync(versionJsonPath, JSON.stringify(versionJsonData, null, 2) + '\n', 'utf8');
+console.log(`✓ Synced version.json to ${version} from package.json`);
 
 // Read service worker template
 const swTemplatePath = path.join(__dirname, '..', 'public', 'service-worker.js');

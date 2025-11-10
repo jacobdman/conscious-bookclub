@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
-import { getBooks } from 'services/books/books.service';
 import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -26,45 +25,55 @@ const Dashboard = () => {
         return;
       }
       
-      // Fetch both books and meetings
-      const [books, meetings] = await Promise.all([
-        getBooks(currentClub.id),
-        getMeetings(currentClub.id)
-      ]);
-      
-      const allBooksData = books.map(book => ({ id: book.id, ...book }));
-      
-      // Create a map of bookId -> earliest upcoming meeting date
+      // Get today's date in YYYY-MM-DD format for start_date filter
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Start of today
+      today.setHours(0, 0, 0, 0);
+      const startDate = today.toISOString().split('T')[0];
       
-      const bookMeetingDates = {};
+      // Fetch meetings with user progress included and filtered by start_date
+      const meetings = await getMeetings(currentClub.id, user.uid, startDate);
+      
+      // Extract books from meetings, including progress from the meeting response
+      const bookMap = new Map();
+      
       meetings.forEach(meeting => {
-        if (meeting.bookId) {
-          const meetingDate = new Date(meeting.date);
-          meetingDate.setHours(0, 0, 0, 0);
+        if (meeting.book && meeting.bookId) {
+          const bookId = meeting.book.id || meeting.bookId;
           
-          // Only include meetings that are today or in the future
-          if (meetingDate >= today) {
-            if (!bookMeetingDates[meeting.bookId] || meetingDate < new Date(bookMeetingDates[meeting.bookId])) {
-              bookMeetingDates[meeting.bookId] = meeting.date;
+          // If we haven't seen this book yet, or this meeting is earlier, update it
+          if (!bookMap.has(bookId)) {
+            const bookData = {
+              id: bookId,
+              ...meeting.book,
+              progress: meeting.book.progress || null, // Progress is nested in book.progress
+            };
+            bookMap.set(bookId, {
+              book: bookData,
+              meetingDate: meeting.date,
+            });
+          } else {
+            const existing = bookMap.get(bookId);
+            const meetingDate = new Date(meeting.date);
+            const existingDate = new Date(existing.meetingDate);
+            if (meetingDate < existingDate) {
+              // This meeting is earlier, update the meeting date
+              bookMap.set(bookId, {
+                ...existing,
+                meetingDate: meeting.date,
+              });
             }
           }
         }
       });
       
-      // Filter books that have upcoming meetings
-      const upcomingBooks = allBooksData.filter(book => {
-        return bookMeetingDates[book.id] !== undefined;
-      });
-      
-      // Sort by meeting date (earliest first)
-      upcomingBooks.sort((a, b) => {
-        const dateA = new Date(bookMeetingDates[a.id]);
-        const dateB = new Date(bookMeetingDates[b.id]);
-        
-        return dateA - dateB;
-      });
+      // Convert map to array and sort by meeting date
+      const upcomingBooks = Array.from(bookMap.values())
+        .sort((a, b) => {
+          const aDate = new Date(a.meetingDate);
+          const bDate = new Date(b.meetingDate);
+          return aDate - bDate;
+        })
+        .map(item => item.book);
       
       setCurrentBooks(upcomingBooks);
     } catch (err) {
@@ -87,7 +96,7 @@ const Dashboard = () => {
   return (
     <GoalsProvider>
       <FeedProvider>
-        <Layout>
+      <Layout>
           <Box 
             sx={{ 
               p: 2, 
@@ -99,25 +108,25 @@ const Dashboard = () => {
               overflowX: 'hidden',
             }}
           >
-            <PWAInstallPrompt />
-            <NotificationPrompt />
-            {currentClub && (
-              <Typography variant="h5" sx={{ mb: 1 }}>
-                {currentClub.name}
-              </Typography>
-            )}
-            {currentClub && (
-              <HabitConsistencyLeaderboardWithData />
-            )}
-            <NextMeetingCard />
-            
-            <QuickGoalCompletion />
-            
-            <CurrentBooksSection books={currentBooks} />
-            
+          <PWAInstallPrompt />
+          <NotificationPrompt />
+          {currentClub && (
+            <Typography variant="h5" sx={{ mb: 1 }}>
+              {currentClub.name}
+            </Typography>
+          )}
+          {currentClub && (
+            <HabitConsistencyLeaderboardWithData />
+          )}
+          <NextMeetingCard />
+          
+          <QuickGoalCompletion />
+          
+          <CurrentBooksSection books={currentBooks} />
+          
             <FeedPreview />
-          </Box>
-        </Layout>
+        </Box>
+      </Layout>
       </FeedProvider>
     </GoalsProvider>
   );

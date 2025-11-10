@@ -154,7 +154,12 @@ const Profile = () => {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ 
+        p: 3, 
+        height: '100%', 
+        overflowY: 'auto', 
+        overflowX: 'hidden' 
+      }}>
         <Paper sx={{ p: 3, mb: 3 }}>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>

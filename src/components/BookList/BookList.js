@@ -344,11 +344,52 @@ const BookList = () => {
     return new Date(date).toLocaleDateString();
   };
 
-  const handleBookAdded = (newBook) => {
-    // Always clear cache and reload data for both new books and edits
-    clearCache(); // Invalidate cache
-    loadMetadata();
-    loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
+  const handleBookAdded = (book) => {
+    if (!book) {
+      // No book data provided, fallback to re-fetch
+      clearCache();
+      loadMetadata();
+      loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
+      setEditingBook(null);
+      return;
+    }
+
+    // Check if this is an update (book exists in current page) or a new book
+    const existingBookIndex = books.findIndex(b => b.id === book.id);
+    
+    if (existingBookIndex !== -1) {
+      // Update existing book in memory
+      setBooks(prev => {
+        const updated = [...prev];
+        updated[existingBookIndex] = { ...updated[existingBookIndex], ...book };
+        return updated;
+      });
+      
+      // Update cache for current page
+      const cacheKey = getCacheKey(currentPage, selectedTheme, selectedFilter, pageSize);
+      setPageCache(prev => {
+        const cached = prev[cacheKey];
+        if (cached) {
+          const updatedBooks = cached.books.map(b => 
+            b.id === book.id ? { ...b, ...book } : b
+          );
+          return {
+            ...prev,
+            [cacheKey]: { ...cached, books: updatedBooks }
+          };
+        }
+        return prev;
+      });
+      
+      // Update metadata if needed (for new books, total count increases)
+      // For updates, we don't need to reload metadata
+    } else {
+      // New book - need to reload to see it in the list
+      clearCache();
+      loadMetadata();
+      loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
+    }
+    
     setEditingBook(null); // Clear editing state
   };
 
@@ -393,7 +434,12 @@ const BookList = () => {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ 
+        p: 3, 
+        height: '100%', 
+        overflowY: 'auto', 
+        overflowX: 'hidden' 
+      }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Box>
             <Typography variant="h4" gutterBottom>

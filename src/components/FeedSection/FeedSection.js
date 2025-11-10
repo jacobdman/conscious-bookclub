@@ -7,8 +7,9 @@ import {
   CircularProgress,
   Paper,
   Badge,
+  Fab,
 } from '@mui/material';
-import { Send } from '@mui/icons-material';
+import { Send, KeyboardArrowDown } from '@mui/icons-material';
 import useFeedContext from 'contexts/Feed';
 import PostCard from 'components/PostCard';
 
@@ -16,6 +17,7 @@ const FeedSection = () => {
   const { posts, loading, loadingMore, error, createPost, unreadCount, hasMore, loadMorePosts } = useFeedContext();
   const [newPostText, setNewPostText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -118,6 +120,25 @@ const FeedSection = () => {
     };
   }, [hasMore, loadingMore, loadMorePosts]);
 
+  // Detect scroll position for scroll-to-bottom FAB
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
+      setShowScrollToBottom(!isNearBottom);
+    };
+
+    // Check initial position
+    handleScroll();
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [posts]); // Re-check when posts change
+
   const handleCreatePost = async () => {
     if (!newPostText.trim() || isSubmitting) return;
 
@@ -149,6 +170,7 @@ const FeedSection = () => {
         flex: 1,
         backgroundColor: 'background.default',
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
       {/* Feed Header */}
@@ -248,6 +270,28 @@ const FeedSection = () => {
         )}
       </Box>
 
+      {/* Scroll-to-bottom FAB */}
+      {showScrollToBottom && (
+        <Fab
+          size="small"
+          color="primary"
+          onClick={scrollToBottom}
+          sx={{
+            position: 'absolute',
+            bottom: 80,
+            right: 16,
+            zIndex: 11,
+            transition: 'opacity 0.2s, transform 0.2s',
+            '&:hover': {
+              transform: 'scale(1.1)',
+            },
+          }}
+          aria-label="Scroll to bottom"
+        >
+          <KeyboardArrowDown />
+        </Fab>
+      )}
+
       {/* Input Area - Sticky at bottom */}
       <Paper
         elevation={0}
@@ -299,7 +343,7 @@ const FeedSection = () => {
           </IconButton>
         </Box>
       </Paper>
-    </Box>
+              </Box>
   );
 };
 
