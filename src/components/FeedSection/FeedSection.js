@@ -6,27 +6,117 @@ import {
   IconButton,
   CircularProgress,
   Paper,
+  Badge,
 } from '@mui/material';
 import { Send } from '@mui/icons-material';
 import useFeedContext from 'contexts/Feed';
 import PostCard from 'components/PostCard';
 
 const FeedSection = () => {
-  const { posts, loading, error, createPost } = useFeedContext();
+  const { posts, loading, loadingMore, error, createPost, unreadCount, hasMore, loadMorePosts } = useFeedContext();
   const [newPostText, setNewPostText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const justLoadedMoreRef = useRef(false); // Track if we just loaded older posts
+  const previousFirstPostIdRef = useRef(null); // Track first post ID to detect new posts
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Scroll to bottom when new posts arrive (but not when loading more at top)
   useEffect(() => {
-    if (!loading && posts.length > 0) {
+    if (posts.length === 0) {
+      previousFirstPostIdRef.current = null;
+      return;
+    }
+
+    const currentFirstPostId = posts[0]?.id;
+    
+    // Only auto-scroll if:
+    // 1. Not loading initial posts
+    // 2. Not currently loading more
+    // 3. Didn't just load older posts (flag prevents auto-scroll)
+    // 4. First post changed (new posts added at beginning) OR initial load
+    if (
+      !loading && 
+      !loadingMore && 
+      !justLoadedMoreRef.current &&
+      (previousFirstPostIdRef.current === null || currentFirstPostId !== previousFirstPostIdRef.current)
+    ) {
       scrollToBottom();
     }
-  }, [posts, loading]);
+    
+    // Update the tracked first post ID
+    previousFirstPostIdRef.current = currentFirstPostId;
+    
+    // Reset the flag after posts have rendered
+    if (justLoadedMoreRef.current) {
+      const timer = setTimeout(() => {
+        justLoadedMoreRef.current = false;
+      }, 300); // Keep flag set longer to prevent auto-scroll
+      return () => clearTimeout(timer);
+    }
+  }, [posts, loading, loadingMore]);
+
+  // Detect scroll to top and load more posts
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer || !hasMore) return;
+
+    let isLoading = false; // Prevent multiple simultaneous loads
+    let scrollTimeout = null;
+
+    const handleScroll = () => {
+      // Debounce scroll events
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+
+      scrollTimeout = setTimeout(() => {
+        // Check if scrolled near the top (within 200px) and not already loading
+        if (scrollContainer.scrollTop < 200 && !isLoading && !loadingMore) {
+          isLoading = true;
+          justLoadedMoreRef.current = true; // Mark that we're loading older posts
+          const scrollHeightBefore = scrollContainer.scrollHeight;
+          const scrollTopBefore = scrollContainer.scrollTop;
+          
+          loadMorePosts().then(() => {
+            // After loading, preserve scroll position
+            // New content is added at the end of array (older posts), which appear at top after reversing
+            // So we need to adjust scroll position to account for the new content height
+            // Use multiple requestAnimationFrame calls to ensure DOM has fully updated
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                const scrollHeightAfter = scrollContainer.scrollHeight;
+                const heightDifference = scrollHeightAfter - scrollHeightBefore;
+                // Adjust scroll position to keep the same content visible
+                // Since older posts are added at the end of array (top after reversing),
+                // we add the height difference to maintain position
+                if (heightDifference > 0) {
+                  scrollContainer.scrollTop = scrollTopBefore + heightDifference;
+                }
+                isLoading = false;
+              });
+            });
+          }).catch(() => {
+            isLoading = false;
+            justLoadedMoreRef.current = false;
+          });
+        }
+      }, 100); // 100ms debounce
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+    };
+  }, [hasMore, loadingMore, loadMorePosts]);
 
   const handleCreatePost = async () => {
     if (!newPostText.trim() || isSubmitting) return;
@@ -61,8 +151,47 @@ const FeedSection = () => {
         overflow: 'hidden',
       }}
     >
+      {/* Feed Header */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
+        }}
+      >
+        <Typography variant="h6" component="h1" sx={{ display: 'inline-flex', alignItems: 'center' }}>
+          {unreadCount > 0 ? (
+            <Badge 
+              badgeContent={unreadCount > 99 ? '99+' : unreadCount} 
+              color="error"
+              anchorOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              sx={{
+                '& .MuiBadge-badge': {
+                  fontSize: '0.7rem',
+                  minWidth: '18px',
+                  height: '18px',
+                  padding: '0 4px',
+                  top: -4,
+                  right: -8,
+                },
+              }}
+            >
+              <span>Feed</span>
+            </Badge>
+          ) : (
+            'Feed'
+          )}
+        </Typography>
+      </Box>
+
       {/* Messages Feed - Scrollable */}
       <Box
+        ref={scrollContainerRef}
         sx={{
           flex: 1,
           overflowY: 'auto',
@@ -72,9 +201,16 @@ const FeedSection = () => {
           flexDirection: 'column',
         }}
       >
+        {/* Loading More Indicator (at top) */}
+        {loadingMore && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+            <CircularProgress size={20} />
+          </Box>
+        )}
+
         {/* Loading State */}
         {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3, mt: 'auto' }}>
             <CircularProgress size={24} />
           </Box>
         )}

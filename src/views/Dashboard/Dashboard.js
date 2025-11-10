@@ -10,7 +10,7 @@ import Layout from 'components/Layout';
 import NextMeetingCard from 'components/NextMeetingCard';
 import CurrentBooksSection from 'components/CurrentBooksSection';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
-import FeedSection from 'components/FeedSection';
+import FeedPreview from 'components/FeedPreview';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
 import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
@@ -79,11 +79,26 @@ const Dashboard = () => {
     }
   }, [user, fetchBooks]);
 
+  // Ensure page starts at top when Dashboard loads
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <GoalsProvider>
       <FeedProvider>
         <Layout>
-          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box 
+            sx={{ 
+              p: 2, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 2,
+              height: '100%',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+            }}
+          >
             <PWAInstallPrompt />
             <NotificationPrompt />
             {currentClub && (
@@ -100,7 +115,7 @@ const Dashboard = () => {
             
             <CurrentBooksSection books={currentBooks} />
             
-            <FeedSection />
+            <FeedPreview />
           </Box>
         </Layout>
       </FeedProvider>

@@ -1,30 +1,72 @@
 const db = require("../../../../db/models/index");
-const {getIO} = require("../../../socket/socket");
 
-// Helper to emit Socket.io events
-const emitToClub = (clubId, event, data) => {
+// Helper to emit Socket.io events via Cloud Run service
+const emitToClub = async (clubId, event, data) => {
   try {
-    const io = getIO();
+    // Determine Socket.io service URL
+    // In production: use Cloud Run service URL
+    // In local dev: use localhost
+    const isEmulator = process.env.FUNCTIONS_EMULATOR === "true" ||
+                       process.env.GCLOUD_PROJECT === "demo-test" ||
+                       !process.env.GCLOUD_PROJECT;
+
+    const socketServiceUrl = isEmulator ?
+      "http://localhost:3001" : // Local development
+      process.env.SOCKET_SERVICE_URL || "https://socket-service-x3bxvqpcca-uc.a.run.app"; // Production
+
     const room = `club:${clubId}`;
-    io.to(room).emit(event, data);
+
+    // Make HTTP POST to Socket.io service /emit endpoint
+    const response = await fetch(`${socketServiceUrl}/emit`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        room,
+        event,
+        data,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to emit ${event} to ${room}:`, response.status, response.statusText);
+    }
   } catch (error) {
-    // Socket.io not initialized yet, that's okay
-    console.log("Socket.io not available:", error.message);
+    // Don't throw - Socket.io events are best-effort, don't break the API response
+    console.log("Socket.io emit failed (non-critical):", error.message);
   }
 };
 
-// GET /v1/posts - Get all posts
+// GET /v1/posts - Get posts with pagination
 const getPosts = async (req, res, next) => {
   try {
-    const {clubId} = req.query;
+    const {clubId, limit, beforeId} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
       throw error;
     }
+
+    // Default to 25 posts, max 100
+    const limitNum = limit ? Math.min(parseInt(limit, 10), 100) : 25;
+
+    const whereClause = {clubId: parseInt(clubId)};
+
+    // If beforeId is provided, only get posts older than that post
+    if (beforeId) {
+      const beforePost = await db.Post.findByPk(parseInt(beforeId));
+      if (beforePost) {
+        whereClause.created_at = {
+          [db.Op.lt]: beforePost.created_at,
+        };
+      }
+    }
+
     const posts = await db.Post.findAll({
-      where: {clubId: parseInt(clubId)},
+      where: whereClause,
       order: [["created_at", "DESC"]],
+      limit: limitNum + 1, // Fetch one extra to check if there are more
       include: [
         {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
         {
@@ -34,7 +76,17 @@ const getPosts = async (req, res, next) => {
         },
       ],
     });
-    res.json(posts.map((post) => ({id: post.id, ...post.toJSON()})));
+
+    // Check if there are more posts
+    const hasMore = posts.length > limitNum;
+    const postsToReturn = hasMore ? posts.slice(0, limitNum) : posts;
+
+    res.json({
+      posts: postsToReturn.map((post) => ({id: post.id, ...post.toJSON()})),
+      hasMore,
+      // Return the oldest post's ID for next pagination
+      nextBeforeId: hasMore ? postsToReturn[postsToReturn.length - 1].id : null,
+    });
   } catch (e) {
     next(e);
   }
@@ -122,8 +174,8 @@ const createPost = async (req, res, next) => {
       ],
     });
 
-    // Emit Socket.io event
-    emitToClub(clubIdInt, "post:created", {id: post.id, ...postWithAssociations.toJSON()});
+    // Emit Socket.io event via Cloud Run service
+    await emitToClub(clubIdInt, "post:created", {id: post.id, ...postWithAssociations.toJSON()});
 
     res.status(201).json({id: post.id, ...postWithAssociations.toJSON()});
   } catch (e) {
@@ -183,8 +235,8 @@ const addReaction = async (req, res, next) => {
       include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
     });
 
-    // Emit Socket.io event
-    emitToClub(parseInt(clubId), "reaction:added", {
+    // Emit Socket.io event via Cloud Run service
+    await emitToClub(parseInt(clubId), "reaction:added", {
       postId: parseInt(postId),
       reaction: reaction.toJSON(),
       reactions: reactions.map((r) => r.toJSON()),
@@ -243,8 +295,8 @@ const removeReaction = async (req, res, next) => {
       include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
     });
 
-    // Emit Socket.io event
-    emitToClub(parseInt(clubId), "reaction:removed", {
+    // Emit Socket.io event via Cloud Run service
+    await emitToClub(parseInt(clubId), "reaction:removed", {
       postId: parseInt(postId),
       emoji: decodeURIComponent(emoji),
       userId,

@@ -1,13 +1,22 @@
 const {Server} = require("socket.io");
 const {getAuth} = require("firebase-admin/auth");
 
+// Use global singleton pattern to persist across module reloads
 let io = null;
 
 const initializeSocket = (server) => {
+  // Check global first (persists across module reloads)
+  if (global.socketIO) {
+    console.log("Using existing Socket.io instance from global");
+    return global.socketIO;
+  }
+
+  // Check module-level cache
   if (io) {
     return io;
   }
 
+  // Create new Socket.io instance
   io = new Server(server, {
     cors: {
       origin: true,
@@ -17,6 +26,9 @@ const initializeSocket = (server) => {
     path: "/socket.io/",
     transports: ["websocket", "polling"],
   });
+
+  // Store in global for persistence
+  global.socketIO = io;
 
   // Authentication middleware
   io.use(async (socket, next) => {
@@ -62,14 +74,22 @@ const initializeSocket = (server) => {
 };
 
 const getIO = () => {
-  if (!io) {
-    // Initialize a minimal server if not already initialized
-    // This is a fallback for when Socket.io is accessed before server setup
-    const http = require("http");
-    const server = http.createServer();
-    return initializeSocket(server);
+  // Check global first (persists across module reloads)
+  if (global.socketIO) {
+    return global.socketIO;
   }
-  return io;
+
+  // Check module-level cache
+  if (io) {
+    return io;
+  }
+
+  // Fallback: Initialize a minimal server if not already initialized
+  // This should rarely happen as socketFunction.js should initialize it first
+  console.warn("Socket.io not initialized, creating fallback instance");
+  const http = require("http");
+  const server = http.createServer();
+  return initializeSocket(server);
 };
 
 module.exports = {

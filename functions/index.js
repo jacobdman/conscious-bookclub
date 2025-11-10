@@ -4,7 +4,15 @@ const {onRequest} = require("firebase-functions/v2/https");
 const express = require("express");
 const cors = require("cors");
 
-// Initialize Firebase Admin
+// Explicitly disable Auth emulator - we want to use production Firebase Auth
+// This ensures tokens from production Auth can be verified even when running Functions locally
+if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+  console.log("⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth");
+  console.log("   Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth");
+  delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+}
+
+// Initialize Firebase Admin (will use production Firebase Auth)
 initializeApp();
 
 // Create Express app for API

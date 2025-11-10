@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Button, Chip, Popover, Typography, Avatar } from '@mui/material';
+import { Box, Button, Chip, Popover, Typography, Avatar, IconButton } from '@mui/material';
+import { AddReaction } from '@mui/icons-material';
 import useFeedContext from 'contexts/Feed';
 import { useAuth } from 'AuthContext';
 
@@ -11,7 +12,7 @@ const EMOJI_CATEGORIES = {
   'Reactions': ['👍', '👎', '❤️', '🔥', '😮', '😢', '😡', '🎉', '👏', '🙌', '😊', '😂', '😍', '🤔', '😴', '😎', '🤗', '😱', '😭', '😤'],
 };
 
-const EmojiInput = ({ postId, reactions = [] }) => {
+const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
   const { user } = useAuth();
   const { addReaction, removeReaction } = useFeedContext();
   const [anchorEl, setAnchorEl] = useState(null);
@@ -19,6 +20,7 @@ const EmojiInput = ({ postId, reactions = [] }) => {
   const [selectedEmoji, setSelectedEmoji] = useState(null);
   const longPressTimer = useRef(null);
   const touchStartTime = useRef(null);
+  const touchHandledRef = useRef(false); // Track if touch event already handled the click
 
   // Group reactions by emoji
   const reactionsByEmoji = reactions.reduce((acc, reaction) => {
@@ -61,11 +63,17 @@ const EmojiInput = ({ postId, reactions = [] }) => {
     }
   };
 
-  const handleReactionClick = async (emoji) => {
-    // Close user list if open
+  const handleReactionClick = async (emoji, event) => {
+    // If touch event already handled this (mobile quick tap), ignore click
+    if (touchHandledRef.current) {
+      touchHandledRef.current = false; // Reset for next interaction
+      return;
+    }
+
+    // Close user list if open (from hover on desktop)
     if (userListOpen) {
       handleUserListClose();
-      return; // Don't toggle reaction if user list was open
+      // Continue to toggle reaction after closing user list
     }
 
     const userReaction = reactionsByEmoji[emoji]?.find(r => r.userId === user?.uid);
@@ -95,26 +103,34 @@ const EmojiInput = ({ postId, reactions = [] }) => {
 
   const handleReactionTouchStart = (event, emoji) => {
     touchStartTime.current = Date.now();
+    touchHandledRef.current = false; // Reset flag
     longPressTimer.current = setTimeout(() => {
       setSelectedEmoji(emoji);
       setUserListAnchor(event.currentTarget);
+      touchHandledRef.current = true; // Mark as handled (long press)
       // Prevent click event from firing after long press
       event.preventDefault();
     }, 500); // 500ms for long press
   };
 
-  const handleReactionTouchEnd = (event) => {
+  const handleReactionTouchEnd = (event, emoji) => {
+    const touchDuration = Date.now() - (touchStartTime.current || 0);
+    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    // If it was a quick tap (not long press), don't show popup
-    const touchDuration = Date.now() - (touchStartTime.current || 0);
+    
+    // If it was a quick tap (not long press), toggle the reaction
     if (touchDuration < 500) {
       setUserListAnchor(null);
       setSelectedEmoji(null);
+      touchHandledRef.current = true; // Mark as handled to prevent click event
+      // Trigger the reaction toggle for quick tap
+      handleReactionClick(emoji, event);
     } else {
       // It was a long press, prevent the click
+      touchHandledRef.current = true; // Already handled by long press
       event.preventDefault();
     }
   };
@@ -159,11 +175,17 @@ const EmojiInput = ({ postId, reactions = [] }) => {
             <Chip
               key={emoji}
               label={`${emoji} ${count > 1 ? count : ''}`}
-              onClick={() => handleReactionClick(emoji)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReactionClick(emoji, e);
+              }}
               onMouseEnter={(e) => handleReactionMouseEnter(e, emoji)}
               onMouseLeave={handleReactionMouseLeave}
-              onTouchStart={(e) => handleReactionTouchStart(e, emoji)}
-              onTouchEnd={handleReactionTouchEnd}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                handleReactionTouchStart(e, emoji);
+              }}
+              onTouchEnd={(e) => handleReactionTouchEnd(e, emoji)}
               onTouchCancel={handleReactionTouchCancel}
               size="small"
               sx={{
@@ -182,23 +204,27 @@ const EmojiInput = ({ postId, reactions = [] }) => {
             />
           );
         })}
-        <Button
-          size="small"
-          onClick={handleOpenPicker}
-          sx={{
-            minWidth: 'auto',
-            padding: '2px 6px',
-            minHeight: 24,
-            fontSize: '0.75rem',
-            opacity: 0.6,
-            '&:hover': {
-              opacity: 1,
-              backgroundColor: 'action.hover',
-            },
-          }}
-        >
-          +
-        </Button>
+        {showAddButton && (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenPicker(e);
+            }}
+            sx={{
+              padding: '2px',
+              minHeight: 24,
+              minWidth: 24,
+              opacity: 0.6,
+              '&:hover': {
+                opacity: 1,
+                backgroundColor: 'action.hover',
+              },
+            }}
+          >
+            <AddReaction sx={{ fontSize: '1.1rem' }} />
+          </IconButton>
+        )}
       </Box>
 
       <Popover

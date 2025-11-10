@@ -1,6 +1,6 @@
 {
   "name": "conscious-bookclub",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -34,7 +34,7 @@
     "deploy": "npm run build && firebase deploy",
     "emulators": "firebase emulators:start",
     "emulators:ui": "firebase emulators:start --only ui",
-    "dev": "concurrently \"npm start\" \"firebase emulators:start\""
+    "dev": "concurrently --names \"REACT,EMULATORS,SOCKET\" --prefix-colors \"blue,green,yellow\" \"npm start\" \"firebase emulators:start\" \"cd socket-service && PORT=3001 npm start\""
   },
   "eslintConfig": {
     "extends": [

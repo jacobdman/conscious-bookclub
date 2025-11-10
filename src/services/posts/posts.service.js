@@ -1,10 +1,19 @@
 import { apiCall } from '../apiHelpers';
 
 // Posts functions
-export const getPosts = async (clubId) => {
+export const getPosts = async (clubId, options = {}) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
-  const posts = await apiCall(`/v1/posts?${params}`);
-  return posts;
+  
+  if (options.limit) {
+    params.append('limit', options.limit.toString());
+  }
+  
+  if (options.beforeId) {
+    params.append('beforeId', options.beforeId.toString());
+  }
+  
+  const result = await apiCall(`/v1/posts?${params}`);
+  return result;
 };
 
 export const getPost = async (clubId, postId) => {

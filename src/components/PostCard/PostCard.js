@@ -11,15 +11,14 @@ import { Reply as ReplyIcon } from '@mui/icons-material';
 import ReplyQuote from 'components/ReplyQuote';
 import EmojiInput from 'components/EmojiInput';
 import useFeedContext from 'contexts/Feed';
-import { useAuth } from 'AuthContext';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
-  const { user } = useAuth();
   const { createReply, registerPostRef } = useFeedContext();
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [showReactions, setShowReactions] = useState(false);
   const postRef = useRef(null);
 
   useEffect(() => {
@@ -61,8 +60,22 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   return (
     <Box
       ref={postRef}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => {
+        setHovered(true);
+        setShowReactions(true);
+      }}
+      onMouseLeave={() => {
+        setHovered(false);
+        // Always hide reactions on mouse leave (desktop behavior)
+        setShowReactions(false);
+      }}
+      onClick={(e) => {
+        // On mobile/touch devices, toggle reactions on tap
+        // Only toggle if clicking on the message itself, not on reactions
+        if ('ontouchstart' in window && !e.target.closest('[data-emoji-reaction]')) {
+          setShowReactions(prev => !prev);
+        }
+      }}
       sx={{
         display: 'flex',
         gap: 1.5,
@@ -140,9 +153,16 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           {post.text}
         </Typography>
 
-        {/* Reactions and Actions */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-          <EmojiInput postId={post.id} reactions={post.reactions || []} />
+        {/* Reactions - always show existing reactions, only show + button on hover/tap */}
+        <Box 
+          sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <EmojiInput 
+            postId={post.id} 
+            reactions={post.reactions || []} 
+            showAddButton={showReactions}
+          />
           {hovered && (
             <Tooltip title="Reply">
               <IconButton

@@ -1,22 +1,36 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box } from '@mui/material';
 import FeedProvider from 'contexts/Feed/FeedProvider';
 import Layout from 'components/Layout';
 import FeedSection from 'components/FeedSection';
+import useFeedContext from 'contexts/Feed';
+
+const FeedContent = () => {
+  const { markAsRead } = useFeedContext();
+
+  useEffect(() => {
+    // Mark feed as read when user views the feed
+    markAsRead();
+  }, [markAsRead]);
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+      }}
+    >
+      <FeedSection />
+    </Box>
+  );
+};
 
 const Feed = () => {
   return (
     <FeedProvider>
       <Layout>
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-          }}
-        >
-          <FeedSection />
-        </Box>
+        <FeedContent />
       </Layout>
     </FeedProvider>
   );
