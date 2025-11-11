@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -45,6 +45,7 @@ const BookList = () => {
   
   const [loading, setLoading] = useState(true);
   const [loadingPage, setLoadingPage] = useState(false); // Page-specific loading
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Track if initial load is complete
   const [error, setError] = useState(null);
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
@@ -231,6 +232,11 @@ const BookList = () => {
       // Mark page as loaded
       setLoadedPages(prev => new Set([...prev, pageNumber]));
       
+      // Mark initial load as complete after first page loads
+      if (isInitialLoad) {
+        setIsInitialLoad(false);
+      }
+      
       // Extract progress from books response (if included)
       const progressMap = {};
       let hasProgressInResponse = false;
@@ -250,8 +256,10 @@ const BookList = () => {
       }
       
       // Fill gaps around this page (background, non-blocking)
-      const gaps = findGapsAroundPage(pageNumber);
-      if (gaps.length > 0) {
+      // Only fill gaps after initial load is complete and when navigating between pages
+      if (!isInitialLoad && loadedPages.size > 0) {
+        const gaps = findGapsAroundPage(pageNumber);
+        if (gaps.length > 0) {
         // Fill gaps in background without blocking UI
         Promise.all(gaps.map(gapPage => 
           fetchPage(gapPage, theme, filter, size).then(gapResult => {
@@ -273,6 +281,7 @@ const BookList = () => {
             console.error(`Error filling gap page ${gapPage}:`, err);
           })
         ));
+        }
       }
       
     } catch (err) {
@@ -281,7 +290,7 @@ const BookList = () => {
     } finally {
       setLoadingPage(false);
     }
-  }, [pageSize, loadProgressForBooks, user, currentClub, isPageLoaded, fetchPage, insertBooksAtPage, findGapsAroundPage, totalBookCount]);
+  }, [pageSize, loadProgressForBooks, user, currentClub, isPageLoaded, fetchPage, insertBooksAtPage, findGapsAroundPage, totalBookCount, isInitialLoad, loadedPages]);
 
   // Pagination handler
   const handlePageChange = (event, page) => {
@@ -297,6 +306,7 @@ const BookList = () => {
     // Clear all books and loaded pages when filter changes
     setAllBooks([]);
     setLoadedPages(new Set());
+    setIsInitialLoad(true); // Reset initial load flag
     loadPage(1, theme, selectedFilter, pageSize);
   };
 
@@ -308,6 +318,7 @@ const BookList = () => {
     // Clear all books and loaded pages when filter changes
     setAllBooks([]);
     setLoadedPages(new Set());
+    setIsInitialLoad(true); // Reset initial load flag
     loadPage(1, selectedTheme, filter, pageSize);
   };
 
@@ -319,6 +330,7 @@ const BookList = () => {
     // Clear all books and loaded pages since page size changed
     setAllBooks([]);
     setLoadedPages(new Set());
+    setIsInitialLoad(true); // Reset initial load flag
     loadPage(1, selectedTheme, selectedFilter, newSize);
   };
 
@@ -421,15 +433,31 @@ const BookList = () => {
     return allBooks.slice(startIdx, endIdx).filter(Boolean);
   }, [allBooks, currentPage, pageSize]);
 
+  // Use ref to prevent multiple initializations
+  const initializedRef = useRef(false);
+  const lastInitKeyRef = useRef('');
+
   useEffect(() => {
-    const initializeData = async () => {
-      setLoading(true);
-      await loadMetadata();
-      await loadPage(1, selectedTheme, selectedFilter, pageSize);
-      setLoading(false);
-    };
-    initializeData();
-  }, [selectedTheme, selectedFilter, pageSize, loadMetadata, loadPage]);
+    // Create a key from the dependencies that should trigger re-initialization
+    const initKey = `${currentClub?.id || ''}-${selectedTheme}-${selectedFilter}-${pageSize}`;
+    
+    // Only initialize if key changed or not yet initialized
+    if (initKey !== lastInitKeyRef.current || !initializedRef.current) {
+      initializedRef.current = true;
+      lastInitKeyRef.current = initKey;
+      
+      const initializeData = async () => {
+        setLoading(true);
+        setAllBooks([]);
+        setLoadedPages(new Set());
+        setIsInitialLoad(true);
+        await loadPage(1, selectedTheme, selectedFilter, pageSize);
+        setLoading(false);
+      };
+      initializeData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTheme, selectedFilter, pageSize, currentClub]);
 
   const formatDate = (date) => {
     if (!date) return 'TBD';
