@@ -11,8 +11,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormControlLabel,
-  Checkbox,
   Alert,
   CircularProgress,
   Typography,
@@ -35,8 +33,6 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
     location: '',
     bookId: '',
     notes: '',
-    notifyOneDayBefore: false,
-    notifyOneWeekBefore: false,
   });
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -67,12 +63,8 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
           location: editingMeeting.location || '',
           bookId: editingMeeting.bookId || '',
           notes: editingMeeting.notes || '',
-          notifyOneDayBefore: editingMeeting.notifyOneDayBefore || false,
-          notifyOneWeekBefore: editingMeeting.notifyOneWeekBefore || false,
         });
       } else {
-        // Use club defaults for new meetings
-        const clubDefaults = currentClub.config || {};
         setFormData({
           date: null,
           startTime: '',
@@ -80,8 +72,6 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
           location: '',
           bookId: '',
           notes: '',
-          notifyOneDayBefore: clubDefaults.defaultMeetingNotifyOneDayBefore || false,
-          notifyOneWeekBefore: clubDefaults.defaultMeetingNotifyOneWeekBefore || false,
         });
       }
       setError(null);
@@ -114,8 +104,6 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
         location: formData.location || null,
         bookId: formData.bookId || null,
         notes: formData.notes || null,
-        notifyOneDayBefore: formData.notifyOneDayBefore,
-        notifyOneWeekBefore: formData.notifyOneWeekBefore,
       };
 
       if (editingMeeting) {
@@ -247,33 +235,6 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
               multiline
               rows={3}
             />
-
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Notification Reminders
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Set when members should be notified about this meeting. Members must have notifications enabled in their profile.
-              </Typography>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={formData.notifyOneWeekBefore}
-                    onChange={(e) => handleInputChange('notifyOneWeekBefore', e.target.checked)}
-                  />
-                }
-                label="Notify members 1 week before meeting"
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={formData.notifyOneDayBefore}
-                    onChange={(e) => handleInputChange('notifyOneDayBefore', e.target.checked)}
-                  />
-                }
-                label="Notify members 1 day before meeting"
-              />
-            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

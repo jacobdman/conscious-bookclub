@@ -141,7 +141,6 @@ const Meetings = () => {
                         <TableCell>Date</TableCell>
                         <TableCell>Book</TableCell>
                         <TableCell>Location</TableCell>
-                        <TableCell>Notifications</TableCell>
                         <TableCell align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -175,21 +174,6 @@ const Meetings = () => {
                                 No location
                               </Typography>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                              {meeting.notifyOneWeekBefore && (
-                                <Chip label="1 week" size="small" color="primary" variant="outlined" />
-                              )}
-                              {meeting.notifyOneDayBefore && (
-                                <Chip label="1 day" size="small" color="primary" variant="outlined" />
-                              )}
-                              {!meeting.notifyOneWeekBefore && !meeting.notifyOneDayBefore && (
-                                <Typography variant="caption" color="text.secondary">
-                                  None
-                                </Typography>
-                              )}
-                            </Box>
                           </TableCell>
                           <TableCell align="right">
                             <IconButton

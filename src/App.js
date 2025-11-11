@@ -16,6 +16,8 @@ import Profile from './views/Profile';
 import Meetings from './views/Meetings';
 import NoClub from './views/NoClub';
 import Landing from './views/Landing';
+import Theory from './views/Theory';
+import Themes from './views/Themes';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
 import { CircularProgress, Box } from '@mui/material';
@@ -51,6 +53,14 @@ function AppContent() {
         <Route
           path="/landing"
           element={<Landing />}
+        />
+        <Route
+          path="/theory"
+          element={<Theory />}
+        />
+        <Route
+          path="/themes"
+          element={<Themes />}
         />
         <Route
           path="/login"

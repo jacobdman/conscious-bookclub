@@ -116,8 +116,6 @@ const createMeeting = async (req, res, next) => {
       bookId: meetingData.bookId || null,
       notes: meetingData.notes || null,
       clubId: parseInt(clubId),
-      notifyOneDayBefore: meetingData.notifyOneDayBefore || false,
-      notifyOneWeekBefore: meetingData.notifyOneWeekBefore || false,
     });
 
     const meetingWithBook = await db.Meeting.findByPk(meeting.id, {
@@ -190,12 +188,6 @@ const updateMeeting = async (req, res, next) => {
     }
     if (updates.notes !== undefined) {
       meeting.notes = updates.notes;
-    }
-    if (updates.notifyOneDayBefore !== undefined) {
-      meeting.notifyOneDayBefore = updates.notifyOneDayBefore;
-    }
-    if (updates.notifyOneWeekBefore !== undefined) {
-      meeting.notifyOneWeekBefore = updates.notifyOneWeekBefore;
     }
 
     await meeting.save();

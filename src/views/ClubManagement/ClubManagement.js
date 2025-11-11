@@ -19,8 +19,6 @@ import {
   FormControl,
   Alert,
   CircularProgress,
-  FormControlLabel,
-  Checkbox,
   Stack,
 } from '@mui/material';
 import { Delete, Edit, Add, Save, Cancel, ContentCopy, Refresh, Check } from '@mui/icons-material';
@@ -43,8 +41,6 @@ const ClubManagement = () => {
   const { currentClub, refreshClubs, refreshClubMembers } = useClubContext();
   const [editingName, setEditingName] = useState(false);
   const [clubName, setClubName] = useState('');
-  const [defaultNotifyOneDay, setDefaultNotifyOneDay] = useState(false);
-  const [defaultNotifyOneWeek, setDefaultNotifyOneWeek] = useState(false);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -74,8 +70,6 @@ const ClubManagement = () => {
   useEffect(() => {
     if (currentClub) {
       setClubName(currentClub.name);
-      setDefaultNotifyOneDay(currentClub.config?.defaultMeetingNotifyOneDayBefore || false);
-      setDefaultNotifyOneWeek(currentClub.config?.defaultMeetingNotifyOneWeekBefore || false);
       loadMembers();
     }
   }, [currentClub, loadMembers]);
@@ -93,23 +87,6 @@ const ClubManagement = () => {
     }
   };
 
-  const handleSaveMeetingDefaults = async () => {
-    if (!currentClub || !user) return;
-
-    try {
-      const currentConfig = currentClub.config || {};
-      const updatedConfig = {
-        ...currentConfig,
-        defaultMeetingNotifyOneDayBefore: defaultNotifyOneDay,
-        defaultMeetingNotifyOneWeekBefore: defaultNotifyOneWeek,
-      };
-      await updateClub(currentClub.id, user.uid, { config: updatedConfig });
-      await refreshClubs();
-    } catch (err) {
-      setError('Failed to update meeting notification defaults');
-      console.error('Error updating meeting notification defaults:', err);
-    }
-  };
 
   const handleAddMember = async () => {
     if (!currentClub || !user || !newMemberId.trim()) return;
@@ -341,47 +318,6 @@ const ClubManagement = () => {
               </Button>
             </Box>
           </Stack>
-        </Paper>
-
-        {/* Default Meeting Notifications Section */}
-        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Default Meeting Notifications</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Set default notification preferences for new meetings. These will be pre-selected when creating meetings, but can be changed per meeting.
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={defaultNotifyOneWeek}
-                  onChange={(e) => setDefaultNotifyOneWeek(e.target.checked)}
-                  size="small"
-                />
-              }
-              label="Notify members 1 week before meeting (default)"
-              sx={{ mb: 0.5 }}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={defaultNotifyOneDay}
-                  onChange={(e) => setDefaultNotifyOneDay(e.target.checked)}
-                  size="small"
-                />
-              }
-              label="Notify members 1 day before meeting (default)"
-              sx={{ mb: 1 }}
-            />
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                variant="contained"
-                onClick={handleSaveMeetingDefaults}
-                size="small"
-              >
-                Save Defaults
-              </Button>
-            </Box>
-          </Box>
         </Paper>
 
         {/* Members Section */}

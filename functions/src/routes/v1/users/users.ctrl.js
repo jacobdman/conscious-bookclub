@@ -49,7 +49,12 @@ const createUser = async (req, res, next) => {
 const updateNotificationPreferences = async (req, res, next) => {
   try {
     const {userId} = req.params;
-    const {dailyGoalNotificationTime, dailyGoalNotificationsEnabled, timezone} = req.body;
+    const {
+      notification_settings: notificationSettings,
+      dailyGoalNotificationTime,
+      dailyGoalNotificationsEnabled,
+      timezone,
+    } = req.body;
 
     const user = await db.User.findByPk(userId);
 
@@ -60,11 +65,43 @@ const updateNotificationPreferences = async (req, res, next) => {
     }
 
     const updateData = {};
+
+    // Handle new notification_settings JSON structure
+    if (notificationSettings !== undefined) {
+      updateData.notificationSettings = notificationSettings;
+
+      // Map goal settings to existing fields for backward compatibility
+      if (notificationSettings.goals) {
+        if (notificationSettings.goals.enabled !== undefined) {
+          updateData.dailyGoalNotificationsEnabled =
+              notificationSettings.goals.enabled;
+        }
+        if (notificationSettings.goals.time !== undefined) {
+          updateData.dailyGoalNotificationTime = notificationSettings.goals.time;
+        }
+      }
+    }
+
+    // Support legacy fields for backward compatibility
     if (dailyGoalNotificationTime !== undefined) {
       updateData.dailyGoalNotificationTime = dailyGoalNotificationTime;
+      // Also update notification_settings if it exists
+      if (user.notificationSettings) {
+        const settings = {...user.notificationSettings};
+        if (!settings.goals) settings.goals = {};
+        settings.goals.time = dailyGoalNotificationTime;
+        updateData.notificationSettings = settings;
+      }
     }
     if (dailyGoalNotificationsEnabled !== undefined) {
       updateData.dailyGoalNotificationsEnabled = dailyGoalNotificationsEnabled;
+      // Also update notification_settings if it exists
+      if (user.notificationSettings) {
+        const settings = {...user.notificationSettings};
+        if (!settings.goals) settings.goals = {};
+        settings.goals.enabled = dailyGoalNotificationsEnabled;
+        updateData.notificationSettings = settings;
+      }
     }
     if (timezone !== undefined) {
       updateData.timezone = timezone;

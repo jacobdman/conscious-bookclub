@@ -31,16 +31,6 @@ module.exports = function(sequelize, DataTypes) {
           field: "club_id",
           allowNull: false,
         },
-        notifyOneDayBefore: {
-          type: DataTypes.BOOLEAN,
-          field: "notify_one_day_before",
-          defaultValue: false,
-        },
-        notifyOneWeekBefore: {
-          type: DataTypes.BOOLEAN,
-          field: "notify_one_week_before",
-          defaultValue: false,
-        },
         duration: {
           type: DataTypes.INTEGER,
           allowNull: true,

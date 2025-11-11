@@ -6,58 +6,21 @@ import {
   ThemeProvider,
   CssBaseline,
   Paper,
-  Tabs,
-  Tab,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import { theme } from '../../theme';
-import { useNavigate, useLocation } from 'react-router-dom';
+import PublicHeader from 'components/PublicHeader';
+import { Link } from 'react-router-dom';
 
 const Theory = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const handleTabChange = (event, newValue) => {
-    if (newValue === 0) {
-      navigate('/landing');
-    } else {
-      navigate('/theory');
-    }
-  };
-
-  const currentTab = location.pathname === '/theory' ? 1 : 0;
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ height: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Header Navigation */}
-        <Box
-          sx={{
-            flexShrink: 0,
-            bgcolor: 'background.paper',
-            borderBottom: 1,
-            borderColor: 'divider',
-            boxShadow: 2,
-          }}
-        >
-          <Container maxWidth="lg">
-            <Tabs
-              value={currentTab}
-              onChange={handleTabChange}
-              sx={{
-                '& .MuiTab-root': {
-                  textTransform: 'none',
-                  fontSize: '1.1rem',
-                  fontWeight: 600,
-                  minHeight: 64,
-                },
-              }}
-            >
-              <Tab label="Landing" />
-              <Tab label="Theory" />
-            </Tabs>
-          </Container>
-        </Box>
+        <PublicHeader />
 
         {/* Scrollable Content */}
         <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
@@ -108,11 +71,12 @@ const Theory = () => {
                   mb: 3,
                 }}
               >
-                At Conscious Book Club, we believe that reading is more than just consuming words on a page. 
-                It's a transformative practice that shapes our minds, expands our perspectives, and connects 
-                us to ideas and experiences beyond our immediate world. Our platform is built on the 
-                fundamental principle that meaningful growth happens in community—when we read together, 
-                discuss together, and grow together.
+                Two years ago I wanted to start a book club with a focus on philosophy. I wanted to bring my existing and somewhat separate groups of friends together to continue our discussions on life, morality, religion, and other philosophical topics with a diverse range of voices.  
+                I had no idea how to do this, so I called my friends together for a "meeting 0" to discuss how to structure this new club. What we came up with was a quarterly rotation of topics keeping the club fresh and engaging for all. We've made some minor tweaks over the past few years, but ultimately the fundamentals have remained the same.  
+                We've seen a lot of success in our club between improvements to reading habits and other regular personal goals. We've had deep discussions, made deeper friendships, and created a close group of friends who share a common goal of personal growth which helps each one of us continue to stay accountable to our goals.
+                <br />
+                <br />
+                I'm going to further break down the philosophy of the club and how it works in the following sections. Hopefully you'll see why we're so passionate about this format, and why we needed our own platform to make it work. This is not just a book club app, it's not just a meeting planner, it's not just a goal tracker or a habit tracker. This is something larger than the sum of its parts, and hopefully it can help you as well.
               </Typography>
             </Box>
 
@@ -128,7 +92,7 @@ const Theory = () => {
                   fontSize: { xs: '1.5rem', md: '2rem' },
                 }}
               >
-                Beyond the Book
+                The CBC Method
               </Typography>
               <Typography
                 variant="body1"
@@ -139,11 +103,21 @@ const Theory = () => {
                   mb: 3,
                 }}
               >
-                We recognize that personal development extends far beyond reading alone. That's why we've 
-                created a platform that tracks not just your reading progress, but your broader personal 
-                goals and habits. Whether it's meditation, exercise, creative writing, or any other 
-                practice that enriches your life, we believe these habits work in harmony with reading 
-                to create a more conscious, intentional way of living.
+                CBC runs on a monthly discussion format, rotating through 3 themes each quarter. Discussion is the core of the club, the books are just a tool to help us frame that discussion. We understand not all of our members will read every book, but they can all contribute to a discussion about the themes of the book.  
+                We also wanted meetings to be novel each time, a strictly philosophical discussion every month might become too heavy for some. For this reason we decided to rotate between 3 themes, Classy. Creative, and Curious (the Ancient Greeks might not have appreciated alliteration, but I sure do!).
+                <br />
+                <br />
+                <b>Classy (Body):</b> A focus on classic literature, history, business, and self development.  
+                <br />
+                <b>Creative (Mind):</b> A focus on creativity, innovation, and new ideas.  
+                <br />
+                <b>Curious (Spirit):</b> A focus on philosophy and religion.
+                <br />
+                <br />
+                Check out our <Link to="/themes" style={{ color: 'inherit', textDecoration: 'underline', fontWeight: 'bold' }}>Themes post</Link> to see a further dive into each theme. Here, I want to highlight the benefits of this format.  
+                Classy night usually ends with poker, creative night is usually focused on a fiction book and sometimes ends with a movie or even an album review, and curious night is ripe for deep discussions late into the night.  
+                Each night we will pick the book for the next night of the same theme, giving members 3 months to read each book. It also means members who only want to read fiction still get to learn from themes presented in other books they might not otherwise have been introduced to.  
+                It also gives us a good runway to set quarterly goals and follow along with progress that feels fast and real.
               </Typography>
             </Box>
 
@@ -159,54 +133,58 @@ const Theory = () => {
                   fontSize: { xs: '1.5rem', md: '2rem' },
                 }}
               >
-                The Power of Accountability
+                How to run your own club - Start with Meeting 0
               </Typography>
-              <Typography
-                variant="body1"
-                sx={{
-                  fontSize: { xs: '1rem', md: '1.125rem' },
-                  lineHeight: 1.8,
-                  color: 'text.primary',
-                  mb: 3,
-                }}
-              >
-                Friendly competition and shared accountability are powerful motivators. Our leaderboards, 
-                streaks, and goal-tracking features aren't about creating pressure—they're about creating 
-                connection. When you see your book club members making progress, it inspires you. When 
-                you share your achievements, it motivates others. This positive feedback loop creates a 
-                supportive environment where everyone can thrive.
-              </Typography>
-            </Box>
-
-            <Box sx={{ mb: 6 }}>
-              <Typography
-                variant="h5"
-                component="h2"
-                gutterBottom
-                sx={{
-                  fontWeight: 600,
-                  color: 'primary.main',
-                  mb: 3,
-                  fontSize: { xs: '1.5rem', md: '2rem' },
-                }}
-              >
-                Intentional Design
-              </Typography>
-              <Typography
-                variant="body1"
-                sx={{
-                  fontSize: { xs: '1rem', md: '1.125rem' },
-                  lineHeight: 1.8,
-                  color: 'text.primary',
-                  mb: 3,
-                }}
-              >
-                Every feature we build is designed with intention. From our calendar system that helps 
-                you plan meaningful discussions, to our feed that keeps you connected with your community, 
-                to our goal-tracking that helps you build lasting habits—we're committed to creating tools 
-                that enhance rather than distract from your reading journey. We believe technology should 
-                serve your growth, not compete for your attention.
-              </Typography>
+              <List sx={{ pl: 2 }}>
+                <ListItem sx={{ display: 'list-item', listStyleType: 'decimal', pl: 1 }}>
+                  <ListItemText
+                    primary={
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          fontSize: { xs: '1rem', md: '1.125rem' },
+                          lineHeight: 1.8,
+                          color: 'text.primary',
+                        }}
+                      >
+                        Pick a time frame that works for you. Don't feel confined to monthly meetings with a quarterly rotation of themes. This is what works for us, but this app (and our own meetings) will only continue to grow with experimentation and feedback
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+                <ListItem sx={{ display: 'list-item', listStyleType: 'decimal', pl: 1 }}>
+                  <ListItemText
+                    primary={
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          fontSize: { xs: '1rem', md: '1.125rem' },
+                          lineHeight: 1.8,
+                          color: 'text.primary',
+                        }}
+                      >
+                        Be serious about goals. Pick meaningful goals that will reflect real exciting progress, but are legitimately achievable. We have 4 different concepts for goals (habits, metrics, milestones, one-offs) to help with tracking.
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+                <ListItem sx={{ display: 'list-item', listStyleType: 'decimal', pl: 1 }}>
+                  <ListItemText
+                    primary={
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          fontSize: { xs: '1rem', md: '1.125rem' },
+                          lineHeight: 1.8,
+                          color: 'text.primary',
+                        }}
+                      >
+                        Finally, and most important with a discussion based group like this, keep criticisms welcome. "Unspoken expectations are premeditated resentments." - Neil Strauss. Don't shy away from disagreement, raise differing opinions often. The ability to disagree is a muscle that can atrophy if not practiced. Quiet contempt in a group about open opinions is a recipe for disaster (or at the very least, uninteresting conversation!)
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              </List>
             </Box>
 
             <Box>
@@ -235,6 +213,9 @@ const Theory = () => {
                 and meaningful engagement with ideas. If this philosophy resonates with you, we'd love to 
                 have you join us. Together, we can create something beautiful—one book, one goal, one 
                 conversation at a time.
+                <br />
+                <br />
+                - Jacob Dayton
               </Typography>
             </Box>
           </Paper>

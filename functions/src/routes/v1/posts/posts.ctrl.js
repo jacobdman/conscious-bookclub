@@ -1,4 +1,56 @@
 const db = require("../../../../db/models/index");
+const webpush = require("web-push");
+
+// Configure web-push with VAPID keys (should be in environment variables)
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@consciousbookclub.com";
+
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
+}
+
+// Helper function to send push notification
+const sendPushNotification = async (subscription, title, body) => {
+  try {
+    // Ensure subscription is an object (not a string)
+    const subscriptionObj = typeof subscription === "string" ?
+      JSON.parse(subscription) :
+      subscription;
+
+    const payload = JSON.stringify({
+      title,
+      body,
+      icon: "/android-chrome-192x192.png",
+      badge: "/android-chrome-192x192.png",
+    });
+
+    const result = await webpush.sendNotification(subscriptionObj, payload);
+    return {success: true, statusCode: result.statusCode};
+  } catch (error) {
+    console.error("Error sending push notification:", {
+      message: error.message,
+      statusCode: error.statusCode,
+    });
+
+    // If subscription is invalid, delete it
+    if (error.statusCode === 410 || error.statusCode === 404) {
+      const subscriptionObj = typeof subscription === "string" ?
+        JSON.parse(subscription) :
+        subscription;
+      await db.PushSubscription.destroy({
+        where: {
+          subscriptionJson: subscriptionObj,
+        },
+      });
+    }
+    return {
+      success: false,
+      error: error.message,
+      statusCode: error.statusCode,
+    };
+  }
+};
 
 // Helper to emit Socket.io events via Cloud Run service
 const emitToClub = async (clubId, event, data) => {
@@ -196,6 +248,95 @@ const createPost = async (req, res, next) => {
 
     // Emit Socket.io event via Cloud Run service
     await emitToClub(clubIdInt, "post:created", {id: post.id, ...postWithAssociations.toJSON()});
+
+    // Send feed notifications based on user preferences
+    // This is non-blocking - don't fail the request if notifications fail
+    if (vapidPublicKey && vapidPrivateKey) {
+      try {
+        // Get all club members
+        const clubMembers = await db.ClubMember.findAll({
+          where: {clubId: clubIdInt},
+          include: [
+            {
+              model: db.User,
+              as: "user",
+            },
+          ],
+        });
+
+        const authorName = postWithAssociations.authorName ||
+            postWithAssociations.author?.displayName || "Someone";
+        const isReply = !!postData.parentPostId;
+        let parentPostAuthorId = null;
+
+        // If this is a reply, get the parent post author ID
+        if (isReply && postData.parentPostId) {
+          const parentPost = await db.Post.findByPk(postData.parentPostId, {
+            attributes: ["authorId"],
+          });
+          if (parentPost) {
+            parentPostAuthorId = parentPost.authorId;
+          }
+        }
+
+        // Send notifications to members who have feed notifications enabled
+        for (const member of clubMembers) {
+          if (!member.user) continue;
+
+          const user = member.user;
+          const settings = user.notificationSettings || {};
+          const feedSettings = settings.feed || {};
+
+          // Skip if feed notifications are not enabled
+          if (!feedSettings.enabled) continue;
+
+          // Skip the post author (don't notify yourself)
+          if (user.uid === postData.authorId) continue;
+
+          let shouldNotify = false;
+
+          if (feedSettings.mode === "all") {
+            // Notify for all new posts
+            shouldNotify = true;
+          } else if (feedSettings.mode === "mentions_replies") {
+            // Only notify for replies to this user's posts
+            if (isReply && parentPostAuthorId === user.uid) {
+              shouldNotify = true;
+            }
+          }
+
+          if (shouldNotify) {
+            // Get user's push subscriptions
+            const subscriptions = await db.PushSubscription.findAll({
+              where: {userId: user.uid},
+            });
+
+            // Prepare notification message
+            let notificationTitle = "New Post";
+            let notificationBody = "";
+
+            if (isReply) {
+              notificationTitle = "New Reply";
+              notificationBody = `${authorName} replied to your post`;
+            } else {
+              notificationBody = `${authorName} posted in your book club`;
+            }
+
+            // Send notification to all subscriptions
+            for (const subscription of subscriptions) {
+              await sendPushNotification(
+                  subscription.subscriptionJson,
+                  notificationTitle,
+                  notificationBody,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        // Log error but don't fail the request
+        console.error("Error sending feed notifications:", error);
+      }
+    }
 
     res.status(201).json({id: post.id, ...postWithAssociations.toJSON()});
   } catch (e) {

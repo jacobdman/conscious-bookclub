@@ -90,13 +90,24 @@ exports.meetingReminder = onSchedule(
 
       try {
         const now = new Date();
+        // Calculate dates for 1 day and 7 days from now (at start of day)
         const oneDayFromNow = new Date(now);
-        oneDayFromNow.setDate(oneDayFromNow.getDate() + 1);
-        const oneWeekFromNow = new Date(now);
-        oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+        oneDayFromNow.setUTCDate(oneDayFromNow.getUTCDate() + 1);
+        oneDayFromNow.setUTCHours(0, 0, 0, 0);
+        const oneDayFromNowStr = oneDayFromNow.toISOString().split("T")[0]; // YYYY-MM-DD
 
-        // Get all meetings
+        const oneWeekFromNow = new Date(now);
+        oneWeekFromNow.setUTCDate(oneWeekFromNow.getUTCDate() + 7);
+        oneWeekFromNow.setUTCHours(0, 0, 0, 0);
+        const oneWeekFromNowStr = oneWeekFromNow.toISOString().split("T")[0]; // YYYY-MM-DD
+
+        // Get only meetings that are 1 day or 7 days away (filtered at SQL level)
         const meetings = await db.Meeting.findAll({
+          where: {
+            date: {
+              [db.Sequelize.Op.in]: [oneDayFromNowStr, oneWeekFromNowStr],
+            },
+          },
           include: [
             {
               model: db.Book,
@@ -105,13 +116,12 @@ exports.meetingReminder = onSchedule(
           ],
         });
 
-        console.log(`Found ${meetings.length} meeting(s) to check`);
+        console.log(`Found ${meetings.length} meeting(s) at notification time (1 or 7 days away)`);
 
         let meetingsProcessed = 0;
         let meetingsSkipped = 0;
         let notificationsSent = 0;
         const skipReasons = {
-          noNotificationNeeded: 0,
           noUsersToNotify: 0,
           noSubscriptions: 0,
         };
@@ -129,96 +139,81 @@ exports.meetingReminder = onSchedule(
               `(${daysUntilMeeting} day(s) away)`,
           );
 
-          let shouldNotify = false;
-          let daysText = "";
+          const shouldNotifyOneDay = daysUntilMeeting === 1;
+          const reminderType = shouldNotifyOneDay ? "oneDayBefore" : "oneWeekBefore";
 
-          // Check if we should send 1 day before notification
-          if (meeting.notifyOneDayBefore && daysUntilMeeting === 1) {
-            shouldNotify = true;
-            daysText = "1 day";
-          }
+          // Build SQL filter for users with appropriate notification preferences
+          // For 1 day: enabled=true AND oneDayBefore=true
+          // For 7 days: enabled=true AND oneWeekBefore=true
+          const notificationFilter = db.Sequelize.literal(
+              "(notification_settings->'meetings'->>'enabled' = 'true' AND " +
+              `notification_settings->'meetings'->>'${reminderType}' = 'true')`,
+          );
 
-          // Check if we should send 1 week before notification
-          if (meeting.notifyOneWeekBefore && daysUntilMeeting === 7) {
-            shouldNotify = true;
-            daysText = "1 week";
-          }
-
-          if (!shouldNotify) {
-            console.log(
-                `  Skipping meeting ${meeting.id}: no notification needed ` +
-                `(notifyOneDayBefore: ${meeting.notifyOneDayBefore}, ` +
-                `notifyOneWeekBefore: ${meeting.notifyOneWeekBefore}, ` +
-                `daysUntilMeeting: ${daysUntilMeeting})`,
-            );
-            skipReasons.noNotificationNeeded++;
-            meetingsSkipped++;
-            continue;
-          }
-
-          // Get all club members for this meeting's club
+          // Get club members with notifications enabled (filtered at SQL level)
           const clubMembers = await db.ClubMember.findAll({
             where: {clubId: meeting.clubId},
             include: [
               {
                 model: db.User,
                 as: "user",
+                where: notificationFilter,
+                required: true, // INNER JOIN - only get members with matching notification settings
               },
             ],
           });
 
-          console.log(`  Meeting ${meeting.id} has ${clubMembers.length} club member(s)`);
+          const memberCount = clubMembers.length;
+          console.log(
+              `  Meeting ${meeting.id} has ${memberCount} club member(s) ` +
+              "with notifications enabled",
+          );
 
-          // Filter to users who have notifications enabled
-          // For meeting notifications, we check if user has any notifications enabled
-          // (using dailyGoalNotificationsEnabled as the global notification toggle)
-          const usersToNotify = [];
-          for (const member of clubMembers) {
-            if (member.user) {
-              const user = await db.User.findByPk(member.user.uid);
-              if (user && user.dailyGoalNotificationsEnabled) {
-                usersToNotify.push(user);
-              }
-            }
-          }
-
-          if (usersToNotify.length === 0) {
-            console.log(`  Skipping meeting ${meeting.id}: no users with notifications enabled`);
+          if (memberCount === 0) {
+            console.log(
+                `  Skipping meeting ${meeting.id}: no users with meeting notifications enabled`,
+            );
             skipReasons.noUsersToNotify++;
             meetingsSkipped++;
             continue;
           }
 
-          console.log(`  Meeting ${meeting.id} has ${usersToNotify.length} user(s) to notify`);
-
           // Prepare notification message
           const bookTitle = meeting.book ? meeting.book.title : "your book club";
           const meetingDateFormatted = formatDate(meeting.date);
-          const title = "Meeting Reminder";
-          const body =
-            `Your book club meeting for "${bookTitle}" is in ${daysText} ` +
-            `on ${meetingDateFormatted}`;
+          const daysText = shouldNotifyOneDay ? "1 day" : "1 week";
 
-          // Send notifications to all users
+          // Send notifications to all filtered users
           let meetingNotificationsSent = 0;
-          for (const user of usersToNotify) {
+          for (const member of clubMembers) {
+            if (!member.user) continue;
+
             const subscriptions = await db.PushSubscription.findAll({
-              where: {userId: user.uid},
+              where: {userId: member.user.uid},
             });
 
             if (subscriptions.length === 0) {
-              console.log(`    User ${user.uid} has no push subscriptions`);
+              console.log(`    User ${member.user.uid} has no push subscriptions`);
               skipReasons.noSubscriptions++;
               continue;
             }
 
-            console.log(`    User ${user.uid} has ${subscriptions.length} subscription(s)`);
+            console.log(`    User ${member.user.uid} has ${subscriptions.length} subscription(s)`);
+
+            // Send notification
+            const notificationBody =
+                `Your book club meeting for "${bookTitle}" is in ${daysText} ` +
+                `on ${meetingDateFormatted}`;
+            const notification = {
+              title: "Meeting Reminder",
+              body: notificationBody,
+            };
 
             for (const subscription of subscriptions) {
               const result = await sendPushNotification(
                   subscription.subscriptionJson,
-                  title,
-                  body,
+                  notification.title,
+                  notification.body,
               );
               if (result && result.success) {
                 meetingNotificationsSent++;
@@ -229,7 +224,7 @@ exports.meetingReminder = onSchedule(
 
           console.log(
               `  Sent ${meetingNotificationsSent} notification(s) for meeting ${meeting.id} ` +
-              `to ${usersToNotify.length} user(s)`,
+              `to ${clubMembers.length} user(s)`,
           );
         }
 

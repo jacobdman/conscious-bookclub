@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Container,
@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import ClubCreationRequest from 'components/ClubCreationRequest';
+import PublicHeader from 'components/PublicHeader';
 import { theme } from '../../theme';
 import { getStorageFileUrl } from 'services/storage';
 
@@ -25,6 +26,8 @@ const Landing = () => {
   const [inviteCode, setInviteCode] = useState('');
   const [imageUrls, setImageUrls] = useState({});
   const [imagesLoading, setImagesLoading] = useState(true);
+  const [showHeader, setShowHeader] = useState(false);
+  const scrollableRef = useRef(null);
 
   const scrollToSection = (sectionId) => {
     const element = document.getElementById(sectionId);
@@ -57,6 +60,7 @@ const Landing = () => {
           'goals-dashboard': 'landing_images/dashboard.png',
           'leaderboards': 'landing_images/club_goals.PNG',
           'calendar-events': 'landing_images/calendar.PNG',
+          'feed-chat': 'landing_images/feed.png',
         };
 
         const urls = {};
@@ -81,21 +85,42 @@ const Landing = () => {
     loadImages();
   }, []);
 
+  // Handle scroll to show/hide header after hero section
+  useEffect(() => {
+    const scrollableContent = scrollableRef.current;
+    if (!scrollableContent) return;
+
+    const handleScroll = () => {
+      const scrollTop = scrollableContent.scrollTop;
+      // Show header after scrolling past ~400px (roughly the hero section height)
+      setShowHeader(scrollTop > 400);
+    };
+
+    scrollableContent.addEventListener('scroll', handleScroll);
+    return () => {
+      scrollableContent.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-        {/* Hero Section */}
-        <Box
-          sx={{
-            background: 'linear-gradient(135deg, #F5F1EA 0%, #BFA480 100%)',
-            py: { xs: 10, md: 16 },
-            textAlign: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <Container maxWidth="lg">
+      <Box sx={{ height: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <PublicHeader showOnScroll={true} isVisible={showHeader} />
+
+        {/* Scrollable Content */}
+        <Box ref={scrollableRef} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          {/* Hero Section */}
+          <Box
+            sx={{
+              background: 'linear-gradient(135deg, #F5F1EA 0%, #BFA480 100%)',
+              py: { xs: 10, md: 16 },
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <Container maxWidth="lg">
             <Typography
               variant="h1"
               component="h1"
@@ -201,16 +226,16 @@ const Landing = () => {
                 Sign In
               </Button>
             </Box>
-          </Container>
-        </Box>
+            </Container>
+          </Box>
 
-        {/* Features & Screenshots Combined Section */}
-        <Box id="see-it-in-action" sx={{ py: { xs: 8, md: 12 }, scrollMarginTop: '80px' }}>
-          <Container maxWidth="lg">
-            <Typography
-              variant="h3"
-              component="h2"
-              align="center"
+          {/* Features & Screenshots Combined Section */}
+          <Box id="see-it-in-action" sx={{ py: { xs: 8, md: 12 }, scrollMarginTop: '80px' }}>
+            <Container maxWidth="lg">
+              <Typography
+                variant="h3"
+                component="h2"
+                align="center"
               gutterBottom
               sx={{ mb: { xs: 6, md: 10 }, color: 'primary.main' }}
             >
@@ -400,7 +425,7 @@ const Landing = () => {
                 display: 'flex',
                 flexDirection: { xs: 'column', md: 'row' },
                 gap: { xs: 4, md: 6 },
-                mb: { xs: 4, md: 6 },
+                mb: { xs: 8, md: 12 },
                 alignItems: 'center',
               }}
             >
@@ -481,12 +506,101 @@ const Landing = () => {
                 </Box>
               </Box>
             </Box>
-          </Container>
-        </Box>
 
-        {/* How It Works Section */}
-        <Container maxWidth="lg" sx={{ py: 8 }}>
-          <Typography
+            {/* Feature 4: Community Feed & Discussion */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row-reverse' },
+                gap: { xs: 4, md: 6 },
+                mb: { xs: 4, md: 6 },
+                alignItems: 'center',
+              }}
+            >
+              <Box
+                sx={{
+                  width: { xs: '100%', md: '50%' },
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  boxShadow: 8,
+                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    boxShadow: 12,
+                  },
+                }}
+              >
+                {imagesLoading || !imageUrls['feed-chat'] ? (
+                  <Paper
+                    sx={{
+                      width: '100%',
+                      aspectRatio: '4/3',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'grey.300',
+                      background: 'linear-gradient(135deg, #E8E3D8 0%, #D4C9B0 100%)',
+                    }}
+                  >
+                    {imagesLoading ? (
+                      <CircularProgress />
+                    ) : (
+                      <Typography variant="body1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
+                        Screenshot: Community Feed
+                      </Typography>
+                    )}
+                  </Paper>
+                ) : (
+                  <Box
+                    component="img"
+                    src={imageUrls['feed-chat']}
+                    alt="Community Feed"
+                    sx={{
+                      width: '100%',
+                      height: 'auto',
+                      display: 'block',
+                    }}
+                  />
+                )}
+              </Box>
+              <Box sx={{ width: { xs: '100%', md: '50%' }, pr: { md: 4 } }}>
+                <Typography
+                  variant="h4"
+                  component="h3"
+                  gutterBottom
+                  sx={{ mb: 2, color: 'primary.main', fontWeight: 'bold' }}
+                >
+                  Community Feed & Discussion
+                </Typography>
+                <Typography
+                  variant="h6"
+                  color="text.secondary"
+                  sx={{ mb: 3, lineHeight: 1.6, fontSize: '1.1rem' }}
+                >
+                  Stay connected with your book club through our community feed. Share thoughts,
+                  ask questions, and continue discussions between meetings. Engage with posts,
+                  reply to comments, and keep the conversation going.
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 2,
+                    mt: 3,
+                  }}
+                >
+                  <Chip label="Feed" sx={{ bgcolor: 'primary.main', color: 'white' }} />
+                  <Chip label="Discussion" sx={{ bgcolor: 'secondary.main', color: 'white' }} />
+                  <Chip label="Community" sx={{ bgcolor: 'primary.main', color: 'white', opacity: 0.8 }} />
+                </Box>
+              </Box>
+            </Box>
+            </Container>
+          </Box>
+
+          {/* How It Works Section */}
+          <Container maxWidth="lg" sx={{ py: 8 }}>
+            <Typography
             variant="h3"
             component="h2"
             align="center"
@@ -604,20 +718,20 @@ const Landing = () => {
               </Grid>
             </Grid>
           </Box>
-        </Container>
+          </Container>
 
-        {/* CTA Section with Invite Code */}
-        <Box
-          id="ready-to-start"
-          sx={{
-            background: 'linear-gradient(135deg, #BFA480 0%, #5D473A 100%)',
-            py: 8,
-            color: 'white',
-            scrollMarginTop: '80px',
-          }}
-        >
-          <Container maxWidth="md">
-            <Typography variant="h3" component="h2" align="center" gutterBottom sx={{ mb: 4 }}>
+          {/* CTA Section with Invite Code */}
+          <Box
+            id="ready-to-start"
+            sx={{
+              background: 'linear-gradient(135deg, #BFA480 0%, #5D473A 100%)',
+              py: 8,
+              color: 'white',
+              scrollMarginTop: '80px',
+            }}
+          >
+            <Container maxWidth="md">
+              <Typography variant="h3" component="h2" align="center" gutterBottom sx={{ mb: 4 }}>
               Ready to Get Started?
             </Typography>
             <Paper sx={{ p: 4, bgcolor: 'rgba(255, 255, 255, 0.95)' }}>
@@ -671,11 +785,11 @@ const Landing = () => {
               </Box>
             </Paper>
           </Container>
-        </Box>
+          </Box>
 
-        {/* Club Creation Request Section */}
-        <Container maxWidth="md" sx={{ py: 8 }}>
-          <Typography
+          {/* Club Creation Request Section */}
+          <Container maxWidth="md" sx={{ py: 8 }}>
+            <Typography
             variant="h3"
             component="h2"
             align="center"
@@ -688,7 +802,8 @@ const Landing = () => {
             Fill out the form below and we'll help you set up your own book club.
           </Typography>
           <ClubCreationRequest />
-        </Container>
+          </Container>
+        </Box>
       </Box>
     </ThemeProvider>
   );

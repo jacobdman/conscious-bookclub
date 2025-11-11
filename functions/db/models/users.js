@@ -36,6 +36,10 @@ module.exports = function(sequelize, DataTypes) {
         timezone: {
           type: DataTypes.STRING(100),
         },
+        notificationSettings: {
+          type: DataTypes.JSONB,
+          field: "notification_settings",
+        },
       },
       {
         tableName: "users",
