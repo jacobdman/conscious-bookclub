@@ -62,7 +62,7 @@ const Layout = ({ children }) => {
           display: 'flex',
           flexDirection: 'column',
           height: 'calc(100vh - 64px)', // AppBar default height
-          overflow: 'hidden',
+          overflow: 'auto',
         }}
       >
         {children}

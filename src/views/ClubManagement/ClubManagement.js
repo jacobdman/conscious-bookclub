@@ -21,8 +21,9 @@ import {
   CircularProgress,
   FormControlLabel,
   Checkbox,
+  Stack,
 } from '@mui/material';
-import { Delete, Edit, Add, Save, Cancel, ContentCopy, Refresh } from '@mui/icons-material';
+import { Delete, Edit, Add, Save, Cancel, ContentCopy, Refresh, Check } from '@mui/icons-material';
 import Layout from 'components/Layout';
 import useClubContext from 'contexts/Club';
 import { useAuth } from 'AuthContext';
@@ -42,8 +43,6 @@ const ClubManagement = () => {
   const { currentClub, refreshClubs, refreshClubMembers } = useClubContext();
   const [editingName, setEditingName] = useState(false);
   const [clubName, setClubName] = useState('');
-  const [editingCalendarId, setEditingCalendarId] = useState(false);
-  const [googleCalendarId, setGoogleCalendarId] = useState('');
   const [defaultNotifyOneDay, setDefaultNotifyOneDay] = useState(false);
   const [defaultNotifyOneWeek, setDefaultNotifyOneWeek] = useState(false);
   const [members, setMembers] = useState([]);
@@ -53,6 +52,8 @@ const ClubManagement = () => {
   const [newMemberId, setNewMemberId] = useState('');
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [rotateDialog, setRotateDialog] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const loadMembers = useCallback(async () => {
     if (!currentClub || !user) return;
@@ -73,7 +74,6 @@ const ClubManagement = () => {
   useEffect(() => {
     if (currentClub) {
       setClubName(currentClub.name);
-      setGoogleCalendarId(currentClub.config?.googleCalendarId || '');
       setDefaultNotifyOneDay(currentClub.config?.defaultMeetingNotifyOneDayBefore || false);
       setDefaultNotifyOneWeek(currentClub.config?.defaultMeetingNotifyOneWeekBefore || false);
       loadMembers();
@@ -90,24 +90,6 @@ const ClubManagement = () => {
     } catch (err) {
       setError('Failed to update club name');
       console.error('Error updating club name:', err);
-    }
-  };
-
-  const handleSaveCalendarId = async () => {
-    if (!currentClub || !user) return;
-
-    try {
-      const currentConfig = currentClub.config || {};
-      const updatedConfig = {
-        ...currentConfig,
-        googleCalendarId: googleCalendarId.trim() || null,
-      };
-      await updateClub(currentClub.id, user.uid, { config: updatedConfig });
-      setEditingCalendarId(false);
-      await refreshClubs();
-    } catch (err) {
-      setError('Failed to update Google Calendar ID');
-      console.error('Error updating Google Calendar ID:', err);
     }
   };
 
@@ -180,10 +162,28 @@ const ClubManagement = () => {
     }
   };
 
-  const handleCopyInviteCode = () => {
+  const handleCopyInviteCode = async () => {
     if (currentClub?.inviteCode) {
-      navigator.clipboard.writeText(currentClub.inviteCode);
-      // Could show a toast notification here
+      try {
+        await navigator.clipboard.writeText(currentClub.inviteCode);
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy invite code:', err);
+      }
+    }
+  };
+
+  const handleCopyInviteUrl = async () => {
+    if (currentClub?.inviteCode) {
+      const inviteUrl = `${window.location.origin}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}`;
+      try {
+        await navigator.clipboard.writeText(inviteUrl);
+        setCopiedUrl(true);
+        setTimeout(() => setCopiedUrl(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy invite URL:', err);
+      }
     }
   };
 
@@ -224,8 +224,8 @@ const ClubManagement = () => {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" sx={{ mb: 3 }}>Manage Club</Typography>
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <Typography variant="h4" sx={{ mb: 2, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>Manage Club</Typography>
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -234,28 +234,28 @@ const ClubManagement = () => {
         )}
 
         {/* Club Name Section */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Club Name</Typography>
+        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Club Name</Typography>
           {editingName ? (
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <TextField
                 value={clubName}
                 onChange={(e) => setClubName(e.target.value)}
                 fullWidth
                 size="small"
               />
-              <IconButton color="primary" onClick={handleSaveName}>
+              <IconButton color="primary" onClick={handleSaveName} size="small">
                 <Save />
               </IconButton>
               <IconButton onClick={() => {
                 setEditingName(false);
                 setClubName(currentClub.name);
-              }}>
+              }} size="small">
                 <Cancel />
               </IconButton>
             </Box>
           ) : (
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <Typography variant="body1">{clubName}</Typography>
               <IconButton size="small" onClick={() => setEditingName(true)}>
                 <Edit />
@@ -264,103 +264,89 @@ const ClubManagement = () => {
           )}
         </Paper>
 
-        {/* Google Calendar ID Section */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Google Calendar</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Configure a Google Calendar ID to display events in the Calendar view. 
-            You can find your calendar ID in your Google Calendar settings.
+        {/* Invite Code Section */}
+        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Invite Code</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Share this code or URL with others to allow them to join your club. You can rotate the code at any time for security.
           </Typography>
-          {editingCalendarId ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="Google Calendar ID"
-                value={googleCalendarId}
-                onChange={(e) => setGoogleCalendarId(e.target.value)}
-                fullWidth
-                size="small"
-                placeholder="e.g., abc123@group.calendar.google.com"
-                helperText="Enter the full Google Calendar ID"
-              />
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <IconButton color="primary" onClick={handleSaveCalendarId}>
-                  <Save />
-                </IconButton>
-                <IconButton onClick={() => {
-                  setEditingCalendarId(false);
-                  setGoogleCalendarId(currentClub.config?.googleCalendarId || '');
-                }}>
-                  <Cancel />
+          <Stack spacing={1.5}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                Invite Code
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <TextField
+                  value={currentClub.inviteCode || ''}
+                  fullWidth
+                  size="small"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      fontFamily: 'monospace',
+                      letterSpacing: '0.1em',
+                      fontSize: { xs: '0.875rem', md: '1rem' },
+                    },
+                  }}
+                />
+                <IconButton
+                  color={copiedCode ? 'success' : 'primary'}
+                  onClick={handleCopyInviteCode}
+                  title="Copy invite code"
+                  size="small"
+                >
+                  {copiedCode ? <Check /> : <ContentCopy />}
                 </IconButton>
               </Box>
             </Box>
-          ) : (
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-              <Typography 
-                variant="body1" 
-                sx={{ 
-                  flex: 1,
-                  wordBreak: 'break-all',
-                  overflowWrap: 'break-word',
-                  minWidth: 0, // Allows flex item to shrink below content size
-                }}
-              >
-                {googleCalendarId || 'Not configured'}
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                Invite URL
               </Typography>
-              <IconButton 
-                size="small" 
-                onClick={() => setEditingCalendarId(true)}
-                sx={{ flexShrink: 0 }}
-              >
-                <Edit />
-              </IconButton>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <TextField
+                  value={currentClub?.inviteCode ? `${window.location.origin}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}` : ''}
+                  fullWidth
+                  size="small"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      fontSize: { xs: '0.75rem', md: '0.875rem' },
+                      wordBreak: 'break-all',
+                    },
+                  }}
+                />
+                <IconButton
+                  color={copiedUrl ? 'success' : 'primary'}
+                  onClick={handleCopyInviteUrl}
+                  title="Copy invite URL"
+                  size="small"
+                >
+                  {copiedUrl ? <Check /> : <ContentCopy />}
+                </IconButton>
+              </Box>
             </Box>
-          )}
-        </Paper>
-
-        {/* Invite Code Section */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Invite Code</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Share this code with others to allow them to join your club. You can rotate the code at any time for security.
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <TextField
-              value={currentClub.inviteCode || ''}
-              fullWidth
-              size="small"
-              InputProps={{
-                readOnly: true,
-              }}
-              sx={{
-                '& .MuiInputBase-input': {
-                  fontFamily: 'monospace',
-                  letterSpacing: '0.1em',
-                },
-              }}
-            />
-            <IconButton
-              color="primary"
-              onClick={handleCopyInviteCode}
-              title="Copy invite code"
-            >
-              <ContentCopy />
-            </IconButton>
-            <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={() => setRotateDialog(true)}
-              size="small"
-            >
-              Rotate
-            </Button>
-          </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                onClick={() => setRotateDialog(true)}
+                size="small"
+              >
+                Rotate Code
+              </Button>
+            </Box>
+          </Stack>
         </Paper>
 
         {/* Default Meeting Notifications Section */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Default Meeting Notifications</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Default Meeting Notifications</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
             Set default notification preferences for new meetings. These will be pre-selected when creating meetings, but can be changed per meeting.
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -369,20 +355,24 @@ const ClubManagement = () => {
                 <Checkbox
                   checked={defaultNotifyOneWeek}
                   onChange={(e) => setDefaultNotifyOneWeek(e.target.checked)}
+                  size="small"
                 />
               }
               label="Notify members 1 week before meeting (default)"
+              sx={{ mb: 0.5 }}
             />
             <FormControlLabel
               control={
                 <Checkbox
                   checked={defaultNotifyOneDay}
                   onChange={(e) => setDefaultNotifyOneDay(e.target.checked)}
+                  size="small"
                 />
               }
               label="Notify members 1 day before meeting (default)"
+              sx={{ mb: 1 }}
             />
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button
                 variant="contained"
                 onClick={handleSaveMeetingDefaults}
@@ -395,32 +385,35 @@ const ClubManagement = () => {
         </Paper>
 
         {/* Members Section */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Members</Typography>
+        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Members</Typography>
             <Button
               variant="contained"
               startIcon={<Add />}
               onClick={() => setAddMemberDialog(true)}
+              size="small"
             >
               Add Member
             </Button>
           </Box>
 
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <CircularProgress />
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+              <CircularProgress size={24} />
             </Box>
           ) : (
-            <List>
+            <List sx={{ py: 0 }}>
               {members.map((member) => (
-                <ListItem key={member.userId}>
+                <ListItem key={member.userId} sx={{ px: { xs: 0, md: 2 }, py: 1 }}>
                   <ListItemText
                     primary={member.user.displayName || member.user.email}
                     secondary={member.user.email}
+                    primaryTypographyProps={{ fontSize: { xs: '0.875rem', md: '1rem' } }}
+                    secondaryTypographyProps={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
                   />
                   <ListItemSecondaryAction>
-                    <FormControl size="small" sx={{ minWidth: 120, mr: 2 }}>
+                    <FormControl size="small" sx={{ minWidth: { xs: 100, md: 120 }, mr: 1 }}>
                       <Select
                         value={member.role}
                         onChange={(e) => handleUpdateRole(member.userId, e.target.value)}
@@ -434,6 +427,7 @@ const ClubManagement = () => {
                         edge="end"
                         color="error"
                         onClick={() => handleRemoveMember(member.userId)}
+                        size="small"
                       >
                         <Delete />
                       </IconButton>
@@ -446,12 +440,13 @@ const ClubManagement = () => {
         </Paper>
 
         {/* Delete Club Section */}
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, color: 'error.main' }}>Danger Zone</Typography>
+        <Paper sx={{ p: { xs: 2, md: 3 } }}>
+          <Typography variant="h6" sx={{ mb: 1.5, color: 'error.main', fontSize: { xs: '1rem', md: '1.25rem' } }}>Danger Zone</Typography>
           <Button
             variant="outlined"
             color="error"
             onClick={() => setDeleteDialog(true)}
+            size="small"
           >
             Delete Club
           </Button>
@@ -459,37 +454,38 @@ const ClubManagement = () => {
 
         {/* Add Member Dialog */}
         <Dialog open={addMemberDialog} onClose={() => setAddMemberDialog(false)}>
-          <DialogTitle>Add Member</DialogTitle>
-          <DialogContent>
+          <DialogTitle sx={{ pb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>Add Member</DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
             <TextField
               autoFocus
               margin="dense"
               label="User ID"
               fullWidth
               variant="standard"
+              size="small"
               value={newMemberId}
               onChange={(e) => setNewMemberId(e.target.value)}
               helperText="Enter the user's UID to add them to the club"
             />
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setAddMemberDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddMember} variant="contained">Add</Button>
+          <DialogActions sx={{ px: 2, pb: 2 }}>
+            <Button onClick={() => setAddMemberDialog(false)} size="small">Cancel</Button>
+            <Button onClick={handleAddMember} variant="contained" size="small">Add</Button>
           </DialogActions>
         </Dialog>
 
         {/* Rotate Invite Code Dialog */}
         <Dialog open={rotateDialog} onClose={() => setRotateDialog(false)}>
-          <DialogTitle>Rotate Invite Code</DialogTitle>
-          <DialogContent>
-            <Typography>
+          <DialogTitle sx={{ pb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>Rotate Invite Code</DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            <Typography variant="body2">
               Are you sure you want to rotate the invite code? The current code will no longer work,
               and you'll need to share the new code with members who want to join.
             </Typography>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setRotateDialog(false)}>Cancel</Button>
-            <Button onClick={handleRotateInviteCode} color="primary" variant="contained">
+          <DialogActions sx={{ px: 2, pb: 2 }}>
+            <Button onClick={() => setRotateDialog(false)} size="small">Cancel</Button>
+            <Button onClick={handleRotateInviteCode} color="primary" variant="contained" size="small">
               Rotate
             </Button>
           </DialogActions>
@@ -497,16 +493,16 @@ const ClubManagement = () => {
 
         {/* Delete Club Dialog */}
         <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
-          <DialogTitle>Delete Club</DialogTitle>
-          <DialogContent>
-            <Typography>
+          <DialogTitle sx={{ pb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>Delete Club</DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            <Typography variant="body2">
               Are you sure you want to delete this club? This action cannot be undone.
               All books, goals, meetings, and posts in this club will be deleted.
             </Typography>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialog(false)}>Cancel</Button>
-            <Button onClick={handleDeleteClub} color="error" variant="contained">
+          <DialogActions sx={{ px: 2, pb: 2 }}>
+            <Button onClick={() => setDeleteDialog(false)} size="small">Cancel</Button>
+            <Button onClick={handleDeleteClub} color="error" variant="contained" size="small">
               Delete
             </Button>
           </DialogActions>
