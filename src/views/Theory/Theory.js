@@ -9,6 +9,8 @@ import {
   List,
   ListItem,
   ListItemText,
+  Divider,
+  Chip,
 } from '@mui/material';
 import { theme } from '../../theme';
 import PublicHeader from 'components/PublicHeader';
@@ -24,31 +26,42 @@ const Theory = () => {
 
         {/* Scrollable Content */}
         <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-          <Container maxWidth="md" sx={{ py: 8 }}>
+          <Container maxWidth="md" sx={{ py: { xs: 4, md: 8 } }}>
             <Paper
               elevation={0}
               sx={{
-                p: { xs: 4, md: 8 },
+                p: { xs: 2, md: 8 },
                 bgcolor: 'background.paper',
                 borderRadius: 3,
               }}
-          >
-            <Typography
-              variant="h2"
-              component="h1"
-              gutterBottom
+            >
+              <Typography
+                variant="h2"
+                component="h1"
+                gutterBottom
+                sx={{
+                  fontWeight: 'bold',
+                  color: 'primary.main',
+                  mb: 2,
+                  fontSize: { xs: '2.5rem', md: '3.5rem' },
+                  lineHeight: 1.2,
+                }}
+              >
+                Our Philosophy
+              </Typography>
+              <Divider sx={{ mb: { xs: 4, md: 6 }, borderWidth: 2, borderColor: 'primary.main', opacity: 0.3 }} />
+
+            <Paper
+              elevation={2}
               sx={{
-                fontWeight: 'bold',
-                color: 'primary.main',
-                mb: 4,
-                fontSize: { xs: '2.5rem', md: '3.5rem' },
-                lineHeight: 1.2,
+                p: { xs: 2, md: 4 },
+                mb: { xs: 3, md: 4 },
+                bgcolor: 'background.default',
+                borderRadius: 2,
+                borderLeft: '4px solid',
+                borderColor: 'primary.main',
               }}
             >
-              Our Philosophy
-            </Typography>
-
-            <Box sx={{ mb: 6 }}>
               <Typography
                 variant="h5"
                 component="h2"
@@ -72,15 +85,28 @@ const Theory = () => {
                 }}
               >
                 Two years ago I wanted to start a book club with a focus on philosophy. I wanted to bring my existing and somewhat separate groups of friends together to continue our discussions on life, morality, religion, and other philosophical topics with a diverse range of voices.  
+                <br />
                 I had no idea how to do this, so I called my friends together for a "meeting 0" to discuss how to structure this new club. What we came up with was a quarterly rotation of topics keeping the club fresh and engaging for all. We've made some minor tweaks over the past few years, but ultimately the fundamentals have remained the same.  
+                <br />
+                <br />
                 We've seen a lot of success in our club between improvements to reading habits and other regular personal goals. We've had deep discussions, made deeper friendships, and created a close group of friends who share a common goal of personal growth which helps each one of us continue to stay accountable to our goals.
                 <br />
                 <br />
                 I'm going to further break down the philosophy of the club and how it works in the following sections. Hopefully you'll see why we're so passionate about this format, and why we needed our own platform to make it work. This is not just a book club app, it's not just a meeting planner, it's not just a goal tracker or a habit tracker. This is something larger than the sum of its parts, and hopefully it can help you as well.
               </Typography>
-            </Box>
+            </Paper>
 
-            <Box sx={{ mb: 6 }}>
+            <Paper
+              elevation={2}
+              sx={{
+                p: { xs: 2, md: 4 },
+                mb: { xs: 3, md: 4 },
+                bgcolor: 'background.default',
+                borderRadius: 2,
+                borderLeft: '4px solid',
+                borderColor: 'secondary.main',
+              }}
+            >
               <Typography
                 variant="h5"
                 component="h2"
@@ -119,9 +145,19 @@ const Theory = () => {
                 Each night we will pick the book for the next night of the same theme, giving members 3 months to read each book. It also means members who only want to read fiction still get to learn from themes presented in other books they might not otherwise have been introduced to.  
                 It also gives us a good runway to set quarterly goals and follow along with progress that feels fast and real.
               </Typography>
-            </Box>
+            </Paper>
 
-            <Box sx={{ mb: 6 }}>
+            <Paper
+              elevation={2}
+              sx={{
+                p: { xs: 2, md: 4 },
+                mb: { xs: 3, md: 4 },
+                bgcolor: 'background.default',
+                borderRadius: 2,
+                borderLeft: '4px solid',
+                borderColor: 'primary.main',
+              }}
+            >
               <Typography
                 variant="h5"
                 component="h2"
@@ -185,9 +221,19 @@ const Theory = () => {
                   />
                 </ListItem>
               </List>
-            </Box>
+            </Paper>
 
-            <Box>
+            <Paper
+              elevation={2}
+              sx={{
+                p: { xs: 3, md: 4 },
+                bgcolor: 'background.default',
+                borderRadius: 2,
+                borderLeft: '4px solid',
+                borderColor: 'secondary.main',
+                textAlign: 'center',
+              }}
+            >
               <Typography
                 variant="h5"
                 component="h2"
@@ -213,11 +259,20 @@ const Theory = () => {
                 and meaningful engagement with ideas. If this philosophy resonates with you, we'd love to 
                 have you join us. Together, we can create something beautiful—one book, one goal, one 
                 conversation at a time.
-                <br />
-                <br />
-                - Jacob Dayton
               </Typography>
-            </Box>
+              <Box sx={{ mt: 3, pt: 3, borderTop: 1, borderColor: 'divider' }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontStyle: 'italic',
+                    color: 'text.secondary',
+                    fontSize: { xs: '0.9rem', md: '1rem' },
+                  }}
+                >
+                  - Jacob Dayton
+                </Typography>
+              </Box>
+            </Paper>
           </Paper>
           </Container>
         </Box>
