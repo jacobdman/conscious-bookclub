@@ -33,17 +33,18 @@ import AddBookForm from 'components/AddBookForm';
 const BookList = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
-  const [books, setBooks] = useState([]);           // Current page books only
+  const [allBooks, setAllBooks] = useState([]);           // All loaded books in order
+  const [loadedPages, setLoadedPages] = useState(new Set()); // Track which pages are loaded
   const [currentPage, setCurrentPage] = useState(1);
   const [totalBookCount, setTotalBookCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [selectedTheme, setSelectedTheme] = useState('all');
   const [selectedFilter, setSelectedFilter] = useState('all'); // New filter for discussed books
   const [pageSize, setPageSize] = useState(10);
-  const [pageCache, setPageCache] = useState({});
   const [filteredCount, setFilteredCount] = useState(0);
   
   const [loading, setLoading] = useState(true);
+  const [loadingPage, setLoadingPage] = useState(false); // Page-specific loading
   const [error, setError] = useState(null);
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
@@ -53,14 +54,74 @@ const BookList = () => {
   const [loadingProgress, setLoadingProgress] = useState({});
   const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
 
-  // Cache helper functions
-  const getCacheKey = (page, theme, filter, size) => {
-    return `page_${page}_${theme}_${filter}_${size}`;
-  };
+  // Helper functions
+  const isPageLoaded = useCallback((pageNumber) => {
+    return loadedPages.has(pageNumber);
+  }, [loadedPages]);
 
-  const clearCache = () => {
-    setPageCache({});
-  };
+  const getBooksForPage = useCallback((pageNumber) => {
+    const startIdx = (pageNumber - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+    return allBooks.slice(startIdx, endIdx).filter(Boolean);
+  }, [allBooks, pageSize]);
+
+  // Find gaps around a page that should be filled
+  const findGapsAroundPage = useCallback((pageNumber, maxGapSize = 2) => {
+    const gaps = [];
+    const sortedPages = Array.from(loadedPages).sort((a, b) => a - b);
+    
+    // Find nearest loaded pages before and after
+    const beforePages = sortedPages.filter(p => p < pageNumber);
+    const afterPages = sortedPages.filter(p => p > pageNumber);
+    
+    const nearestBefore = beforePages.length > 0 ? Math.max(...beforePages) : null;
+    const nearestAfter = afterPages.length > 0 ? Math.min(...afterPages) : null;
+    
+    // Check gap before
+    if (nearestBefore !== null) {
+      const gapSize = pageNumber - nearestBefore - 1;
+      if (gapSize > 0 && gapSize <= maxGapSize) {
+        for (let i = nearestBefore + 1; i < pageNumber; i++) {
+          gaps.push(i);
+        }
+      }
+    } else if (pageNumber > 1) {
+      // No pages loaded before, fill up to maxGapSize pages before
+      const startPage = Math.max(1, pageNumber - maxGapSize);
+      for (let i = startPage; i < pageNumber; i++) {
+        gaps.push(i);
+      }
+    }
+    
+    // Check gap after
+    if (nearestAfter !== null) {
+      const gapSize = nearestAfter - pageNumber - 1;
+      if (gapSize > 0 && gapSize <= maxGapSize) {
+        for (let i = pageNumber + 1; i < nearestAfter; i++) {
+          gaps.push(i);
+        }
+      }
+    }
+    
+    return gaps;
+  }, [loadedPages]);
+
+  // Insert books at correct position in array
+  const insertBooksAtPage = useCallback((books, pageNumber) => {
+    const startIdx = (pageNumber - 1) * pageSize;
+    setAllBooks(prev => {
+      const newBooks = [...prev];
+      // Ensure array is large enough
+      while (newBooks.length < startIdx + books.length) {
+        newBooks.push(undefined);
+      }
+      // Insert books at correct positions
+      books.forEach((book, index) => {
+        newBooks[startIdx + index] = book;
+      });
+      return newBooks;
+    });
+  }, [pageSize]);
 
   // Load progress for all books on current page
   const loadProgressForBooks = useCallback(async (booksList) => {
@@ -104,78 +165,71 @@ const BookList = () => {
     }
   }, [pageSize, currentClub]);
 
+  // Fetch a single page
+  const fetchPage = useCallback(async (pageNumber, theme = 'all', filter = 'all', size = pageSize) => {
+    if (!currentClub) {
+      throw new Error('No club selected');
+    }
+
+    const userId = user?.uid || null;
+    let result;
+    
+    if (theme !== 'all') {
+      // Theme-filtered pagination
+      result = await getBooksPageFiltered(currentClub.id, theme, pageNumber, size, 'createdAt', 'desc', userId);
+    } else if (filter === 'discussed') {
+      // Filter by discussed books - get ALL discussed books first
+      const allDiscussedBooks = await getAllDiscussedBooks(currentClub.id);
+      
+      // Then paginate the results
+      const startIndex = (pageNumber - 1) * size;
+      const endIndex = startIndex + size;
+      const paginatedBooks = allDiscussedBooks.slice(startIndex, endIndex);
+      
+      result = {
+        books: paginatedBooks,
+        totalCount: allDiscussedBooks.length
+      };
+    } else {
+      // Regular pagination (no filter)
+      result = await getBooksPage(currentClub.id, pageNumber, size, 'createdAt', 'desc', userId);
+    }
+    
+    return result;
+  }, [pageSize, user, currentClub]);
+
   // Load a specific page
   const loadPage = useCallback(async (pageNumber, theme = 'all', filter = 'all', size = pageSize) => {
+    // Check if page is already loaded
+    if (isPageLoaded(pageNumber)) {
+      // Page already loaded, just update metadata if needed
+      return;
+    }
+
     try {
-      setLoading(true);
+      setLoadingPage(true);
       setError(null);
       
-      // Check cache first
-      const cacheKey = getCacheKey(pageNumber, theme, filter, size);
-      const cached = pageCache[cacheKey];
+      // Fetch the requested page
+      const result = await fetchPage(pageNumber, theme, filter, size);
       
-      if (cached) {
-        setBooks(cached.books);
-        setTotalBookCount(cached.totalCount);
-        setFilteredCount(cached.totalCount);
-        setTotalPages(Math.ceil(cached.totalCount / size));
-        setLoading(false);
-        
-        // Extract progress from cached books if available
-        const progressMap = {};
-        let hasProgressInResponse = false;
-        cached.books.forEach((book) => {
-          if (book.progress !== undefined) {
-            hasProgressInResponse = true;
-            progressMap[book.id] = book.progress;
-          }
-        });
-        
-        if (hasProgressInResponse) {
-          setBookProgress(progressMap);
-        } else if (user?.uid) {
-          // Fallback: load progress separately if not in cached data
-          loadProgressForBooks(cached.books);
-        }
-        return;
+      // Update total count and pages if this is first load or count changed
+      if (totalBookCount === 0 || result.totalCount !== totalBookCount) {
+        setTotalBookCount(result.totalCount);
+        setTotalPages(Math.ceil(result.totalCount / size));
       }
       
-      // Fetch books with progress included if userId is available
-      if (!currentClub) {
-        setError('No club selected');
-        setLoading(false);
-        return;
-      }
-
-      const userId = user?.uid || null;
-      let result;
-      if (theme !== 'all') {
-        // Theme-filtered pagination
-        result = await getBooksPageFiltered(currentClub.id, theme, pageNumber, size, 'createdAt', 'desc', userId);
+      if (theme !== 'all' || filter === 'discussed') {
         setFilteredCount(result.totalCount);
-      } else if (filter === 'discussed') {
-        // Filter by discussed books - get ALL discussed books first
-        const allDiscussedBooks = await getAllDiscussedBooks(currentClub.id);
-        setFilteredCount(allDiscussedBooks.length);
-        
-        // Then paginate the results
-        const startIndex = (pageNumber - 1) * size;
-        const endIndex = startIndex + size;
-        const paginatedBooks = allDiscussedBooks.slice(startIndex, endIndex);
-        
-        result = {
-          books: paginatedBooks,
-          totalCount: allDiscussedBooks.length
-        };
       } else {
-        // Regular pagination (no filter)
-        result = await getBooksPage(currentClub.id, pageNumber, size, 'createdAt', 'desc', userId);
-        setFilteredCount(0); // Not filtering
+        setFilteredCount(0);
       }
       
-      setBooks(result.books);
-      setTotalBookCount(result.totalCount);
-      setTotalPages(Math.ceil(result.totalCount / size));
+      // Insert books at correct position in array
+      insertBooksAtPage(result.books, pageNumber);
+      
+      // Mark page as loaded
+      setLoadedPages(prev => new Set([...prev, pageNumber]));
       
       // Extract progress from books response (if included)
       const progressMap = {};
@@ -188,25 +242,46 @@ const BookList = () => {
       });
       
       if (hasProgressInResponse) {
-        // Progress was included in the response, use it directly
-        setBookProgress(progressMap);
-      } else if (userId) {
+        // Progress was included in the response, merge it
+        setBookProgress(prev => ({ ...prev, ...progressMap }));
+      } else if (user?.uid) {
         // Fallback: progress not in response, fetch separately
         loadProgressForBooks(result.books);
       }
       
-      // Cache this page
-      setPageCache(prev => ({
-        ...prev,
-        [cacheKey]: { books: result.books, totalCount: result.totalCount }
-      }));
+      // Fill gaps around this page (background, non-blocking)
+      const gaps = findGapsAroundPage(pageNumber);
+      if (gaps.length > 0) {
+        // Fill gaps in background without blocking UI
+        Promise.all(gaps.map(gapPage => 
+          fetchPage(gapPage, theme, filter, size).then(gapResult => {
+            insertBooksAtPage(gapResult.books, gapPage);
+            setLoadedPages(prev => new Set([...prev, gapPage]));
+            
+            // Extract progress for gap pages
+            const gapProgressMap = {};
+            gapResult.books.forEach((book) => {
+              if (book.progress !== undefined) {
+                gapProgressMap[book.id] = book.progress;
+              }
+            });
+            if (Object.keys(gapProgressMap).length > 0) {
+              setBookProgress(prev => ({ ...prev, ...gapProgressMap }));
+            }
+          }).catch(err => {
+            // Silently fail for gap filling - not critical
+            console.error(`Error filling gap page ${gapPage}:`, err);
+          })
+        ));
+      }
       
     } catch (err) {
       setError('Failed to fetch books');
+      console.error('Error loading page:', err);
     } finally {
-      setLoading(false);
+      setLoadingPage(false);
     }
-  }, [pageSize, pageCache, loadProgressForBooks, user, currentClub]);
+  }, [pageSize, loadProgressForBooks, user, currentClub, isPageLoaded, fetchPage, insertBooksAtPage, findGapsAroundPage, totalBookCount]);
 
   // Pagination handler
   const handlePageChange = (event, page) => {
@@ -219,6 +294,9 @@ const BookList = () => {
     const theme = event.target.value;
     setSelectedTheme(theme);
     setCurrentPage(1);
+    // Clear all books and loaded pages when filter changes
+    setAllBooks([]);
+    setLoadedPages(new Set());
     loadPage(1, theme, selectedFilter, pageSize);
   };
 
@@ -227,6 +305,9 @@ const BookList = () => {
     const filter = event.target.value;
     setSelectedFilter(filter);
     setCurrentPage(1);
+    // Clear all books and loaded pages when filter changes
+    setAllBooks([]);
+    setLoadedPages(new Set());
     loadPage(1, selectedTheme, filter, pageSize);
   };
 
@@ -235,7 +316,9 @@ const BookList = () => {
     const newSize = event.target.value;
     setPageSize(newSize);
     setCurrentPage(1);
-    clearCache(); // Clear cache since page size changed
+    // Clear all books and loaded pages since page size changed
+    setAllBooks([]);
+    setLoadedPages(new Set());
     loadPage(1, selectedTheme, selectedFilter, newSize);
   };
 
@@ -331,10 +414,19 @@ const BookList = () => {
     loadMeetings();
   }, [currentClub]);
 
+  // Computed: current page books
+  const currentBooks = React.useMemo(() => {
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+    return allBooks.slice(startIdx, endIdx).filter(Boolean);
+  }, [allBooks, currentPage, pageSize]);
+
   useEffect(() => {
     const initializeData = async () => {
+      setLoading(true);
       await loadMetadata();
       await loadPage(1, selectedTheme, selectedFilter, pageSize);
+      setLoading(false);
     };
     initializeData();
   }, [selectedTheme, selectedFilter, pageSize, loadMetadata, loadPage]);
@@ -347,45 +439,29 @@ const BookList = () => {
   const handleBookAdded = (book) => {
     if (!book) {
       // No book data provided, fallback to re-fetch
-      clearCache();
+      setAllBooks([]);
+      setLoadedPages(new Set());
       loadMetadata();
       loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
       setEditingBook(null);
       return;
     }
 
-    // Check if this is an update (book exists in current page) or a new book
-    const existingBookIndex = books.findIndex(b => b.id === book.id);
+    // Check if this is an update (book exists in allBooks) or a new book
+    const existingBookIndex = allBooks.findIndex(b => b && b.id === book.id);
     
     if (existingBookIndex !== -1) {
       // Update existing book in memory
-      setBooks(prev => {
+      setAllBooks(prev => {
         const updated = [...prev];
         updated[existingBookIndex] = { ...updated[existingBookIndex], ...book };
         return updated;
       });
-      
-      // Update cache for current page
-      const cacheKey = getCacheKey(currentPage, selectedTheme, selectedFilter, pageSize);
-      setPageCache(prev => {
-        const cached = prev[cacheKey];
-        if (cached) {
-          const updatedBooks = cached.books.map(b => 
-            b.id === book.id ? { ...b, ...book } : b
-          );
-          return {
-            ...prev,
-            [cacheKey]: { ...cached, books: updatedBooks }
-          };
-        }
-        return prev;
-      });
-      
-      // Update metadata if needed (for new books, total count increases)
-      // For updates, we don't need to reload metadata
     } else {
       // New book - need to reload to see it in the list
-      clearCache();
+      // Clear and reload since new book might affect pagination
+      setAllBooks([]);
+      setLoadedPages(new Set());
       loadMetadata();
       loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
     }
@@ -394,7 +470,18 @@ const BookList = () => {
   };
 
   const handleBookDeleted = (deletedBookId) => {
-    clearCache(); // Invalidate cache
+    // Remove book from allBooks if it exists
+    const existingBookIndex = allBooks.findIndex(b => b && b.id === deletedBookId);
+    if (existingBookIndex !== -1) {
+      setAllBooks(prev => {
+        const updated = [...prev];
+        updated[existingBookIndex] = undefined; // Mark as deleted
+        return updated;
+      });
+    }
+    
+    // Invalidate all loaded pages since deletion affects pagination
+    setLoadedPages(new Set());
     loadMetadata();
     loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
     setEditingBook(null); // Clear editing state
@@ -410,7 +497,8 @@ const BookList = () => {
     setEditingBook(null);
   };
 
-  if (loading) {
+  if (loading && allBooks.length === 0) {
+    // Only show full-page spinner on initial load when no books are loaded
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -422,7 +510,7 @@ const BookList = () => {
     return (
       <Box sx={{ p: 2 }}>
         <Alert severity="error" action={
-          <Button color="inherit" size="small" onClick={() => loadPage(currentPage)}>
+          <Button color="inherit" size="small" onClick={() => loadPage(currentPage, selectedTheme, selectedFilter, pageSize)}>
             Retry
           </Button>
         }>
@@ -517,6 +605,13 @@ const BookList = () => {
           </Box>
         )}
 
+        {/* Loading indicator for page loading (doesn't hide content) */}
+        {loadingPage && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <CircularProgress size={24} />
+          </Box>
+        )}
+
         <TableContainer component={Paper}>
           <Table sx={{ minWidth: 650 }} aria-label="books table">
             <TableHead>
@@ -533,7 +628,7 @@ const BookList = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {books.map((book) => (
+              {currentBooks.map((book) => (
                 <TableRow
                   key={book.id}
                   sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
@@ -628,7 +723,7 @@ const BookList = () => {
           </Table>
         </TableContainer>
 
-        {books.length === 0 && (
+        {currentBooks.length === 0 && !loadingPage && (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Typography variant="h6" color="text.secondary">
               No books found
