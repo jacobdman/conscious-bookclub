@@ -20,7 +20,8 @@ const normalizeGoal = (goalData, docId = null) => {
       ...m,
       id: m.id || m.ID,
       done: m.done || false,
-      title: m.title || 'Untitled milestone'
+      title: m.title || 'Untitled milestone',
+      order: m.order !== undefined ? m.order : (m.id || m.ID || 0)
     }));
   }
   // Normalize goal type

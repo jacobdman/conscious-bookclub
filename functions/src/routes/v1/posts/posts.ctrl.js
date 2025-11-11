@@ -11,7 +11,7 @@ if (vapidPublicKey && vapidPrivateKey) {
 }
 
 // Helper function to send push notification
-const sendPushNotification = async (subscription, title, body) => {
+const sendPushNotification = async (subscription, title, body, data = {}) => {
   try {
     // Ensure subscription is an object (not a string)
     const subscriptionObj = typeof subscription === "string" ?
@@ -23,6 +23,7 @@ const sendPushNotification = async (subscription, title, body) => {
       body,
       icon: "/android-chrome-192x192.png",
       badge: "/android-chrome-192x192.png",
+      data,
     });
 
     const result = await webpush.sendNotification(subscriptionObj, payload);
@@ -91,6 +92,51 @@ const emitToClub = async (clubId, event, data) => {
   }
 };
 
+// Helper to check which users are currently in a club's socket room
+// Returns a Set of userIds that are actively viewing the feed
+// If socket service is unavailable, returns empty Set (fail-safe - send notifications)
+const checkUsersInRoom = async (clubId, userIds) => {
+  try {
+    // Determine Socket.io service URL (same logic as emitToClub)
+    const isEmulator = process.env.FUNCTIONS_EMULATOR === "true" ||
+                       process.env.GCLOUD_PROJECT === "demo-test" ||
+                       !process.env.GCLOUD_PROJECT;
+
+    const socketServiceUrl = isEmulator ?
+      "http://localhost:3001" : // Local development
+      process.env.SOCKET_SERVICE_URL ||
+      "https://socket-service-499467823747.us-central1.run.app"; // Production
+
+    const room = `club:${clubId}`;
+
+    // Make HTTP POST to Socket.io service /check-room-members endpoint
+    const response = await fetch(`${socketServiceUrl}/check-room-members`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        room,
+        userIds: Array.isArray(userIds) ? userIds : [],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to check room members for ${room}:`, response.status, response.statusText);
+      // Fail-safe: return empty Set so notifications are still sent
+      return new Set();
+    }
+
+    const result = await response.json();
+    return new Set(result.userIdsInRoom || []);
+  } catch (error) {
+    // Fail-safe: if socket service is unavailable, return empty Set
+    // This ensures notifications are still sent rather than being blocked
+    console.log("Socket.io room check failed (non-critical):", error.message);
+    return new Set();
+  }
+};
+
 // GET /v1/posts - Get posts with pagination
 const getPosts = async (req, res, next) => {
   try {
@@ -130,8 +176,11 @@ const getPosts = async (req, res, next) => {
         {
           model: db.Post,
           as: "parentPost",
-          attributes: ["id", "isSpoiler"],
+          attributes: ["id", "text", "authorName", "isSpoiler"],
           required: false,
+          include: [
+            {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
+          ],
         },
       ],
     });
@@ -176,8 +225,11 @@ const getPost = async (req, res, next) => {
         {
           model: db.Post,
           as: "parentPost",
-          attributes: ["id", "isSpoiler"],
+          attributes: ["id", "text", "authorName", "isSpoiler"],
           required: false,
+          include: [
+            {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
+          ],
         },
       ],
     });
@@ -204,27 +256,9 @@ const createPost = async (req, res, next) => {
     const postData = req.body;
     const clubIdInt = parseInt(clubId);
 
-    // If this is a reply, fetch parent post text and author name
-    let parentPostText = null;
-    let parentAuthorName = null;
-    if (postData.parentPostId) {
-      const parentPost = await db.Post.findByPk(postData.parentPostId, {
-        include: [{model: db.User, as: "author", attributes: ["uid", "displayName"]}],
-      });
-      if (parentPost && parentPost.clubId === clubIdInt) {
-        // Truncate to ~150 characters for preview
-        parentPostText = parentPost.text.length > 150 ?
-          parentPost.text.substring(0, 150) + "..." :
-          parentPost.text;
-        parentAuthorName = parentPost.authorName || parentPost.author?.displayName || "Unknown";
-      }
-    }
-
     const post = await db.Post.create({
       ...postData,
       clubId: clubIdInt,
-      parentPostText,
-      parentAuthorName,
       isSpoiler: postData.isSpoiler || false,
     });
 
@@ -240,8 +274,11 @@ const createPost = async (req, res, next) => {
         {
           model: db.Post,
           as: "parentPost",
-          attributes: ["id", "isSpoiler"],
+          attributes: ["id", "text", "authorName", "isSpoiler"],
           required: false,
+          include: [
+            {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
+          ],
         },
       ],
     });
@@ -279,7 +316,8 @@ const createPost = async (req, res, next) => {
           }
         }
 
-        // Send notifications to members who have feed notifications enabled
+        // Collect userIds that should receive notifications (before checking room membership)
+        const userIdsToNotify = [];
         for (const member of clubMembers) {
           if (!member.user) continue;
 
@@ -292,6 +330,48 @@ const createPost = async (req, res, next) => {
 
           // Skip the post author (don't notify yourself)
           if (user.uid === postData.authorId) continue;
+
+          let shouldNotify = false;
+
+          if (feedSettings.mode === "all") {
+            // Notify for all new posts
+            shouldNotify = true;
+          } else if (feedSettings.mode === "mentions_replies") {
+            // Only notify for replies to this user's posts
+            if (isReply && parentPostAuthorId === user.uid) {
+              shouldNotify = true;
+            }
+          }
+
+          if (shouldNotify) {
+            userIdsToNotify.push(user.uid);
+          }
+        }
+
+        // Check which users are actively viewing the feed (in socket room)
+        // Skip notifications for users who are already seeing updates in real-time
+        const usersInRoom = await checkUsersInRoom(clubIdInt, userIdsToNotify);
+
+        // Send notifications to members who have feed notifications enabled
+        // and are not actively viewing the feed
+        for (const member of clubMembers) {
+          if (!member.user) continue;
+
+          const user = member.user;
+          const settings = user.notificationSettings || {};
+          const feedSettings = settings.feed || {};
+
+          // Skip if feed notifications are not enabled
+          if (!feedSettings.enabled) continue;
+
+          // Skip the post author (don't notify yourself)
+          if (user.uid === postData.authorId) continue;
+
+          // Skip if user is actively viewing the feed (already receiving real-time updates)
+          if (usersInRoom.has(user.uid)) {
+            console.log(`Skipping notification for user ${user.uid} - actively viewing feed`);
+            continue;
+          }
 
           let shouldNotify = false;
 
@@ -319,15 +399,20 @@ const createPost = async (req, res, next) => {
               notificationTitle = "New Reply";
               notificationBody = `${authorName} replied to your post`;
             } else {
-              notificationBody = `${authorName} posted in your book club`;
+              // Truncate post text to ~50-60 characters for notification
+              const truncatedText = postData.text.length > 60 ?
+                postData.text.substring(0, 60) + "..." :
+                postData.text;
+              notificationBody = `${authorName}: ${truncatedText}`;
             }
 
-            // Send notification to all subscriptions
+            // Send notification to all subscriptions with route data
             for (const subscription of subscriptions) {
               await sendPushNotification(
                   subscription.subscriptionJson,
                   notificationTitle,
                   notificationBody,
+                  {route: "/feed", type: "feed"},
               );
             }
           }

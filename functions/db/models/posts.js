@@ -31,16 +31,6 @@ module.exports = function(sequelize, DataTypes) {
           field: "parent_post_id",
           allowNull: true,
         },
-        parentPostText: {
-          type: DataTypes.TEXT,
-          field: "parent_post_text",
-          allowNull: true,
-        },
-        parentAuthorName: {
-          type: DataTypes.STRING(255),
-          field: "parent_author_name",
-          allowNull: true,
-        },
         isSpoiler: {
           type: DataTypes.BOOLEAN,
           field: "is_spoiler",

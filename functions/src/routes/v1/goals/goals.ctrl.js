@@ -6,7 +6,7 @@ const db = require("../../../../db/models/index");
 const getMilestones = async (goalId) => {
   const milestones = await db.Milestone.findAll({
     where: {goalId},
-    order: [["id", "ASC"]],
+    order: [["order", "ASC"], ["created_at", "ASC"]],
   });
   return milestones.map((m) => ({id: m.id, ...m.toJSON()}));
 };
@@ -220,7 +220,8 @@ const getGoals = async (req, res, next) => {
         {
           model: db.Milestone,
           as: "milestones",
-          attributes: ["id", "title", "done", "doneAt"],
+          attributes: ["id", "title", "done", "doneAt", "order"],
+          order: [["order", "ASC"], ["created_at", "ASC"]],
         },
       ],
     });
@@ -312,12 +313,13 @@ const createGoal = async (req, res, next) => {
 
     // Create milestones if provided
     if (type === "milestone" && goalData.milestones && Array.isArray(goalData.milestones)) {
-      for (const milestoneData of goalData.milestones) {
+      for (const [i, milestoneData] of goalData.milestones.entries()) {
         await db.Milestone.create({
           goalId: goal.id,
           title: milestoneData.title,
           done: milestoneData.done || false,
           doneAt: milestoneData.doneAt || null,
+          order: milestoneData.order !== undefined ? milestoneData.order : i,
         });
       }
     }
@@ -329,7 +331,8 @@ const createGoal = async (req, res, next) => {
         {
           model: db.Milestone,
           as: "milestones",
-          attributes: ["id", "title", "done", "doneAt"],
+          attributes: ["id", "title", "done", "doneAt", "order"],
+          order: [["order", "ASC"], ["created_at", "ASC"]],
         },
       ],
     });
@@ -383,12 +386,13 @@ const updateGoal = async (req, res, next) => {
       await db.Milestone.destroy({where: {goalId}});
 
       // Create new milestones
-      for (const milestoneData of milestones) {
+      for (const [i, milestoneData] of milestones.entries()) {
         await db.Milestone.create({
           goalId,
           title: milestoneData.title,
           done: milestoneData.done || false,
           doneAt: milestoneData.doneAt || null,
+          order: milestoneData.order !== undefined ? milestoneData.order : i,
         });
       }
     }
@@ -399,7 +403,8 @@ const updateGoal = async (req, res, next) => {
         {
           model: db.Milestone,
           as: "milestones",
-          attributes: ["id", "title", "done", "doneAt"],
+          attributes: ["id", "title", "done", "doneAt", "order"],
+          order: [["order", "ASC"], ["created_at", "ASC"]],
         },
       ],
     });
@@ -706,11 +711,23 @@ const createMilestone = async (req, res, next) => {
   try {
     const {goalId} = req.params;
     const milestoneData = req.body;
+
+    // If order is not provided, set it to the max order + 1 for this goal
+    let order = milestoneData.order;
+    if (order === undefined) {
+      const maxOrderMilestone = await db.Milestone.findOne({
+        where: {goalId: parseInt(goalId)},
+        order: [["order", "DESC"]],
+      });
+      order = maxOrderMilestone ? maxOrderMilestone.order + 1 : 0;
+    }
+
     const milestone = await db.Milestone.create({
       goalId: parseInt(goalId),
       title: milestoneData.title,
       done: milestoneData.done || false,
       doneAt: milestoneData.doneAt || null,
+      order: order,
     });
     res.status(201).json({id: milestone.id, ...milestone.toJSON()});
   } catch (e) {
@@ -731,8 +748,9 @@ const updateMilestone = async (req, res, next) => {
     }
     await milestone.update({
       title: updates.title || milestone.title,
-      done: updates.done !== undefined ? updates.done : milestone.done,
-      doneAt: updates.done ? (updates.doneAt || new Date()) : null,
+      done: updates.done || milestone.done,
+      doneAt: updates.done ? (updates.doneAt || new Date()) : milestone.doneAt,
+      order: updates.order || milestone.order,
     });
     res.json({id: milestone.id, ...milestone.toJSON()});
   } catch (e) {

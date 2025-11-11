@@ -257,7 +257,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       } else {
         // Add new book
         const newBookRef = await addBook(currentClub.id, bookData);
-        const newBook = { id: newBookRef.id, ...bookData };
+        // Use the full response which includes id, createdAt, and all other fields
+        const newBook = newBookRef;
         onBookAdded(newBook); // Pass the new book data
       }
       

@@ -50,6 +50,56 @@ app.post("/emit", (req, res) => {
   }
 });
 
+// Endpoint to check which users are currently in a room
+// Used to prevent sending push notifications to users actively viewing the feed
+app.post("/check-room-members", (req, res) => {
+  try {
+    const {room, userIds} = req.body;
+
+    if (!room) {
+      return res.status(400).json({
+        error: "Missing required field: room",
+      });
+    }
+
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({
+        error: "userIds must be an array",
+      });
+    }
+
+    // Get all sockets in the room
+    const roomSockets = io.sockets.adapter.rooms.get(room);
+    const userIdsInRoom = [];
+
+    if (roomSockets) {
+      // Iterate through sockets in the room and collect userIds
+      for (const socketId of roomSockets) {
+        const socket = io.sockets.sockets.get(socketId);
+        if (socket && socket.userId) {
+          // If userIds array is provided, only include matching userIds
+          // Otherwise, return all userIds in the room
+          if (userIds.length === 0 || userIds.includes(socket.userId)) {
+            userIdsInRoom.push(socket.userId);
+          }
+        }
+      }
+    }
+
+    // Remove duplicates (in case a user has multiple sockets)
+    const uniqueUserIdsInRoom = [...new Set(userIdsInRoom)];
+
+    res.status(200).json({
+      success: true,
+      room,
+      userIdsInRoom: uniqueUserIdsInRoom,
+    });
+  } catch (error) {
+    console.error("Error checking room members:", error);
+    res.status(500).json({error: "Failed to check room members"});
+  }
+});
+
 // Create HTTP server
 const server = http.createServer(app);
 

@@ -70,10 +70,17 @@ export const markOneTimeGoalComplete = async (userId, goalId) => {
 // Goal entry management functions
 export const createGoalEntry = async (userId, goalId, entryData) => {
   const params = new URLSearchParams({ userId });
-  return apiCall(`/v1/goals/${goalId}/entries?${params}`, {
+  const result = await apiCall(`/v1/goals/${goalId}/entries?${params}`, {
     method: 'POST',
     body: JSON.stringify(entryData),
   });
+  // Return both entry and goal for backward compatibility
+  return {
+    entry: result.entry,
+    goal: result.goal,
+    // For backward compatibility, also return entry properties at top level
+    ...result.entry,
+  };
 };
 
 export const getGoalEntries = async (userId, goalId, periodStart = null, periodEnd = null, limit = null, offset = 0) => {
@@ -87,17 +94,26 @@ export const getGoalEntries = async (userId, goalId, periodStart = null, periodE
 
 export const updateGoalEntry = async (userId, goalId, entryId, updates) => {
   const params = new URLSearchParams({ userId });
-  return apiCall(`/v1/goals/${goalId}/entries/${entryId}?${params}`, {
+  const result = await apiCall(`/v1/goals/${goalId}/entries/${entryId}?${params}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
+  // Return both entry and goal for backward compatibility
+  return {
+    entry: result.entry,
+    goal: result.goal,
+    // For backward compatibility, also return entry properties at top level
+    ...result.entry,
+  };
 };
 
 export const deleteGoalEntry = async (userId, goalId, entryId) => {
   const params = new URLSearchParams({ userId });
-  await apiCall(`/v1/goals/${goalId}/entries/${entryId}?${params}`, {
+  const result = await apiCall(`/v1/goals/${goalId}/entries/${entryId}?${params}`, {
     method: 'DELETE',
   });
+  // Return the goal object
+  return result.goal;
 };
 
 // Goal progress functions

@@ -19,7 +19,7 @@ import {
   Divider,
   Checkbox,
 } from '@mui/material';
-import { Close, Add, Edit, Delete } from '@mui/icons-material';
+import { Close, Add, Edit, Delete, DragIndicator } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import { 
   getGoalEntries,
@@ -47,6 +47,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [entryDialog, setEntryDialog] = useState({ open: false, entry: null, saving: false, error: null });
+  const [draggedMilestoneId, setDraggedMilestoneId] = useState(null);
+  const [draggedOverMilestoneId, setDraggedOverMilestoneId] = useState(null);
   const observerTarget = useRef(null);
   const currentOffset = useRef(0);
   const INITIAL_LIMIT = 10;
@@ -150,9 +152,13 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     if (!user || !window.confirm('Are you sure you want to delete this entry?')) return;
 
     try {
-      await deleteGoalEntry(user.uid, goal.id, entry.id);
+      const updatedGoal = await deleteGoalEntry(user.uid, goal.id, entry.id);
       // Remove from local state
       setEntries(prev => prev.filter(e => e.id !== entry.id));
+      // Update the goal in context with the returned goal data
+      if (updatedGoal) {
+        await updateGoalInContext(goal.id, updatedGoal);
+      }
     } catch (err) {
       console.error('Failed to delete entry:', err);
     }
@@ -167,8 +173,11 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
     try {
       let savedEntry;
+      let updatedGoal = null;
       if (isUpdate) {
-        savedEntry = await updateGoalEntry(user.uid, goal.id, entryDialog.entry.id, entryData);
+        const result = await updateGoalEntry(user.uid, goal.id, entryDialog.entry.id, entryData);
+        savedEntry = result.entry || result;
+        updatedGoal = result.goal;
         setEntries(prev => {
           // Update the entry and re-sort by occurred_at
           const updated = prev.map(e => 
@@ -181,7 +190,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
           });
         });
       } else {
-        savedEntry = await createGoalEntry(user.uid, goal.id, entryData);
+        const result = await createGoalEntry(user.uid, goal.id, entryData);
+        savedEntry = result.entry || result;
+        updatedGoal = result.goal;
         // Add entry and sort by occurred_at (most recent first)
         setEntries(prev => {
           const combined = [savedEntry, ...prev];
@@ -191,6 +202,11 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
             return dateB - dateA; // Descending order (newest first)
           });
         });
+      }
+      
+      // Update the goal in context with the returned goal data
+      if (updatedGoal) {
+        await updateGoalInContext(goal.id, updatedGoal);
       }
       
       setEntryDialog({ open: false, entry: null, saving: false, error: null });
@@ -236,6 +252,90 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     } catch (err) {
       console.error('Failed to update milestone:', err);
     }
+  };
+
+  const handleDragStart = (e, milestoneId) => {
+    setDraggedMilestoneId(milestoneId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', milestoneId);
+  };
+
+  const handleDragOver = (e, milestoneId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (milestoneId !== draggedOverMilestoneId) {
+      setDraggedOverMilestoneId(milestoneId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDraggedOverMilestoneId(null);
+  };
+
+  const handleDrop = async (e, targetMilestoneId) => {
+    e.preventDefault();
+    setDraggedOverMilestoneId(null);
+
+    if (!draggedMilestoneId || draggedMilestoneId === targetMilestoneId) {
+      setDraggedMilestoneId(null);
+      return;
+    }
+
+    if (!user || !goal || !currentClub) {
+      setDraggedMilestoneId(null);
+      return;
+    }
+
+    try {
+      // Get sorted milestones by order
+      const sortedMilestones = [...(goal.milestones || [])].sort((a, b) => {
+        const orderA = a.order !== undefined ? a.order : (a.id || 0);
+        const orderB = b.order !== undefined ? b.order : (b.id || 0);
+        return orderA - orderB;
+      });
+
+      const draggedIndex = sortedMilestones.findIndex(m => m.id === draggedMilestoneId);
+      const targetIndex = sortedMilestones.findIndex(m => m.id === targetMilestoneId);
+
+      if (draggedIndex === -1 || targetIndex === -1) {
+        setDraggedMilestoneId(null);
+        return;
+      }
+
+      // Reorder milestones array
+      const reorderedMilestones = [...sortedMilestones];
+      const [draggedMilestone] = reorderedMilestones.splice(draggedIndex, 1);
+      reorderedMilestones.splice(targetIndex, 0, draggedMilestone);
+
+      // Update order for all affected milestones
+      const updatePromises = reorderedMilestones.map((milestone, index) => {
+        if (milestone.order !== index) {
+          return updateMilestone(user.uid, goal.id, milestone.id, { order: index });
+        }
+        return Promise.resolve();
+      });
+
+      await Promise.all(updatePromises);
+
+      // Update the goal in context with new order
+      const updatedMilestones = reorderedMilestones.map((milestone, index) => ({
+        ...milestone,
+        order: index,
+      }));
+
+      await updateGoalInContext(goal.id, {
+        milestones: updatedMilestones,
+      });
+    } catch (err) {
+      console.error('Failed to reorder milestones:', err);
+    } finally {
+      setDraggedMilestoneId(null);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedMilestoneId(null);
+    setDraggedOverMilestoneId(null);
   };
 
   const handleToggleOneTimeGoal = async () => {
@@ -337,35 +437,75 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                       No milestones defined
                     </Typography>
                   ) : (
-                    goal.milestones.map((milestone) => {
-                      if (!milestone || !milestone.id) return null;
-                      
-                      return (
-                        <Box key={milestone.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Checkbox
-                            checked={milestone.done || false}
-                            onChange={() => handleToggleMilestone(milestone)}
-                            disabled={!milestone.id}
-                            size="small"
-                          />
-                          <Typography
-                            variant="body2"
+                    [...(goal.milestones || [])]
+                      .sort((a, b) => {
+                        const orderA = a.order !== undefined ? a.order : (a.id || 0);
+                        const orderB = b.order !== undefined ? b.order : (b.id || 0);
+                        return orderA - orderB;
+                      })
+                      .map((milestone) => {
+                        if (!milestone || !milestone.id) return null;
+                        
+                        const isDragging = draggedMilestoneId === milestone.id;
+                        const isDraggedOver = draggedOverMilestoneId === milestone.id;
+                        
+                        return (
+                          <Box
+                            key={milestone.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, milestone.id)}
+                            onDragOver={(e) => handleDragOver(e, milestone.id)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, milestone.id)}
+                            onDragEnd={handleDragEnd}
                             sx={{
-                              textDecoration: milestone.done ? 'line-through' : 'none',
-                              opacity: milestone.done ? 0.6 : 1,
-                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              mb: 1,
+                              p: 1,
+                              borderRadius: 1,
+                              cursor: 'move',
+                              opacity: isDragging ? 0.5 : 1,
+                              backgroundColor: isDraggedOver ? 'action.hover' : 'transparent',
+                              '&:hover': {
+                                backgroundColor: 'action.hover',
+                              },
                             }}
                           >
-                            {milestone.title || 'Untitled milestone'}
-                          </Typography>
-                          {milestone.doneAt && (
-                            <Typography variant="caption" color="text.secondary">
-                              {formatDate(milestone.doneAt)}
+                            <DragIndicator
+                              sx={{
+                                color: 'text.secondary',
+                                cursor: 'grab',
+                                '&:active': {
+                                  cursor: 'grabbing',
+                                },
+                              }}
+                            />
+                            <Checkbox
+                              checked={milestone.done || false}
+                              onChange={() => handleToggleMilestone(milestone)}
+                              disabled={!milestone.id}
+                              size="small"
+                            />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                textDecoration: milestone.done ? 'line-through' : 'none',
+                                opacity: milestone.done ? 0.6 : 1,
+                                flex: 1,
+                              }}
+                            >
+                              {milestone.title || 'Untitled milestone'}
                             </Typography>
-                          )}
-                        </Box>
-                      );
-                    })
+                            {milestone.doneAt && (
+                              <Typography variant="caption" color="text.secondary">
+                                {formatDate(milestone.doneAt)}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      })
                   )}
                 </Box>
               )}

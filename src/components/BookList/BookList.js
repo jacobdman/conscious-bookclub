@@ -467,7 +467,6 @@ const BookList = () => {
   const handleBookAdded = (book) => {
     if (!book) {
       // No book data provided, fallback to re-fetch
-      setAllBooks([]);
       setLoadedPages(new Set());
       loadMetadata();
       loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
@@ -486,18 +485,37 @@ const BookList = () => {
         return updated;
       });
     } else {
-      // New book - need to reload to see it in the list
-      // Clear and reload since new book might affect pagination
-      setAllBooks([]);
-      setLoadedPages(new Set());
-      loadMetadata();
-      loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
+      // New book - add to the front of the array
+      setAllBooks(prev => {
+        const newArray = [book, ...prev];
+        
+        // If we're on page 1 and the array exceeds pageSize, remove the last item
+        // This keeps the current page size consistent
+        if (currentPage === 1 && newArray.length > pageSize) {
+          // Remove the last item that would be beyond the current page
+          return newArray.slice(0, pageSize);
+        }
+        
+        return newArray;
+      });
+      
+      // Update total count
+      setTotalBookCount(prev => {
+        const newCount = prev + 1;
+        setTotalPages(Math.ceil(newCount / pageSize));
+        return newCount;
+      });
+      
+      // If we're on page 1, mark it as loaded (since we just added the book)
+      if (currentPage === 1) {
+        setLoadedPages(prev => new Set([...prev, 1]));
+      }
     }
     
     setEditingBook(null); // Clear editing state
   };
 
-  const handleBookDeleted = (deletedBookId) => {
+  const handleBookDeleted = async (deletedBookId) => {
     // Remove book from allBooks if it exists
     const existingBookIndex = allBooks.findIndex(b => b && b.id === deletedBookId);
     if (existingBookIndex !== -1) {
@@ -509,9 +527,15 @@ const BookList = () => {
     }
     
     // Invalidate all loaded pages since deletion affects pagination
-    setLoadedPages(new Set());
-    loadMetadata();
-    loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
+    // Keep existing books visible during reload
+    setLoadingPage(true);
+    setLoadedPages(prev => {
+      const updated = new Set(prev);
+      updated.delete(currentPage); // Remove current page from loaded pages to force reload
+      return updated;
+    });
+    await loadMetadata();
+    await loadPage(currentPage, selectedTheme, selectedFilter, pageSize);
     setEditingBook(null); // Clear editing state
   };
 

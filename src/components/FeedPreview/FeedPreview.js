@@ -174,11 +174,11 @@ const FeedPreview = () => {
                   )}
 
                   {/* Reply quote if this is a reply */}
-                  {post.parentPostId && (
+                  {post.parentPostId && post.parentPost && (
                     <Box sx={{ mb: 0.5 }}>
                       <ReplyQuote
-                        parentAuthorName={post.parentAuthorName}
-                        parentPostText={post.parentPostText}
+                        parentAuthorName={post.parentPost.authorName || post.parentPost.author?.displayName || 'Unknown'}
+                        parentPostText={post.parentPost.text}
                         parentIsSpoiler={post.parentIsSpoiler}
                         onClick={(e) => {
                           e.stopPropagation();

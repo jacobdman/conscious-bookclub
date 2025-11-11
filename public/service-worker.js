@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 /* Service Worker file - uses service worker globals (self, caches, clients, location) */
-const CACHE_NAME = 'cbc-app-v0.1.21';
+const CACHE_NAME = 'cbc-app-v0.1.22';
 const VERSION_URL = '/version.json';
 
 // Install event - cache static assets
@@ -233,19 +233,37 @@ self.addEventListener('notificationclick', (event) => {
 
   event.notification.close();
 
+  // Determine the route based on notification data
+  const notificationData = event.notification.data || {};
+  const route = notificationData.route || '/';
+  const baseUrl = self.location.origin;
+
   // Open or focus the app
   event.waitUntil(
       self.clients.matchAll({type: 'window', includeUncontrolled: true}).then((clientList) => {
-        // If app is already open, focus it
+        // If app is already open, navigate to the route and focus it
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
-          if (client.url === '/' && 'focus' in client) {
+          if (client.url.startsWith(baseUrl) && 'focus' in client) {
+            // Navigate to the route if needed
+            const targetUrl = baseUrl + route;
+            if (client.url !== targetUrl && 'navigate' in client) {
+              try {
+                client.navigate(targetUrl);
+              } catch (e) {
+                // If navigate fails, fall back to opening new window
+                console.log('Navigate failed, opening new window:', e);
+                if (self.clients.openWindow) {
+                  return self.clients.openWindow(targetUrl);
+                }
+              }
+            }
             return client.focus();
           }
         }
-        // Otherwise, open a new window
+        // Otherwise, open a new window with the route
         if (self.clients.openWindow) {
-          return self.clients.openWindow('/');
+          return self.clients.openWindow(baseUrl + route);
         }
       })
   );

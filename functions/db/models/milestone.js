@@ -24,6 +24,11 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.DATE,
           field: "done_at",
         },
+        order: {
+          type: DataTypes.INTEGER,
+          allowNull: false,
+          defaultValue: 0,
+        },
       },
       {
         tableName: "milestone",

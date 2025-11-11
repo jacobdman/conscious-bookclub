@@ -152,10 +152,14 @@ const TodaysGoals = () => {
         // For habits, create or delete entry based on current state
         if (!isCurrentlyComplete) {
           // Create entry when checking
-          await createGoalEntry(user.uid, goalId, {
+          const result = await createGoalEntry(user.uid, goalId, {
             occurred_at: new Date().toISOString(),
             quantity: null,
           });
+          // Update the goal in context with the returned goal data
+          if (result.goal) {
+            await updateGoal(goalId, result.goal);
+          }
         } else {
           // Delete today's entry when unchecking
           const todayBoundaries = getTodayBoundaries();
@@ -166,7 +170,11 @@ const TodaysGoals = () => {
               new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
             )[0];
             if (mostRecentEntry) {
-              await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
+              const updatedGoal = await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
+              // Update the goal in context with the returned goal data
+              if (updatedGoal) {
+                await updateGoal(goalId, updatedGoal);
+              }
             }
           }
         }
@@ -186,7 +194,11 @@ const TodaysGoals = () => {
               new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
             )[0];
             if (mostRecentEntry) {
-              await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
+              const updatedGoal = await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
+              // Update the goal in context with the returned goal data
+              if (updatedGoal) {
+                await updateGoal(goalId, updatedGoal);
+              }
             }
           }
         }
@@ -320,13 +332,18 @@ const TodaysGoals = () => {
       setUpdating(prev => ({ ...prev, [goal.id]: true }));
       setQuantityDialog({ open: false, goal: null, quantity: '' });
 
-      await createGoalEntry(user.uid, goal.id, {
+      const result = await createGoalEntry(user.uid, goal.id, {
         occurred_at: new Date().toISOString(),
         quantity: quantity,
       });
 
+      // Update the goal in context with the returned goal data
+      if (result.goal) {
+        await updateGoal(goal.id, result.goal);
+      }
+
       // Refresh completion states for this specific metric goal only
-      const updatedGoal = allGoals.find(g => g.id === goal.id) || goal;
+      const updatedGoal = result.goal || allGoals.find(g => g.id === goal.id) || goal;
       if (filteredGoals.find(g => g.id === goal.id)) {
         await fetchCompletions([updatedGoal]);
       }

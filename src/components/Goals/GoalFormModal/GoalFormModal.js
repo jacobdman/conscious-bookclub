@@ -63,6 +63,13 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
 
   useEffect(() => {
     if (editingGoal) {
+      // Sort milestones by order when loading
+      const milestones = (editingGoal.milestones || []).slice().sort((a, b) => {
+        const orderA = a.order !== undefined ? a.order : (a.id || 0);
+        const orderB = b.order !== undefined ? b.order : (b.id || 0);
+        return orderA - orderB;
+      });
+      
       setFormData({
         title: editingGoal.title || '',
         type: editingGoal.type || 'habit',
@@ -72,7 +79,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         targetQuantity: editingGoal.targetQuantity || editingGoal.target_quantity || null,
         unit: editingGoal.unit || '',
         dueAt: parseDate(editingGoal.dueAt || editingGoal.due_at),
-        milestones: editingGoal.milestones || [],
+        milestones: milestones,
         completed: editingGoal.completed || false,
       });
     } else {
@@ -102,7 +109,11 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
     if (newMilestone.title.trim()) {
       setFormData(prev => ({
         ...prev,
-        milestones: [...prev.milestones, { title: newMilestone.title.trim(), done: false }]
+        milestones: [...prev.milestones, { 
+          title: newMilestone.title.trim(), 
+          done: false,
+          order: prev.milestones.length
+        }]
       }));
       setNewMilestone({ title: '' });
     }

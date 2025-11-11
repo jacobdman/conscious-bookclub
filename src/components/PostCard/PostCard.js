@@ -134,12 +134,12 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         )}
 
         {/* Reply Quote */}
-        {post.parentPostId && post.parentPostText && (
+        {post.parentPostId && post.parentPost && (
           <Box sx={{ mb: 0.75 }}>
             <ReplyQuote
-              parentPostText={post.parentPostText}
+              parentPostText={post.parentPost.text}
               parentPostId={post.parentPostId}
-              parentAuthorName={post.parentAuthorName || post.parentAuthor?.displayName || 'Unknown'}
+              parentAuthorName={post.parentPost.authorName || post.parentPost.author?.displayName || 'Unknown'}
               parentIsSpoiler={post.parentIsSpoiler}
             />
           </Box>
