@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 /* Service Worker file - uses service worker globals (self, caches, clients, location) */
-const CACHE_NAME = 'cbc-app-v0.1.15';
+const CACHE_NAME = 'cbc-app-v0.1.17';
 const VERSION_URL = '/version.json';
 
 // Install event - cache static assets
@@ -85,20 +85,28 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Network-first strategy for API calls
+  // Only cache GET requests - POST/PUT/DELETE cannot be cached
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/v1/')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clone the response for caching
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
+          // Only cache GET requests (POST/PUT/DELETE cannot be cached)
+          if (request.method === 'GET') {
+            // Clone the response for caching
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
           return response;
         })
         .catch(() => {
-          // If network fails, try cache
-          return caches.match(request);
+          // If network fails, try cache (only for GET requests)
+          if (request.method === 'GET') {
+            return caches.match(request);
+          }
+          // For non-GET requests, return error response
+          return new Response('Network error', { status: 503 });
         })
     );
     return;

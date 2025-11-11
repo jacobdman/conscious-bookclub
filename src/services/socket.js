@@ -51,10 +51,7 @@ export const connectSocket = () => {
       }
 
       // Path configuration:
-      // - Production: Client connects to /ws, Socket.io path is /ws/socket.io
-      //   (Hosting strips /ws, so server sees /socket.io)
-      // - Development: Client connects to localhost:PORT, Socket.io path is /socket.io
-      const socketPath = ENV_IS_PRODUCTION ? '/ws/socket.io' : '/socket.io';
+      const socketPath = '/socket.io';
 
       socket = io(SOCKET_URL, {
         path: socketPath,
