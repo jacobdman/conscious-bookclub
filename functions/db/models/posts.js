@@ -41,6 +41,12 @@ module.exports = function(sequelize, DataTypes) {
           field: "parent_author_name",
           allowNull: true,
         },
+        isSpoiler: {
+          type: DataTypes.BOOLEAN,
+          field: "is_spoiler",
+          allowNull: false,
+          defaultValue: false,
+        },
       },
       {
         tableName: "posts",
@@ -49,6 +55,23 @@ module.exports = function(sequelize, DataTypes) {
         updatedAt: false,
       },
   );
+
+  // Virtual field to get parent post's isSpoiler status
+  Post.prototype.getParentIsSpoiler = function() {
+    return this.parentPost ? (this.parentPost.isSpoiler || false) : null;
+  };
+
+  // Add virtual field to JSON output
+  Post.prototype.toJSON = function() {
+    const values = Object.assign({}, this.get());
+    if (this.parentPost) {
+      values.parentIsSpoiler = this.parentPost.isSpoiler || false;
+    } else if (this.parentPostId) {
+      // If parentPostId exists but parentPost is not loaded, return null
+      values.parentIsSpoiler = null;
+    }
+    return values;
+  };
 
   Post.associate = (models) => {
     Post.belongsTo(models.User, {

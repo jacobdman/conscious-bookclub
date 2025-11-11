@@ -16,6 +16,8 @@ const FeedPreview = () => {
   const navigate = useNavigate();
   const { posts, loading, unreadCount } = useFeedContext();
   const [showReactionsMap, setShowReactionsMap] = React.useState({});
+  const [revealedSpoilers, setRevealedSpoilers] = React.useState({});
+  const [fadingOutSpoilers, setFadingOutSpoilers] = React.useState({});
 
   // Get latest 3 posts (they're already sorted newest first)
   // Reverse so latest appears at bottom
@@ -177,6 +179,7 @@ const FeedPreview = () => {
                       <ReplyQuote
                         parentAuthorName={post.parentAuthorName}
                         parentPostText={post.parentPostText}
+                        parentIsSpoiler={post.parentIsSpoiler}
                         onClick={(e) => {
                           e.stopPropagation();
                           // Navigate to feed and scroll to parent post
@@ -187,9 +190,69 @@ const FeedPreview = () => {
                   )}
 
                   {/* Message text */}
-                  <Typography variant="body2" sx={{ mb: 0.5, wordBreak: 'break-word' }}>
-                    {post.text}
-                  </Typography>
+                  {post.isSpoiler && !revealedSpoilers[post.id] ? (
+                    <Box
+                      onClick={() => {
+                        setFadingOutSpoilers(prev => ({ ...prev, [post.id]: true }));
+                        setTimeout(() => {
+                          setRevealedSpoilers(prev => ({ ...prev, [post.id]: true }));
+                          setFadingOutSpoilers(prev => {
+                            const next = { ...prev };
+                            delete next[post.id];
+                            return next;
+                          });
+                        }, 300);
+                      }}
+                      sx={{
+                        cursor: 'pointer',
+                        mb: 0.5,
+                        userSelect: 'none',
+                        backgroundColor: 'action.hover',
+                        borderRadius: 1.5,
+                        px: 1.5,
+                        py: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        transition: 'all 0.3s ease',
+                        opacity: fadingOutSpoilers[post.id] ? 0 : 1,
+                        transform: fadingOutSpoilers[post.id] ? 'scale(0.98)' : 'scale(1)',
+                        pointerEvents: fadingOutSpoilers[post.id] ? 'none' : 'auto',
+                        '&:hover': {
+                          backgroundColor: 'action.selected',
+                          borderColor: 'primary.main',
+                        },
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: 'text.secondary',
+                          fontWeight: 500,
+                          textAlign: 'center',
+                          mb: 0.25,
+                          display: 'block',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        Spoiler
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: 'text.secondary',
+                          textAlign: 'center',
+                          display: 'block',
+                          fontSize: '0.7rem',
+                        }}
+                      >
+                        Click to reveal
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" sx={{ mb: 0.5, wordBreak: 'break-word' }}>
+                      {post.text}
+                    </Typography>
+                  )}
 
                   {/* Emoji reactions - always show existing reactions, only show + button on hover/tap */}
                   <Box

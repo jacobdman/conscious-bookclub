@@ -75,6 +75,12 @@ const getPosts = async (req, res, next) => {
           as: "reactions",
           include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
         },
+        {
+          model: db.Post,
+          as: "parentPost",
+          attributes: ["id", "isSpoiler"],
+          required: false,
+        },
       ],
     });
 
@@ -114,6 +120,12 @@ const getPost = async (req, res, next) => {
           model: db.PostReaction,
           as: "reactions",
           include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
+        },
+        {
+          model: db.Post,
+          as: "parentPost",
+          attributes: ["id", "isSpoiler"],
+          required: false,
         },
       ],
     });
@@ -161,6 +173,7 @@ const createPost = async (req, res, next) => {
       clubId: clubIdInt,
       parentPostText,
       parentAuthorName,
+      isSpoiler: postData.isSpoiler || false,
     });
 
     // Fetch with associations for Socket.io event
@@ -171,6 +184,12 @@ const createPost = async (req, res, next) => {
           model: db.PostReaction,
           as: "reactions",
           include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
+        },
+        {
+          model: db.Post,
+          as: "parentPost",
+          attributes: ["id", "isSpoiler"],
+          required: false,
         },
       ],
     });

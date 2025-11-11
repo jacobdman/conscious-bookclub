@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import useFeedContext from 'contexts/Feed';
 
-const ReplyQuote = ({ parentPostText, parentPostId, parentAuthorName }) => {
+const ReplyQuote = ({ parentPostText, parentPostId, parentAuthorName, parentIsSpoiler }) => {
   const { scrollToPost } = useFeedContext();
 
   const handleClick = () => {
@@ -40,21 +40,36 @@ const ReplyQuote = ({ parentPostText, parentPostId, parentAuthorName }) => {
       >
         {parentAuthorName}
       </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          fontSize: '0.8125rem',
-          color: 'text.secondary',
-          lineHeight: 1.3,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-        }}
-      >
-        {parentPostText}
-      </Typography>
+      {parentIsSpoiler ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: '0.7rem',
+              color: 'text.secondary',
+              fontStyle: 'italic',
+            }}
+          >
+            ⚠️ Spoiler content
+          </Typography>
+        </Box>
+      ) : (
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: '0.8125rem',
+            color: 'text.secondary',
+            lineHeight: 1.3,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}
+        >
+          {parentPostText}
+        </Typography>
+      )}
     </Box>
   );
 };

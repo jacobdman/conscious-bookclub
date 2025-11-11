@@ -6,6 +6,8 @@ import {
   IconButton,
   TextField,
   Tooltip,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { Reply as ReplyIcon } from '@mui/icons-material';
 import ReplyQuote from 'components/ReplyQuote';
@@ -16,9 +18,12 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const { createReply, registerPostRef } = useFeedContext();
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [isReplySpoiler, setIsReplySpoiler] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const postRef = useRef(null);
 
   useEffect(() => {
@@ -35,8 +40,9 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
 
     try {
       setIsSubmitting(true);
-      await createReply(post.id, { text: replyText.trim() });
+      await createReply(post.id, { text: replyText.trim(), isSpoiler: isReplySpoiler });
       setReplyText('');
+      setIsReplySpoiler(false);
       setShowReplyForm(false);
     } catch (err) {
       console.error('Error creating reply:', err);
@@ -134,24 +140,79 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
               parentPostText={post.parentPostText}
               parentPostId={post.parentPostId}
               parentAuthorName={post.parentAuthorName || post.parentAuthor?.displayName || 'Unknown'}
+              parentIsSpoiler={post.parentIsSpoiler}
             />
           </Box>
         )}
 
         {/* Message Text */}
-        <Typography
-          variant="body1"
-          sx={{
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            fontSize: '0.9375rem',
-            lineHeight: 1.4,
-            color: 'text.primary',
-            mb: 0.5,
-          }}
-        >
-          {post.text}
-        </Typography>
+        {post.isSpoiler && !isRevealed ? (
+          <Box
+            onClick={() => {
+              setIsFadingOut(true);
+              setTimeout(() => {
+                setIsRevealed(true);
+                setIsFadingOut(false);
+              }, 300);
+            }}
+            sx={{
+              cursor: 'pointer',
+              mb: 0.5,
+              userSelect: 'none',
+              backgroundColor: 'action.hover',
+              borderRadius: 1.5,
+              px: 2,
+              py: 2.5,
+              border: '1px solid',
+              borderColor: 'divider',
+              transition: 'all 0.3s ease',
+              opacity: isFadingOut ? 0 : 1,
+              transform: isFadingOut ? 'scale(0.98)' : 'scale(1)',
+              pointerEvents: isFadingOut ? 'none' : 'auto',
+              '&:hover': {
+                backgroundColor: 'action.selected',
+                borderColor: 'primary.main',
+              },
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'text.secondary',
+                fontWeight: 500,
+                textAlign: 'center',
+                mb: 0.5,
+              }}
+            >
+              Spoiler
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
+                textAlign: 'center',
+                display: 'block',
+                fontSize: '0.75rem',
+              }}
+            >
+              Click to reveal
+            </Typography>
+          </Box>
+        ) : (
+          <Typography
+            variant="body1"
+            sx={{
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              fontSize: '0.9375rem',
+              lineHeight: 1.4,
+              color: 'text.primary',
+              mb: 0.5,
+            }}
+          >
+            {post.text}
+          </Typography>
+        )}
 
         {/* Reactions - always show existing reactions, only show + button on hover/tap */}
         <Box 
@@ -206,12 +267,24 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
                 },
               }}
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isReplySpoiler}
+                  onChange={(e) => setIsReplySpoiler(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Mark as spoiler"
+              sx={{ mb: 1, ml: 0.5 }}
+            />
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
               <Typography
                 variant="caption"
                 onClick={() => {
                   setShowReplyForm(false);
                   setReplyText('');
+                  setIsReplySpoiler(false);
                 }}
                 sx={{
                   cursor: 'pointer',

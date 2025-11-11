@@ -7,6 +7,8 @@ import {
   CircularProgress,
   Paper,
   Fab,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { Send, KeyboardArrowDown } from '@mui/icons-material';
 import useFeedContext from 'contexts/Feed';
@@ -15,6 +17,7 @@ import PostCard from 'components/PostCard';
 const FeedSection = () => {
   const { posts, loading, loadingMore, error, createPost, hasMore, loadMorePosts } = useFeedContext();
   const [newPostText, setNewPostText] = useState('');
+  const [isSpoiler, setIsSpoiler] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef(null);
@@ -143,8 +146,9 @@ const FeedSection = () => {
 
     try {
       setIsSubmitting(true);
-      await createPost({ text: newPostText.trim() });
+      await createPost({ text: newPostText.trim(), isSpoiler });
       setNewPostText('');
+      setIsSpoiler(false);
       inputRef.current?.focus();
     } catch (err) {
       console.error('Error creating post:', err);
@@ -266,42 +270,55 @@ const FeedSection = () => {
           zIndex: 10,
         }}
       >
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-          <TextField
-            inputRef={inputRef}
-            fullWidth
-            multiline
-            maxRows={4}
-            placeholder="Message..."
-            value={newPostText}
-            onChange={(e) => setNewPostText(e.target.value)}
-            onKeyPress={handleKeyPress}
-            variant="outlined"
-            size="small"
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'background.default',
-                borderRadius: 3,
-              },
-            }}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+            <TextField
+              inputRef={inputRef}
+              fullWidth
+              multiline
+              maxRows={4}
+              placeholder="Message..."
+              value={newPostText}
+              onChange={(e) => setNewPostText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              variant="outlined"
+              size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'background.default',
+                  borderRadius: 3,
+                },
+              }}
+            />
+            <IconButton
+              color="primary"
+              onClick={handleCreatePost}
+              disabled={!newPostText.trim() || isSubmitting}
+              sx={{
+                backgroundColor: 'primary.main',
+                color: 'primary.contrastText',
+                '&:hover': {
+                  backgroundColor: 'primary.dark',
+                },
+                '&:disabled': {
+                  backgroundColor: 'action.disabledBackground',
+                },
+              }}
+            >
+              {isSubmitting ? <CircularProgress size={20} /> : <Send />}
+            </IconButton>
+          </Box>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={isSpoiler}
+                onChange={(e) => setIsSpoiler(e.target.checked)}
+                size="small"
+              />
+            }
+            label="Mark as spoiler"
+            sx={{ ml: 0.5 }}
           />
-          <IconButton
-            color="primary"
-            onClick={handleCreatePost}
-            disabled={!newPostText.trim() || isSubmitting}
-            sx={{
-              backgroundColor: 'primary.main',
-              color: 'primary.contrastText',
-              '&:hover': {
-                backgroundColor: 'primary.dark',
-              },
-              '&:disabled': {
-                backgroundColor: 'action.disabledBackground',
-              },
-            }}
-          >
-            {isSubmitting ? <CircularProgress size={20} /> : <Send />}
-          </IconButton>
         </Box>
       </Paper>
               </Box>

@@ -311,6 +311,7 @@ const FeedProvider = ({ children }) => {
       clubId: currentClub.id,
       created_at: new Date().toISOString(),
       reactions: [],
+      isSpoiler: postData.isSpoiler || false,
       isOptimistic: true,
       tempId: tempId, // Store tempId for matching later
     };
@@ -368,6 +369,7 @@ const FeedProvider = ({ children }) => {
       clubId: currentClub.id,
       created_at: new Date().toISOString(),
       reactions: [],
+      isSpoiler: replyData.isSpoiler || false,
       isOptimistic: true,
       tempId: tempId,
     };
