@@ -32,7 +32,7 @@ import {
   getGoalTypeColor,
 } from 'utils/goalHelpers';
 
-const TodaysGoals = () => {
+const QuickGoalCompletion = () => {
   const { user } = useAuth();
   const { goals: allGoals, updateGoal } = useGoalsContext();
   const [completionStates, setCompletionStates] = useState({});
@@ -378,7 +378,7 @@ const TodaysGoals = () => {
 
   if (loading) {
     return (
-      <Card>
+      <Card sx={{ overflow: 'visible' }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 2 }}>
             <CircularProgress size={24} />
@@ -393,7 +393,7 @@ const TodaysGoals = () => {
 
   if (error) {
     return (
-      <Card>
+      <Card sx={{ overflow: 'visible' }}>
         <CardContent>
           <Alert severity="error" onClose={() => setError(null)}>
             {error}
@@ -405,7 +405,7 @@ const TodaysGoals = () => {
 
   if (filteredGoals.length === 0) {
     return (
-      <Card>
+      <Card sx={{ overflow: 'visible' }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Today's Goals
@@ -420,7 +420,7 @@ const TodaysGoals = () => {
 
   return (
     <>
-      <Card>
+      <Card sx={{ overflow: 'visible' }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Today's Goals
@@ -577,4 +577,4 @@ const TodaysGoals = () => {
   );
 };
 
-export default TodaysGoals;
+export default QuickGoalCompletion;

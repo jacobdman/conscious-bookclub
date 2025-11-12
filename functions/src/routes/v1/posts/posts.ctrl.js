@@ -122,7 +122,10 @@ const checkUsersInRoom = async (clubId, userIds) => {
     });
 
     if (!response.ok) {
-      console.error(`Failed to check room members for ${room}:`, response.status, response.statusText);
+      console.error(
+          `Failed to check room members for ${room}: ` +
+        `${response.status} ${response.statusText}`,
+      );
       // Fail-safe: return empty Set so notifications are still sent
       return new Set();
     }

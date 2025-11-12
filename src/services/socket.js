@@ -7,7 +7,13 @@ const ENV_IS_PRODUCTION = process.env.NODE_ENV === 'production';
 // In development, use local Socket.io server on configurable port
 // Default to 3001, but can be overridden with REACT_APP_SOCKET_PORT
 const SOCKET_PORT = process.env.REACT_APP_SOCKET_PORT || '3001';
-const SOCKET_URL = ENV_IS_PRODUCTION
+
+// Allow direct connection to Cloud Run service via environment variable
+// If REACT_APP_SOCKET_SERVICE_URL is set, use it directly
+// Otherwise, use /ws path (Firebase Hosting rewrite) in production
+const SOCKET_URL = process.env.REACT_APP_SOCKET_SERVICE_URL
+  ? process.env.REACT_APP_SOCKET_SERVICE_URL
+  : ENV_IS_PRODUCTION
   ? `${window.location.origin}/ws`  // Firebase Hosting rewrites /ws/** to Cloud Run
   : `http://localhost:${SOCKET_PORT}`;
 

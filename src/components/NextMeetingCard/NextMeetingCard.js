@@ -88,7 +88,7 @@ const NextMeetingCard = () => {
 
   if (loading) {
     return (
-      <Card>
+      <Card sx={{ overflow: 'visible' }}>
         <CardContent sx={{ py: 1, display: 'flex', justifyContent: 'center' }}>
           <CircularProgress size={24} />
         </CardContent>
@@ -98,7 +98,7 @@ const NextMeetingCard = () => {
 
   if (error) {
     return (
-      <Card>
+      <Card sx={{ overflow: 'visible' }}>
         <CardContent sx={{ py: 1 }}>
           <Typography variant="h6" gutterBottom>
             Next Meeting
@@ -113,7 +113,7 @@ const NextMeetingCard = () => {
 
   if (!nextEvent) {
     return (
-      <Card>
+      <Card sx={{ overflow: 'visible' }}>
         <CardContent sx={{ py: 1 }}>
           <Typography variant="h6">Next Meeting</Typography>
           <Typography variant="body2" color="text.secondary">
@@ -125,7 +125,7 @@ const NextMeetingCard = () => {
   }
 
   return (
-    <Card>
+    <Card sx={{ overflow: 'visible' }}>
       <CardContent sx={{ py: 1 }}>
         <Typography variant="h6" gutterBottom>
           Next Meeting

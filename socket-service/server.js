@@ -110,13 +110,20 @@ server.keepAliveTimeout = 65000; // 65 seconds
 const PRODUCTION_DOMAIN = process.env.PRODUCTION_DOMAIN || 
   "https://conscious-bookclub-87073-9eb71.web.app";
 
+// Allowed origins for CORS in production
+const ALLOWED_ORIGINS = process.env.NODE_ENV === "production" 
+  ? [
+      PRODUCTION_DOMAIN,
+      "https://conscious-bookclub-87073-9eb71.firebaseapp.com",
+      "https://cbc.jacobdayton.com", // Custom domain
+    ]
+  : true; // Allow all origins in development
+
 // Initialize Socket.io
 const io = new Server(server, {
   path: "/socket.io", // Server sees /socket.io after Hosting strips /ws
   cors: {
-    origin: process.env.NODE_ENV === "production" 
-      ? [PRODUCTION_DOMAIN, "https://conscious-bookclub-87073-9eb71.firebaseapp.com"]
-      : true, // Allow all origins in development
+    origin: ALLOWED_ORIGINS,
     credentials: true,
     methods: ["GET", "POST"],
   },

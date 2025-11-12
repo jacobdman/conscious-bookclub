@@ -24,7 +24,7 @@ import { Edit, Add, ChevronRight } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useGoalsContext from 'contexts/Goals';
 import GoalFormModal from 'components/Goals/GoalFormModal';
-import TodaysGoals from 'components/QuickGoalCompletion';
+import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import PersonalGoalsReport from 'components/PersonalGoalsReport';
 import Layout from 'components/Layout';
@@ -177,7 +177,7 @@ const Goals = () => {
           <>
 
         <Box sx={{ mb: 3 }}>
-          <TodaysGoals />
+          <QuickGoalCompletion />
         </Box>
 
         <Box sx={{ mb: 2 }}>
