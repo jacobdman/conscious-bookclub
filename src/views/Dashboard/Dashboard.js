@@ -119,8 +119,7 @@ const Dashboard = () => {
             <HabitConsistencyLeaderboardWithData />
           )}
           <NextMeetingCard />
-           ljaslfajsdf 
-           adsfasdf
+          
           <QuickGoalCompletion />
           
           <CurrentBooksSection books={currentBooks} />
