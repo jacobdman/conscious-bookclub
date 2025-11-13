@@ -18,6 +18,12 @@ if (getApps().length === 0) {
 // Create Express app for health check and event triggering
 const app = express();
 
+// Log all incoming requests for debugging
+app.use((req, res, next) => {
+  console.log(`[SocketServer] Incoming request: ${req.method} ${req.path}`);
+  next();
+});
+
 // Parse JSON bodies
 app.use(express.json());
 
@@ -29,23 +35,55 @@ app.get("/healthz", (req, res) => {
 // Endpoint for Functions to trigger Socket.io events
 // This allows the Functions API to notify the Socket.io service when posts/reactions are created
 app.post("/emit", (req, res) => {
+  console.log(`[SocketServer] /emit endpoint hit - method: ${req.method}, path: ${req.path}`);
   try {
     const {room, event, data} = req.body;
 
     if (!room || !event || !data) {
+      console.log(`[SocketServer] /emit - Missing required fields: room=${!!room}, event=${!!event}, data=${!!data}`);
       return res.status(400).json({
         error: "Missing required fields: room, event, data",
       });
     }
 
+    // Check room membership before emitting
+    const roomSockets = io.sockets.adapter.rooms.get(room);
+    const memberCount = roomSockets ? roomSockets.size : 0;
+    
+    // Log detailed room information for debugging
+    const socketIdsInRoom = roomSockets ? Array.from(roomSockets) : [];
+    const userIdsInRoom = [];
+    if (roomSockets) {
+      for (const socketId of socketIdsInRoom) {
+        const socket = io.sockets.sockets.get(socketId);
+        if (socket && socket.userId) {
+          userIdsInRoom.push(socket.userId);
+        }
+      }
+    }
+    
+    console.log(`[SocketServer] /emit - Received request: event=${event}, room=${room}, members=${memberCount}`);
+    if (memberCount > 0) {
+      console.log(`[SocketServer] /emit - Room members: socketIds=[${socketIdsInRoom.join(', ')}], userIds=[${userIdsInRoom.join(', ')}]`);
+    } else {
+      console.log(`[SocketServer] /emit - WARNING: Room ${room} has 0 members! Event will not be delivered.`);
+    }
+    
+    // Log data summary (avoid logging full data to prevent log spam)
+    const dataSummary = event === 'post:created' 
+      ? `postId=${data.id || 'unknown'}`
+      : event === 'reaction:added' || event === 'reaction:removed'
+      ? `postId=${data.postId || 'unknown'}`
+      : 'data received';
+
     // Emit event to the specified room
     // Room format should be: "club:{clubId}"
     io.to(room).emit(event, data);
 
-    console.log(`Emitted ${event} to ${room}`);
-    res.status(200).json({success: true, room, event});
+    console.log(`[SocketServer] Emitted ${event} to ${room} (${memberCount} members) - ${dataSummary}`);
+    res.status(200).json({success: true, room, event, memberCount});
   } catch (error) {
-    console.error("Error emitting event:", error);
+    console.error("[SocketServer] Error emitting event:", error);
     res.status(500).json({error: "Failed to emit event"});
   }
 });
@@ -98,6 +136,12 @@ app.post("/check-room-members", (req, res) => {
     console.error("Error checking room members:", error);
     res.status(500).json({error: "Failed to check room members"});
   }
+});
+
+// Catch-all route for debugging (should not be hit if routes are set up correctly)
+app.use((req, res) => {
+  console.log(`[SocketServer] ⚠️ Unhandled route: ${req.method} ${req.path}`);
+  res.status(404).json({error: `Route not found: ${req.method} ${req.path}`});
 });
 
 // Create HTTP server
@@ -191,31 +235,58 @@ io.use(async (socket, next) => {
 
 // Connection handling
 io.on("connection", (socket) => {
-  console.log(`User ${socket.userId} connected (socket: ${socket.id})`);
+  console.log(`[SocketServer] ✅ User ${socket.userId} connected (socket: ${socket.id})`);
+  console.log(`[SocketServer] Total connected sockets: ${io.sockets.sockets.size}`);
 
   // Join club room with rate limiting
-  socket.on("join:club", (clubId) => {
+  socket.on("join:club", (clubId, callback) => {
+    console.log(`[SocketServer] Received join:club request from user ${socket.userId} (socket: ${socket.id}) for club ${clubId}`);
+    
     if (!consumeToken(socket.id)) {
-      console.warn(`Rate limit exceeded for socket ${socket.id}`);
-      socket.emit("error", {message: "Rate limit exceeded. Please wait a moment."});
+      console.warn(`[SocketServer] ⚠️ Rate limit exceeded for socket ${socket.id} (user: ${socket.userId})`);
+      if (typeof callback === 'function') {
+        callback({error: "Rate limit exceeded. Please wait a moment."});
+      } else {
+        socket.emit("error", {message: "Rate limit exceeded. Please wait a moment."});
+      }
       return;
     }
 
     const room = `club:${clubId}`;
     socket.join(room);
-    console.log(`User ${socket.userId} joined room ${room}`);
+    
+    // Get room size after join
+    const roomSockets = io.sockets.adapter.rooms.get(room);
+    const memberCount = roomSockets ? roomSockets.size : 0;
+    
+    // Get all socket IDs in the room for debugging
+    const socketIdsInRoom = roomSockets ? Array.from(roomSockets) : [];
+    
+    console.log(`[SocketServer] ✅ User ${socket.userId} joined room ${room} (${memberCount} total members)`);
+    console.log(`[SocketServer] Room ${room} socket IDs: [${socketIdsInRoom.join(', ')}]`);
+    
+    // Send confirmation callback if provided
+    if (typeof callback === 'function') {
+      callback({success: true, room, memberCount});
+    }
   });
 
   // Leave club room
   socket.on("leave:club", (clubId) => {
     const room = `club:${clubId}`;
     socket.leave(room);
-    console.log(`User ${socket.userId} left room ${room}`);
+    
+    // Get room size after leave
+    const roomSockets = io.sockets.adapter.rooms.get(room);
+    const memberCount = roomSockets ? roomSockets.size : 0;
+    
+    console.log(`[SocketServer] User ${socket.userId} left room ${room} (${memberCount} remaining members)`);
   });
 
   // Handle disconnection
   socket.on("disconnect", (reason) => {
-    console.log(`User ${socket.userId} disconnected: ${reason}`);
+    console.log(`[SocketServer] ❌ User ${socket.userId} disconnected: ${reason} (socket: ${socket.id})`);
+    console.log(`[SocketServer] Remaining connected sockets: ${io.sockets.sockets.size}`);
     cleanupRateLimiter(socket.id);
   });
 });
@@ -229,6 +300,8 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`   Production domain: ${PRODUCTION_DOMAIN}`);
   console.log(`   Health check: http://localhost:${PORT}/healthz`);
+  console.log(`   Emit endpoint: http://localhost:${PORT}/emit`);
+  console.log(`   Express routes registered: GET /healthz, POST /emit, POST /check-room-members`);
 });
 
 // Export for testing

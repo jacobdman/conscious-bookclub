@@ -8,13 +8,11 @@ const ENV_IS_PRODUCTION = process.env.NODE_ENV === 'production';
 // Default to 3001, but can be overridden with REACT_APP_SOCKET_PORT
 const SOCKET_PORT = process.env.REACT_APP_SOCKET_PORT || '3001';
 
-// Allow direct connection to Cloud Run service via environment variable
-// If REACT_APP_SOCKET_SERVICE_URL is set, use it directly
-// Otherwise, use /ws path (Firebase Hosting rewrite) in production
-const SOCKET_URL = process.env.REACT_APP_SOCKET_SERVICE_URL
-  ? process.env.REACT_APP_SOCKET_SERVICE_URL
-  : ENV_IS_PRODUCTION
-  ? `${window.location.origin}/ws`  // Firebase Hosting rewrites /ws/** to Cloud Run
+// Determine socket URL:
+// - In development: always use localhost (ignore REACT_APP_SOCKET_SERVICE_URL)
+// - In production: use REACT_APP_SOCKET_SERVICE_URL if set, otherwise use /ws path
+const SOCKET_URL = ENV_IS_PRODUCTION
+  ? (process.env.REACT_APP_SOCKET_SERVICE_URL || `${window.location.origin}/ws`)
   : `http://localhost:${SOCKET_PORT}`;
 
 let socket = null;
@@ -24,8 +22,11 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 export const connectSocket = () => {
+  console.log(`[SocketClient] connectSocket called - SOCKET_URL=${SOCKET_URL}, ENV_IS_PRODUCTION=${ENV_IS_PRODUCTION}, REACT_APP_SOCKET_SERVICE_URL=${process.env.REACT_APP_SOCKET_SERVICE_URL}`);
+  
   // If already connected, return existing socket
   if (socket?.connected) {
+    console.log(`[SocketClient] Socket already connected, reusing (socket.id: ${socket.id})`);
     return Promise.resolve(socket);
   }
 
@@ -73,7 +74,7 @@ export const connectSocket = () => {
       });
 
       socket.on('connect', () => {
-        console.log(`✅ Socket.io connected successfully to ${SOCKET_URL}`);
+        console.log(`[SocketClient] ✅ Socket.io connected successfully to ${SOCKET_URL} (socket.id: ${socket.id})`);
         reconnectAttempts = 0;
         isConnecting = false;
         connectionPromise = null;
@@ -83,16 +84,16 @@ export const connectSocket = () => {
       socket.on('connect_error', (error) => {
         reconnectAttempts++;
         const errorMsg = error.message || error.toString();
-        console.error(`❌ Socket.io connection error (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-        console.error(`   URL: ${SOCKET_URL}`);
-        console.error(`   Port: ${SOCKET_PORT}`);
-        console.error(`   Error: ${errorMsg}`);
-        console.error(`   Make sure the Socket.io server is running on port ${SOCKET_PORT}`);
+        console.error(`[SocketClient] ❌ Socket.io connection error (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+        console.error(`[SocketClient]    URL: ${SOCKET_URL}`);
+        console.error(`[SocketClient]    Port: ${SOCKET_PORT}`);
+        console.error(`[SocketClient]    Error: ${errorMsg}`);
+        console.error(`[SocketClient]    Make sure the Socket.io server is running on port ${SOCKET_PORT}`);
         
         // Only reject on initial connection failure, not on reconnection attempts
         if (!socket.connected && reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          console.error('❌ Max reconnection attempts reached. Giving up.');
-          console.error(`   Failed to connect to ${SOCKET_URL} after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+          console.error('[SocketClient] ❌ Max reconnection attempts reached. Giving up.');
+          console.error(`[SocketClient]    Failed to connect to ${SOCKET_URL} after ${MAX_RECONNECT_ATTEMPTS} attempts`);
           isConnecting = false;
           connectionPromise = null;
           reject(error);
@@ -100,7 +101,7 @@ export const connectSocket = () => {
       });
 
       socket.on('disconnect', (reason) => {
-        console.log('Socket.io disconnected:', reason);
+        console.log(`[SocketClient] Socket.io disconnected: ${reason} (socket.id: ${socket?.id || 'unknown'})`);
         if (reason === 'io server disconnect') {
           // Server disconnected the socket, Socket.io will automatically reconnect
           // No manual action needed
@@ -108,7 +109,7 @@ export const connectSocket = () => {
       });
 
       socket.on('reconnect', (attemptNumber) => {
-        console.log(`✅ Socket.io reconnected to ${SOCKET_URL} after ${attemptNumber} attempts`);
+        console.log(`[SocketClient] ✅ Socket.io reconnected to ${SOCKET_URL} after ${attemptNumber} attempts (socket.id: ${socket.id})`);
         reconnectAttempts = 0;
         
         // Update auth token on reconnect (Socket.io already reconnected, don't manually reconnect)
@@ -118,24 +119,24 @@ export const connectSocket = () => {
             .then((newToken) => {
               // Update token for future reconnections
               socket.auth.token = newToken;
-              console.log('Auth token refreshed on reconnect');
+              console.log('[SocketClient] Auth token refreshed on reconnect');
             })
             .catch((error) => {
-              console.error('Error refreshing auth token on reconnect:', error);
+              console.error('[SocketClient] Error refreshing auth token on reconnect:', error);
             });
         }
       });
 
       socket.on('reconnect_attempt', (attemptNumber) => {
-        console.log(`🔄 Socket.io reconnection attempt ${attemptNumber}/${MAX_RECONNECT_ATTEMPTS} to ${SOCKET_URL}`);
+        console.log(`[SocketClient] 🔄 Socket.io reconnection attempt ${attemptNumber}/${MAX_RECONNECT_ATTEMPTS} to ${SOCKET_URL}`);
       });
 
       socket.on('reconnect_failed', () => {
-        console.error(`❌ Socket.io reconnection failed after all attempts to ${SOCKET_URL}`);
+        console.error(`[SocketClient] ❌ Socket.io reconnection failed after all attempts to ${SOCKET_URL}`);
         reconnectAttempts = MAX_RECONNECT_ATTEMPTS;
       });
     }).catch((error) => {
-      console.error('Error getting auth token:', error);
+      console.error('[SocketClient] Error getting auth token:', error);
       isConnecting = false;
       connectionPromise = null;
       reject(error);
@@ -158,16 +159,27 @@ export const disconnectSocket = () => {
 
 export const joinClubRoom = (clubId) => {
   if (!socket || !socket.connected) {
-    console.warn('Socket not connected, cannot join room');
+    console.warn(`[SocketClient] Cannot join room club:${clubId} - socket not connected (socket=${!!socket}, connected=${socket?.connected})`);
     return;
   }
-  socket.emit('join:club', clubId);
+  console.log(`[SocketClient] Joining room club:${clubId} (socket.id: ${socket.id}, connected: ${socket.connected})`);
+  
+  // Add a one-time listener to confirm room join (if server supports it)
+  socket.emit('join:club', clubId, (response) => {
+    if (response && response.error) {
+      console.error(`[SocketClient] Failed to join room club:${clubId}:`, response.error);
+    } else {
+      console.log(`[SocketClient] ✅ Successfully joined room club:${clubId}`);
+    }
+  });
 };
 
 export const leaveClubRoom = (clubId) => {
   if (!socket || !socket.connected) {
+    console.warn(`[SocketClient] Cannot leave room club:${clubId} - socket not connected`);
     return;
   }
+  console.log(`[SocketClient] Leaving room club:${clubId} (socket.id: ${socket.id})`);
   socket.emit('leave:club', clubId);
 };
 

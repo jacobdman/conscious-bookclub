@@ -59,16 +59,43 @@ const emitToClub = async (clubId, event, data) => {
     // Determine Socket.io service URL
     // In production: use Cloud Run service URL
     // In local dev: use localhost
-    const isEmulator = process.env.FUNCTIONS_EMULATOR === "true" ||
-                       process.env.GCLOUD_PROJECT === "demo-test" ||
-                       !process.env.GCLOUD_PROJECT;
+    // Check multiple ways to detect emulator:
+    // 1. FUNCTIONS_EMULATOR env var (set by Firebase emulator)
+    // 2. FIREBASE_EMULATOR_HUB env var (also set by Firebase emulator)
+    // 3. GCLOUD_PROJECT not set or is demo-test
+    const isEmulator =
+      process.env.FUNCTIONS_EMULATOR === "true" ||
+      !!process.env.FIREBASE_EMULATOR_HUB ||
+      process.env.GCLOUD_PROJECT === "demo-test" ||
+      !process.env.GCLOUD_PROJECT;
 
+    // When running in emulator, always use localhost (ignore SOCKET_SERVICE_URL)
+    // In production, use SOCKET_SERVICE_URL env var or default production URL
     const socketServiceUrl = isEmulator ?
-      "http://localhost:3001" : // Local development
-      process.env.SOCKET_SERVICE_URL ||
-      "https://socket-service-499467823747.us-central1.run.app"; // Production
+      "http://localhost:3001" : // Local development - always use localhost
+      (process.env.SOCKET_SERVICE_URL ||
+        "https://socket-service-x3bxvqpcca-uc.a.run.app"); // Production
+
+    console.log(`[API] Emit configuration:`, {
+      isEmulator,
+      socketServiceUrl,
+      FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
+      FIREBASE_EMULATOR_HUB: process.env.FIREBASE_EMULATOR_HUB,
+      GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+      SOCKET_SERVICE_URL: process.env.SOCKET_SERVICE_URL,
+    });
 
     const room = `club:${clubId}`;
+
+    // Log data summary (avoid logging full data to prevent log spam)
+    const dataSummary =
+      event === "post:created" ?
+        `postId=${data.id || "unknown"}` :
+        event === "reaction:added" || event === "reaction:removed" ?
+          `postId=${data.postId || "unknown"}` :
+          "data prepared";
+
+    console.log(`[API] Attempting to emit ${event} to ${room} - ${dataSummary}`);
 
     // Make HTTP POST to Socket.io service /emit endpoint
     const response = await fetch(`${socketServiceUrl}/emit`, {
@@ -84,11 +111,25 @@ const emitToClub = async (clubId, event, data) => {
     });
 
     if (!response.ok) {
-      console.error(`Failed to emit ${event} to ${room}:`, response.status, response.statusText);
+      const errorText = await response.text().catch(() => "unknown error");
+      const errorMsg =
+        `[API] Failed to emit ${event} to ${room}: ` +
+        `${response.status} ${response.statusText} - ${errorText}`;
+      console.error(errorMsg);
+    } else {
+      const responseData = await response.json().catch(() => ({}));
+      const memberCount = responseData.memberCount ?? "unknown";
+      const successMsg =
+        `[API] Successfully emitted ${event} to ${room} ` +
+        `(${memberCount} members in room)`;
+      console.log(successMsg);
     }
   } catch (error) {
     // Don't throw - Socket.io events are best-effort, don't break the API response
-    console.log("Socket.io emit failed (non-critical):", error.message);
+    const errorMsg =
+      `[API] Socket.io emit failed (non-critical) for ${event} ` +
+      `to club:${clubId}: ${error.message}`;
+    console.error(errorMsg);
   }
 };
 
@@ -105,7 +146,7 @@ const checkUsersInRoom = async (clubId, userIds) => {
     const socketServiceUrl = isEmulator ?
       "http://localhost:3001" : // Local development
       process.env.SOCKET_SERVICE_URL ||
-      "https://socket-service-499467823747.us-central1.run.app"; // Production
+      "https://socket-service-x3bxvqpcca-uc.a.run.app"; // Production
 
     const room = `club:${clubId}`;
 

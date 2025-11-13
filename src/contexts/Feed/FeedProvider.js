@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { getPosts, createPost as createPostService, addReaction as addReactionService, removeReaction as removeReactionService } from 'services/posts/posts.service';
-import { connectSocket, disconnectSocket, joinClubRoom, leaveClubRoom, getSocket } from 'services/socket';
+import { connectSocket, joinClubRoom, leaveClubRoom } from 'services/socket';
 import { getReadStatus, markAsRead as markAsReadService } from 'services/feed/feed.service';
 import { setBadge, clearBadge } from 'services/badge';
 import FeedContext from './FeedContext';
@@ -124,9 +124,11 @@ const FeedProvider = ({ children }) => {
 
     const setupSocket = async () => {
       try {
+        console.log(`[FeedProvider] Setting up socket for club ${currentClub.id} (user: ${user.uid})`);
         const socket = await connectSocket();
         socketRef.current = socket;
         
+        console.log(`[FeedProvider] Socket connected, joining club room ${currentClub.id}`);
         // Join club room
         joinClubRoom(currentClub.id);
 
@@ -134,9 +136,17 @@ const FeedProvider = ({ children }) => {
         const handlePostCreated = (postData) => {
           const postId = postData.id?.toString();
           
+          console.log(`[FeedProvider] ✅ Received post:created event for post ${postId} (club: ${currentClub.id})`);
+          console.log(`[FeedProvider] Post data:`, {
+            id: postData.id,
+            text: postData.text?.substring(0, 50) + '...',
+            authorId: postData.authorId,
+            created_at: postData.created_at,
+          });
+          
           // Check if we've already processed this post ID (prevent duplicate processing)
           if (processedPostIdsRef.current.has(postId)) {
-            console.log(`[FeedProvider] Ignoring duplicate post:created event for post ${postId}`);
+            console.log(`[FeedProvider] ⚠️ Ignoring duplicate post:created event for post ${postId}`);
             return; // Already processed this post, ignore duplicate event
           }
           
@@ -204,6 +214,7 @@ const FeedProvider = ({ children }) => {
         };
 
         const handleReactionAdded = (data) => {
+          console.log(`[FeedProvider] Received reaction:added event for post ${data.postId} (club: ${currentClub.id})`);
           setPosts(prev => prev.map(post => {
             if (post.id === data.postId) {
               return {
@@ -216,6 +227,7 @@ const FeedProvider = ({ children }) => {
         };
 
         const handleReactionRemoved = (data) => {
+          console.log(`[FeedProvider] Received reaction:removed event for post ${data.postId} (club: ${currentClub.id})`);
           setPosts(prev => prev.map(post => {
             if (post.id === data.postId) {
               return {
@@ -249,8 +261,20 @@ const FeedProvider = ({ children }) => {
         socket.on('post:created', handlePostCreated);
         socket.on('reaction:added', handleReactionAdded);
         socket.on('reaction:removed', handleReactionRemoved);
+        
+        console.log(`[FeedProvider] Event listeners registered for club ${currentClub.id}`);
+        
+        // Listen for reconnect events to rejoin room
+        const handleReconnect = () => {
+          console.log(`[FeedProvider] Socket reconnected, rejoining club room ${currentClub.id}`);
+          joinClubRoom(currentClub.id);
+        };
+        
+        socket.on('reconnect', handleReconnect);
+        eventHandlersRef.current['reconnect'] = handleReconnect;
+        
       } catch (err) {
-        console.error('Error setting up socket:', err);
+        console.error('[FeedProvider] Error setting up socket:', err);
         socketRef.current = null;
       }
     };
@@ -261,6 +285,7 @@ const FeedProvider = ({ children }) => {
       // Cleanup: remove all event listeners and disconnect
       const socket = socketRef.current;
       if (socket) {
+        console.log(`[FeedProvider] Cleaning up socket listeners for club ${currentClub?.id}`);
         // Remove all event listeners
         Object.entries(eventHandlersRef.current).forEach(([event, handler]) => {
           socket.off(event, handler);
@@ -269,6 +294,7 @@ const FeedProvider = ({ children }) => {
         
         // Leave club room and disconnect
         if (currentClub) {
+          console.log(`[FeedProvider] Leaving club room ${currentClub.id}`);
           leaveClubRoom(currentClub.id);
         }
         
