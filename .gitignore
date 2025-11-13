@@ -13,10 +13,17 @@ node_modules/
 
 # misc
 .DS_Store
+
+# Environment variables (all .env files)
+.env
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
+*.env
 
 # Firebase Functions local config (contains secrets)
 functions/.runtimeconfig.json
