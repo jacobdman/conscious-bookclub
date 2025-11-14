@@ -226,6 +226,15 @@ const getGoals = async (req, res, next) => {
       ],
     });
 
+    // Helper to get today's boundaries
+    const getTodayBoundaries = () => {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      return { start, end };
+    };
+
     // Compute progress for each goal and build response
     const goalsData = await Promise.all(
         goals.map(async (goal) => {
@@ -244,10 +253,23 @@ const getGoals = async (req, res, next) => {
             console.error(`Error calculating progress for goal ${goal.id}:`, err);
           }
 
+          // For habit/metric goals, include today's entries by default
+          let todayEntries = [];
+          if ((goalData.type === 'habit' || goalData.type === 'metric') && goalData.cadence) {
+            try {
+              const todayBoundaries = getTodayBoundaries();
+              todayEntries = await getGoalEntries(userId, goal.id, todayBoundaries.start, todayBoundaries.end);
+            } catch (err) {
+              // If fetching today's entries fails, continue without them
+              console.error(`Error fetching today's entries for goal ${goal.id}:`, err);
+            }
+          }
+
           return {
             id: goal.id,
             ...goalData,
             progress,
+            entries: todayEntries, // Include today's entries for habit/metric goals
           };
         }),
     );
@@ -746,11 +768,27 @@ const updateMilestone = async (req, res, next) => {
       error.status = 404;
       throw error;
     }
+    // Handle doneAt: if done is false, clear doneAt; if done is true, set doneAt
+    let doneAtValue = milestone.doneAt;
+    if (updates.doneAt !== undefined) {
+      // Explicitly provided doneAt value
+      doneAtValue = updates.doneAt;
+    } else if (updates.done !== undefined) {
+      // done is being updated
+      if (updates.done === false) {
+        // Unchecking: clear doneAt
+        doneAtValue = null;
+      } else if (updates.done === true) {
+        // Checking: set doneAt if not already set
+        doneAtValue = milestone.doneAt || new Date();
+      }
+    }
+    
     await milestone.update({
-      title: updates.title || milestone.title,
-      done: updates.done || milestone.done,
-      doneAt: updates.done ? (updates.doneAt || new Date()) : milestone.doneAt,
-      order: updates.order || milestone.order,
+      title: updates.title !== undefined ? updates.title : milestone.title,
+      done: updates.done !== undefined ? updates.done : milestone.done,
+      doneAt: doneAtValue,
+      order: updates.order !== undefined ? updates.order : milestone.order,
     });
     res.json({id: milestone.id, ...milestone.toJSON()});
   } catch (e) {

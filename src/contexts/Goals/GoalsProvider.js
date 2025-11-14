@@ -1,12 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
-import { getGoals, addGoal, updateGoal, deleteGoal } from 'services/goals/goals.service';
+import { 
+  getGoals, 
+  addGoal, 
+  updateGoal, 
+  deleteGoal,
+  createGoalEntry,
+  updateGoalEntry,
+  deleteGoalEntry,
+  getGoalEntries,
+  updateMilestone,
+} from 'services/goals/goals.service';
 import { normalizeGoalType } from 'utils/goalHelpers';
 import GoalsContext from './GoalsContext';
 
 // Helper function to normalize goal data
-const normalizeGoal = (goalData, docId = null) => {
+const normalizeGoal = (goalData, docId = null, preserveEntries = false) => {
   // Ensure milestones array is properly set and is always an array
   if (!goalData.milestones && goalData.Milestones) {
     goalData.milestones = goalData.Milestones;
@@ -26,10 +36,29 @@ const normalizeGoal = (goalData, docId = null) => {
   }
   // Normalize goal type
   goalData.type = normalizeGoalType(goalData.type);
-  return {
+  
+  const normalized = {
     id: docId || goalData.id,
     ...goalData
   };
+  
+  // Preserve entries and pagination if they exist and preserveEntries is true
+  // This allows us to keep cached entries when updating goals
+  if (!preserveEntries) {
+    // Initialize entries and pagination if not present
+    if (!normalized.entries) {
+      normalized.entries = [];
+    }
+    if (!normalized.entriesPagination) {
+      normalized.entriesPagination = {
+        hasMore: true,
+        offset: 0,
+        limit: 10
+      };
+    }
+  }
+  
+  return normalized;
 };
 
 // ******************STATE VALUES**********************
@@ -49,7 +78,19 @@ const GoalsProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       const goals = await getGoals(user.uid, currentClub.id, options);
-      const goalsData = goals.map(goal => normalizeGoal(goal, goal.id));
+      const goalsData = goals.map(goal => {
+        const normalized = normalizeGoal(goal, goal.id);
+        // Goals now include today's entries from API for habit/metric goals
+        // Initialize entriesPagination if entries are present
+        if (normalized.entries && normalized.entries.length > 0 && !normalized.entriesPagination) {
+          normalized.entriesPagination = {
+            hasMore: false, // Today's entries are a limited set
+            offset: normalized.entries.length,
+            limit: 10
+          };
+        }
+        return normalized;
+      });
       setGoals(goalsData);
     } catch (err) {
       setError('Failed to fetch goals');
@@ -94,13 +135,27 @@ const GoalsProvider = ({ children }) => {
       // Make API call - returns full updated goal object with progress
       const result = await updateGoal(user.uid, currentClub.id, goalId, updates);
       
-      // Normalize and replace goal in state with server response
-      const updatedGoal = normalizeGoal(result, result.id);
-      setGoals(prev => prev.map(goal => 
-        goal.id === goalId ? updatedGoal : goal
-      ));
+      // Preserve entries and pagination when updating (they're cached separately)
+      let updatedGoalResult = null;
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const updatedGoal = normalizeGoal(result, result.id, true);
+          // Preserve cached entries and pagination if they exist
+          updatedGoalResult = {
+            ...updatedGoal,
+            entries: goal.entries || updatedGoal.entries || [],
+            entriesPagination: goal.entriesPagination || updatedGoal.entriesPagination || {
+              hasMore: true,
+              offset: 0,
+              limit: 10
+            }
+          };
+          return updatedGoalResult;
+        }
+        return goal;
+      }));
       
-      return updatedGoal;
+      return updatedGoalResult || normalizeGoal(result, result.id);
     } catch (err) {
       setError('Failed to update goal');
       console.error('Error updating goal:', err);
@@ -133,6 +188,325 @@ const GoalsProvider = ({ children }) => {
     }
   }, [user, currentClub]);
 
+  // ******************ENTRY OPERATIONS**********************
+  // Fetch entries for a goal (with pagination support)
+  const handleFetchGoalEntries = useCallback(async (goalId, limit = 10, offset = 0, append = false, periodStart = null, periodEnd = null) => {
+    if (!user || !goalId) return;
+
+    try {
+      const entries = await getGoalEntries(user.uid, goalId, periodStart, periodEnd, limit, offset);
+      
+      // Sort entries by occurred_at (descending - most recent first)
+      const sortedEntries = entries.sort((a, b) => {
+        const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+        const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+        return dateB - dateA;
+      });
+
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const existingEntries = goal.entries || [];
+          const newEntries = append 
+            ? [...existingEntries, ...sortedEntries].sort((a, b) => {
+                const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+                const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+                return dateB - dateA;
+              })
+            : sortedEntries;
+          
+          return {
+            ...goal,
+            entries: newEntries,
+            entriesPagination: {
+              hasMore: entries.length === limit,
+              offset: offset + entries.length,
+              limit
+            }
+          };
+        }
+        return goal;
+      }));
+
+      return sortedEntries;
+    } catch (err) {
+      console.error('Error fetching entries:', err);
+      throw err;
+    }
+  }, [user]);
+
+  // Create a new entry
+  const handleCreateEntry = useCallback(async (goalId, entryData) => {
+    if (!user || !currentClub || !goalId) return;
+
+    try {
+      const result = await createGoalEntry(user.uid, goalId, entryData);
+      // Service returns {entry: <entry object>, goal: null, ...entry properties}
+      const savedEntry = result.entry || result;
+      const updatedGoal = result.goal;
+
+      // Normalize entry to ensure consistent date format
+      // Sequelize returns occurredAt (camelCase), but we need both formats for compatibility
+      const normalizedEntry = {
+        id: savedEntry.id,
+        goalId: savedEntry.goalId || savedEntry.goal_id,
+        userId: savedEntry.userId || savedEntry.user_id,
+        occurred_at: savedEntry.occurred_at || savedEntry.occurredAt,
+        occurredAt: savedEntry.occurredAt || savedEntry.occurred_at,
+        quantity: savedEntry.quantity,
+        created_at: savedEntry.created_at || savedEntry.createdAt,
+      };
+
+      // Update goal in state with new entry added to entries array
+      setGoals(prev => {
+        const updatedGoals = prev.map(goal => {
+          if (goal.id === goalId) {
+            const existingEntries = goal.entries || [];
+            // Ensure we don't add duplicates - check by id
+            const entryExists = existingEntries.some(e => e.id === normalizedEntry.id);
+            
+            if (entryExists) {
+              // Entry already exists, update it (shouldn't happen for new entries, but just in case)
+              const newEntries = existingEntries.map(e => 
+                e.id === normalizedEntry.id ? normalizedEntry : e
+              );
+              
+              // Sort by date (most recent first)
+              const sortedEntries = [...newEntries].sort((a, b) => {
+                const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+                const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+                return dateB - dateA;
+              });
+              
+              return {
+                ...goal,
+                entries: sortedEntries, // New array reference
+                entriesPagination: {
+                  ...(goal.entriesPagination || {
+                    hasMore: true,
+                    offset: 0,
+                    limit: 10
+                  })
+                }
+              };
+            } else {
+              // Add new entry at the beginning
+              const newEntries = [normalizedEntry, ...existingEntries];
+              
+              // Sort by date (most recent first)
+              const sortedEntries = [...newEntries].sort((a, b) => {
+                const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+                const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+                return dateB - dateA;
+              });
+              
+              // Create a completely new goal object to ensure React detects the change
+              // This is critical for React to re-render
+              const updatedGoalObj = {
+                ...goal,
+                entries: sortedEntries, // New array reference
+                entriesPagination: {
+                  ...(goal.entriesPagination || {
+                    hasMore: true,
+                    offset: 0,
+                    limit: 10
+                  })
+                }
+              };
+              
+              // If API returned updated goal, merge its properties
+              if (updatedGoal) {
+                const normalizedUpdatedGoal = normalizeGoal(updatedGoal, updatedGoal.id, true);
+                return {
+                  ...normalizedUpdatedGoal,
+                  entries: sortedEntries, // Use the same sorted entries
+                  entriesPagination: updatedGoalObj.entriesPagination
+                };
+              }
+              
+              return updatedGoalObj;
+            }
+          }
+          return goal; // Return unchanged goal (new reference not needed for other goals)
+        });
+        
+        // Return new array to ensure React detects the change
+        return updatedGoals;
+      });
+
+      return { entry: normalizedEntry, goal: updatedGoal };
+    } catch (err) {
+      console.error('Error creating entry:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
+  // Update an existing entry
+  const handleUpdateEntry = useCallback(async (goalId, entryId, updates) => {
+    if (!user || !currentClub || !goalId || !entryId) return;
+
+    try {
+      const result = await updateGoalEntry(user.uid, goalId, entryId, updates);
+      const savedEntry = result.entry || result;
+      const updatedGoal = result.goal;
+
+      // Update goal in state with entry updated in entries array
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const existingEntries = goal.entries || [];
+          const newEntries = existingEntries.map(e => 
+            e.id === entryId ? { ...e, ...updates, ...savedEntry } : e
+          ).sort((a, b) => {
+            const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+            const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+            return dateB - dateA;
+          });
+          
+          return {
+            ...normalizeGoal(updatedGoal, updatedGoal.id, true),
+            entries: newEntries,
+            entriesPagination: goal.entriesPagination || {
+              hasMore: true,
+              offset: 0,
+              limit: 10
+            }
+          };
+        }
+        return goal;
+      }));
+
+      return { entry: savedEntry, goal: updatedGoal };
+    } catch (err) {
+      console.error('Error updating entry:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
+  // Delete an entry
+  const handleDeleteEntry = useCallback(async (goalId, entryId) => {
+    if (!user || !currentClub || !goalId || !entryId) return;
+
+    try {
+      // DELETE endpoint returns 204 (no content), so we handle it optimistically
+      await deleteGoalEntry(user.uid, goalId, entryId);
+
+      // Update goal in state with entry removed from entries array
+      let updatedGoalResult = null;
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const existingEntries = goal.entries || [];
+          const newEntries = existingEntries.filter(e => e.id !== entryId);
+          
+          // Preserve existing goal data, just update entries
+          updatedGoalResult = {
+            ...goal,
+            entries: newEntries,
+            entriesPagination: goal.entriesPagination || {
+              hasMore: true,
+              offset: 0,
+              limit: 10
+            }
+          };
+          return updatedGoalResult;
+        }
+        return goal;
+      }));
+
+      return updatedGoalResult;
+    } catch (err) {
+      console.error('Error deleting entry:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
+  // ******************MILESTONE OPERATIONS**********************
+  // Update a single milestone
+  const handleUpdateMilestone = useCallback(async (goalId, milestoneId, updates) => {
+    if (!user || !currentClub || !goalId || !milestoneId) return;
+
+    try {
+      const updatedMilestone = await updateMilestone(user.uid, goalId, milestoneId, updates);
+      
+      // Update milestone in goal's milestones array and calculate progress locally
+      let updatedGoalResult = null;
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const updatedMilestones = (goal.milestones || []).map(m => {
+            const mId = m.id || m.ID;
+            const mIdNum = typeof mId === 'string' ? parseInt(mId, 10) : mId;
+            const milestoneIdNum = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+            
+            if (mIdNum === milestoneIdNum) {
+              // Use the updated milestone from API response directly
+              // Backend handles doneAt clearing when done is false
+              return {
+                ...m,
+                ...updatedMilestone,
+                done: updatedMilestone.done || false,
+                doneAt: updatedMilestone.doneAt || null
+              };
+            }
+            return m;
+          });
+          
+          // Calculate progress locally for milestone goals
+          const allDone = updatedMilestones.length > 0 && updatedMilestones.every(m => m.done);
+          const completedCount = updatedMilestones.filter(m => m.done).length;
+          const progress = {
+            completed: allDone,
+            actual: completedCount,
+            target: updatedMilestones.length
+          };
+          
+          updatedGoalResult = {
+            ...goal,
+            milestones: updatedMilestones,
+            progress: progress
+          };
+          
+          return updatedGoalResult;
+        }
+        return goal;
+      }));
+
+      return updatedGoalResult;
+    } catch (err) {
+      console.error('Error updating milestone:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
+  // Bulk update milestones (for reordering)
+  const handleBulkUpdateMilestones = useCallback(async (goalId, milestones) => {
+    if (!user || !currentClub || !goalId) return;
+
+    try {
+      // Update goal with new milestones array
+      const result = await updateGoal(user.uid, currentClub.id, goalId, { milestones });
+      
+      // Update goal in state
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const updatedGoal = normalizeGoal(result, result.id, true);
+          return {
+            ...updatedGoal,
+            entries: goal.entries || [],
+            entriesPagination: goal.entriesPagination || {
+              hasMore: true,
+              offset: 0,
+              limit: 10
+            }
+          };
+        }
+        return goal;
+      }));
+
+      return normalizeGoal(result, result.id);
+    } catch (err) {
+      console.error('Error bulk updating milestones:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
   // ******************EXPORTS**********************
   return (
     <GoalsContext.Provider
@@ -144,6 +518,12 @@ const GoalsProvider = ({ children }) => {
         updateGoal: handleUpdateGoal,
         deleteGoal: handleDeleteGoal,
         refreshGoals,
+        createEntry: handleCreateEntry,
+        updateEntry: handleUpdateEntry,
+        deleteEntry: handleDeleteEntry,
+        fetchGoalEntries: handleFetchGoalEntries,
+        updateMilestone: handleUpdateMilestone,
+        bulkUpdateMilestones: handleBulkUpdateMilestones,
       }}
     >
       {children}

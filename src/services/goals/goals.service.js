@@ -74,12 +74,13 @@ export const createGoalEntry = async (userId, goalId, entryData) => {
     method: 'POST',
     body: JSON.stringify(entryData),
   });
-  // Return both entry and goal for backward compatibility
+  // API returns entry directly: {id, goalId, userId, occurredAt, quantity, created_at}
+  // Return in a consistent format for backward compatibility
   return {
-    entry: result.entry,
-    goal: result.goal,
+    entry: result, // The entry object itself
+    goal: result.goal || null, // API doesn't return goal, so null
     // For backward compatibility, also return entry properties at top level
-    ...result.entry,
+    ...result,
   };
 };
 
@@ -109,11 +110,12 @@ export const updateGoalEntry = async (userId, goalId, entryId, updates) => {
 
 export const deleteGoalEntry = async (userId, goalId, entryId) => {
   const params = new URLSearchParams({ userId });
-  const result = await apiCall(`/v1/goals/${goalId}/entries/${entryId}?${params}`, {
+  // DELETE endpoint returns 204 (no content), so result will be null/undefined
+  await apiCall(`/v1/goals/${goalId}/entries/${entryId}?${params}`, {
     method: 'DELETE',
   });
-  // Return the goal object
-  return result.goal;
+  // Return null since API doesn't return goal object
+  return null;
 };
 
 // Goal progress functions

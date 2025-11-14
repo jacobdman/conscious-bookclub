@@ -313,13 +313,24 @@ export const formatMilestoneDisplay = (goal) => {
     return [{text: goal.title, completed: false}];
   }
   
-  const completedToday = getCompletedMilestonesToday(goal.milestones);
-  const nextIncomplete = getNextIncompleteMilestone(goal.milestones);
+  // Sort milestones by order (lowest first)
+  const sortedMilestones = [...goal.milestones].sort((a, b) => {
+    const aOrder = a.order !== undefined ? a.order : (a.id || a.ID || 0);
+    const bOrder = b.order !== undefined ? b.order : (b.id || b.ID || 0);
+    return aOrder - bOrder;
+  });
+  
+  const completedToday = getCompletedMilestonesToday(sortedMilestones);
+  const nextIncomplete = getNextIncompleteMilestone(sortedMilestones);
   
   const display = [];
   
-  // Add completed milestones from today (with strikethrough)
-  completedToday.forEach(m => {
+  // Add completed milestones from today (with strikethrough), sorted by order
+  completedToday.sort((a, b) => {
+    const aOrder = a.order !== undefined ? a.order : (a.id || a.ID || 0);
+    const bOrder = b.order !== undefined ? b.order : (b.id || b.ID || 0);
+    return aOrder - bOrder;
+  }).forEach(m => {
     display.push({
       text: `${goal.title}: ${m.title}`,
       completed: true,

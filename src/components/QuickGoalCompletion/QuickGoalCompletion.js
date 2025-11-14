@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -19,12 +19,10 @@ import {
 } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import useGoalsContext from 'contexts/Goals';
-import { getGoalEntries, getGoalProgress, createGoalEntry, updateMilestone, deleteGoalEntry } from 'services/goals/goals.service';
 import {
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
   getTodayBoundaries,
-  hasEntryToday,
   getProgressText,
   formatMilestoneDisplay,
   normalizeGoalType,
@@ -34,77 +32,17 @@ import {
 
 const QuickGoalCompletion = () => {
   const { user } = useAuth();
-  const { goals: allGoals, updateGoal } = useGoalsContext();
-  const [completionStates, setCompletionStates] = useState({});
-  const [progressData, setProgressData] = useState({});
-  const [loading, setLoading] = useState(false);
+  const { 
+    goals: allGoals, 
+    updateGoal,
+    createEntry,
+    deleteEntry,
+    updateMilestone,
+    fetchGoalEntries,
+  } = useGoalsContext();
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState({});
-  const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null });
-  
-  const fetchCompletions = useCallback(async (goalsToCheck) => {
-    if (!user || !goalsToCheck || goalsToCheck.length === 0) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Check completion states and fetch data for each goal
-      const completionStates = {};
-      const progressData = {};
-      const todayBoundaries = getTodayBoundaries();
-
-      // Process active goals
-      for (const goal of goalsToCheck) {
-        // For active goals, fetch data from API
-        if (goal.type === 'habit') {
-          // For habits: check if entry exists TODAY
-          try {
-            const entries = await getGoalEntries(user.uid, goal.id, todayBoundaries.start, todayBoundaries.end);
-            const hasToday = hasEntryToday(entries);
-            completionStates[goal.id] = hasToday;
-          } catch (err) {
-            completionStates[goal.id] = false;
-          }
-        } else if (goal.type === 'metric') {
-          // For metrics: check if entry exists TODAY (like habits)
-          // Use progress from goal context if available, otherwise fetch
-          try {
-            const entries = await getGoalEntries(user.uid, goal.id, todayBoundaries.start, todayBoundaries.end);
-            const hasToday = hasEntryToday(entries);
-            completionStates[goal.id] = hasToday;
-            
-            // Use progress from goal context if available
-            if (goal.progress) {
-              progressData[goal.id] = goal.progress;
-            } else {
-              // Fallback: fetch progress if not in context
-              const progress = await getGoalProgress(user.uid, goal.id);
-              progressData[goal.id] = progress;
-            }
-          } catch (err) {
-            completionStates[goal.id] = false;
-            progressData[goal.id] = goal.progress || null;
-          }
-        } else if (normalizeGoalType(goal.type) === 'one_time') {
-          completionStates[goal.id] = goal.completed || false;
-        } else if (goal.type === 'milestone') {
-          // For milestones: check if all are done
-          const milestones = goal.milestones || goal.Milestones || [];
-          const allDone = milestones.length > 0 && milestones.every(m => m.done);
-          completionStates[goal.id] = allDone || false;
-        }
-      }
-
-      // Merge completion states and progress data instead of replacing
-      setCompletionStates(prev => ({ ...prev, ...completionStates }));
-      setProgressData(prev => ({ ...prev, ...progressData }));
-    } catch (err) {
-      setError('Failed to fetch completion data');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+  const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null, quantity: '' });
 
   // Get filtered and sorted goals whenever allGoals changes
   const filteredGoals = useMemo(() => {
@@ -113,114 +51,149 @@ const QuickGoalCompletion = () => {
     return sorted.slice(0, 5); // Limit to top 5
   }, [allGoals]);
 
-  // Track previous filteredGoals to detect actual changes (not just reference equality)
-  const prevFilteredGoalsRef = useRef([]);
-  
-  // Fetch completion states when filtered goals change (only if goals actually added/removed)
-  useEffect(() => {
-    const prevGoalIds = prevFilteredGoalsRef.current.map(g => g.id).sort();
-    const currentGoalIds = filteredGoals.map(g => g.id).sort();
-    
-    // Only refetch if goals were actually added or removed (not just completion status changed)
-    const goalsChanged = JSON.stringify(prevGoalIds) !== JSON.stringify(currentGoalIds);
-    
-    if (goalsChanged) {
-      if (filteredGoals.length > 0) {
-        fetchCompletions(filteredGoals);
-      } else {
-        // Clear completion states if no goals
-        setCompletionStates({});
-        setProgressData({});
-      }
+  // Goals now include today's entries by default from the API, so no need to fetch them separately
+
+  // Get completion state for a goal
+  const getCompletionState = (goal) => {
+    if (goal.type === 'habit' || goal.type === 'metric') {
+      // Check cached entries for today
+      const todayBoundaries = getTodayBoundaries();
+      const cachedEntries = goal.entries || [];
+      const todayEntries = cachedEntries.filter(entry => {
+        const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+        return entryDate >= todayBoundaries.start && entryDate < todayBoundaries.end;
+      });
+      return todayEntries.length > 0;
+    } else if (normalizeGoalType(goal.type) === 'one_time') {
+      return goal.completed || false;
+    } else if (goal.type === 'milestone') {
+      const milestones = goal.milestones || [];
+      return milestones.length > 0 && milestones.every(m => m.done);
     }
-    
-    // Update ref for next comparison
-    prevFilteredGoalsRef.current = filteredGoals;
-  }, [filteredGoals, fetchCompletions]);
+    return false;
+  };
 
 
   const handleGoalToggle = async (goal) => {
     if (!user) return;
 
     const goalId = goal.id;
-    const isCurrentlyComplete = completionStates[goalId];
+    
+    // Prevent multiple clicks - check if already updating
+    if (updating[goalId]) {
+      return;
+    }
+
+    // Get the latest goal from context to ensure we have current state
+    const currentGoal = allGoals.find(g => g.id === goalId) || goal;
+    const isCurrentlyComplete = getCompletionState(currentGoal);
 
     try {
       setUpdating(prev => ({ ...prev, [goalId]: true }));
 
-      if (goal.type === 'habit') {
+      if (currentGoal.type === 'habit') {
         // For habits, create or delete entry based on current state
         if (!isCurrentlyComplete) {
           // Create entry when checking
-          const result = await createGoalEntry(user.uid, goalId, {
+          await createEntry(goalId, {
             occurred_at: new Date().toISOString(),
             quantity: null,
           });
-          // Update the goal in context with the returned goal data
-          if (result.goal) {
-            await updateGoal(goalId, result.goal);
-          }
+          // The createEntry function in the provider should update the state
+          // The component will re-render when goals state changes
         } else {
           // Delete today's entry when unchecking
           const todayBoundaries = getTodayBoundaries();
-          const entries = await getGoalEntries(user.uid, goalId, todayBoundaries.start, todayBoundaries.end);
+          // Fetch today's entries if not cached
+          let entries = currentGoal.entries || [];
+          const todayEntries = entries.filter(entry => {
+            const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+            return entryDate >= todayBoundaries.start && entryDate < todayBoundaries.end;
+          });
+          
+          if (todayEntries.length === 0) {
+            // Fetch entries for today
+            entries = await fetchGoalEntries(goalId, 10, 0, false, todayBoundaries.start, todayBoundaries.end);
+          }
+          
           if (entries && entries.length > 0) {
-            // Delete the most recent entry for today
-            const mostRecentEntry = entries.sort((a, b) => 
-              new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
-            )[0];
-            if (mostRecentEntry) {
-              const updatedGoal = await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
-              // Update the goal in context with the returned goal data
-              if (updatedGoal) {
-                await updateGoal(goalId, updatedGoal);
+            // Find today's entries
+            const todayEntriesFiltered = entries.filter(entry => {
+              const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+              return entryDate >= todayBoundaries.start && entryDate < todayBoundaries.end;
+            });
+            
+            if (todayEntriesFiltered.length > 0) {
+              // Delete the most recent entry for today
+              const mostRecentEntry = todayEntriesFiltered.sort((a, b) => 
+                new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
+              )[0];
+              if (mostRecentEntry) {
+                await deleteEntry(goalId, mostRecentEntry.id);
               }
             }
           }
         }
-      } else if (goal.type === 'metric') {
+      } else if (currentGoal.type === 'metric') {
         // For metrics, open quantity dialog when checking, or delete entry when unchecking
         if (!isCurrentlyComplete) {
-          setQuantityDialog({ open: true, goal: goal });
+          setQuantityDialog({ open: true, goal: currentGoal, quantity: '' });
           setUpdating(prev => ({ ...prev, [goalId]: false }));
           return;
         } else {
           // Delete today's most recent entry when unchecking
           const todayBoundaries = getTodayBoundaries();
-          const entries = await getGoalEntries(user.uid, goalId, todayBoundaries.start, todayBoundaries.end);
+          // Fetch today's entries if not cached
+          let entries = currentGoal.entries || [];
+          const todayEntries = entries.filter(entry => {
+            const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+            return entryDate >= todayBoundaries.start && entryDate < todayBoundaries.end;
+          });
+          
+          if (todayEntries.length === 0) {
+            // Fetch entries for today
+            entries = await fetchGoalEntries(goalId, 10, 0, false, todayBoundaries.start, todayBoundaries.end);
+          }
+          
           if (entries && entries.length > 0) {
-            // Delete the most recent entry for today
-            const mostRecentEntry = entries.sort((a, b) => 
-              new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
-            )[0];
-            if (mostRecentEntry) {
-              const updatedGoal = await deleteGoalEntry(user.uid, goalId, mostRecentEntry.id);
-              // Update the goal in context with the returned goal data
-              if (updatedGoal) {
-                await updateGoal(goalId, updatedGoal);
+            // Find today's entries
+            const todayEntriesFiltered = entries.filter(entry => {
+              const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+              return entryDate >= todayBoundaries.start && entryDate < todayBoundaries.end;
+            });
+            
+            if (todayEntriesFiltered.length > 0) {
+              // Delete the most recent entry for today
+              const mostRecentEntry = todayEntriesFiltered.sort((a, b) => 
+                new Date(b.occurred_at || b.occurredAt) - new Date(a.occurred_at || a.occurredAt)
+              )[0];
+              if (mostRecentEntry) {
+                await deleteEntry(goalId, mostRecentEntry.id);
               }
             }
           }
         }
-      } else if (normalizeGoalType(goal.type) === 'one_time') {
+      } else if (normalizeGoalType(currentGoal.type) === 'one_time') {
         // Toggle completion status for one-time goals
         const newCompleted = !isCurrentlyComplete;
         await updateGoal(goalId, {
           completed: newCompleted,
           completedAt: newCompleted ? new Date().toISOString() : null,
         });
-        // Update completion state locally (no API call needed - completion status is in goal object)
-        setCompletionStates(prev => ({ ...prev, [goalId]: newCompleted }));
         setUpdating(prev => ({ ...prev, [goalId]: false }));
         return;
-      } else if (goal.type === 'milestone') {
+      } else if (currentGoal.type === 'milestone') {
         // For milestones, toggle the next incomplete milestone or undo the last completed one
-        const milestones = goal.milestones || goal.Milestones || [];
+        // Sort milestones by order (lowest first) before processing
+        const milestones = [...(currentGoal.milestones || [])].sort((a, b) => {
+          const aOrder = a.order !== undefined ? a.order : (a.id || a.ID || 0);
+          const bOrder = b.order !== undefined ? b.order : (b.id || b.ID || 0);
+          return aOrder - bOrder;
+        });
         const incompleteMilestone = milestones.find(m => !m.done);
         
         if (incompleteMilestone) {
           // Mark the next incomplete milestone as done
-          // Get the milestone ID, handling both id and ID field names
           const milestoneId = incompleteMilestone.id || incompleteMilestone.ID;
           if (!milestoneId) {
             console.error('Milestone ID not found for milestone:', incompleteMilestone);
@@ -228,23 +201,8 @@ const QuickGoalCompletion = () => {
             return;
           }
           
-          // Ensure milestoneId is a number (backend expects integer)
           const milestoneIdNum = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
-          await updateMilestone(user.uid, goalId, milestoneIdNum, { done: true });
-          // Update goal in context to reflect milestone change
-          const updatedMilestones = milestones.map(m => {
-            const mId = m.id || m.ID;
-            const mIdNum = typeof mId === 'string' ? parseInt(mId, 10) : mId;
-            if (mIdNum === milestoneIdNum) {
-              return { ...m, done: true, doneAt: new Date().toISOString() };
-            }
-            return m;
-          });
-          await updateGoal(goalId, { milestones: updatedMilestones });
-          
-          // Update completion state locally (check if all milestones are now done)
-          const allDone = updatedMilestones.length > 0 && updatedMilestones.every(m => m.done);
-          setCompletionStates(prev => ({ ...prev, [goalId]: allDone }));
+          await updateMilestone(goalId, milestoneIdNum, { done: true });
         } else if (isCurrentlyComplete) {
           // If all are done and user unchecks, undo the last completed milestone from today
           const todayBoundaries = getTodayBoundaries();
@@ -267,7 +225,6 @@ const QuickGoalCompletion = () => {
           
           if (completedToday.length > 0) {
             const milestoneToUndo = completedToday[0];
-            // Get the milestone ID, handling both id and ID field names
             const milestoneId = milestoneToUndo.id || milestoneToUndo.ID;
             if (!milestoneId) {
               console.error('Milestone ID not found for milestone:', milestoneToUndo);
@@ -275,40 +232,12 @@ const QuickGoalCompletion = () => {
               return;
             }
             
-            // Ensure milestoneId is a number (backend expects integer)
             const milestoneIdNum = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
-            await updateMilestone(user.uid, goalId, milestoneIdNum, { done: false });
-            // Update goal in context
-            const updatedMilestones = milestones.map(m => {
-              const mId = m.id || m.ID;
-              const mIdNum = typeof mId === 'string' ? parseInt(mId, 10) : mId;
-              if (mIdNum === milestoneIdNum) {
-                return { ...m, done: false, doneAt: null };
-              }
-              return m;
-            });
-            await updateGoal(goalId, { milestones: updatedMilestones });
-            
-            // Update completion state
-            const allDone = updatedMilestones.length > 0 && updatedMilestones.every(m => m.done);
-            setCompletionStates(prev => ({ ...prev, [goalId]: allDone }));
+            await updateMilestone(goalId, milestoneIdNum, { done: false, doneAt: null });
           }
         }
         setUpdating(prev => ({ ...prev, [goalId]: false }));
         return;
-      }
-
-      // For habit/metric goals, fetch completion data only for this specific goal
-      if (goal.type === 'habit' || goal.type === 'metric') {
-        const updatedGoal = allGoals.find(g => g.id === goalId) || goal;
-        if (filteredGoals.find(g => g.id === goalId)) {
-          await fetchCompletions([updatedGoal]);
-        }
-        
-        // Notify Goals component to refetch entries if this goal is expanded
-        window.dispatchEvent(new CustomEvent('goalEntryChanged', { 
-          detail: { goalId, goalType: goal.type } 
-        }));
       }
     } catch (err) {
       setError('Failed to update goal');
@@ -332,26 +261,10 @@ const QuickGoalCompletion = () => {
       setUpdating(prev => ({ ...prev, [goal.id]: true }));
       setQuantityDialog({ open: false, goal: null, quantity: '' });
 
-      const result = await createGoalEntry(user.uid, goal.id, {
+      await createEntry(goal.id, {
         occurred_at: new Date().toISOString(),
         quantity: quantity,
       });
-
-      // Update the goal in context with the returned goal data
-      if (result.goal) {
-        await updateGoal(goal.id, result.goal);
-      }
-
-      // Refresh completion states for this specific metric goal only
-      const updatedGoal = result.goal || allGoals.find(g => g.id === goal.id) || goal;
-      if (filteredGoals.find(g => g.id === goal.id)) {
-        await fetchCompletions([updatedGoal]);
-      }
-      
-      // Notify Goals component to refetch entries if this goal is expanded
-      window.dispatchEvent(new CustomEvent('goalEntryChanged', { 
-        detail: { goalId: goal.id, goalType: goal.type } 
-      }));
     } catch (err) {
       setError('Failed to create entry');
     } finally {
@@ -372,24 +285,9 @@ const QuickGoalCompletion = () => {
     if (goal.type === 'milestone') {
       return formatMilestoneDisplay(goal);
     }
-    return [{ text: goal.title, completed: completionStates[goal.id] || false }];
+    return [{ text: goal.title, completed: getCompletionState(goal) }];
   };
 
-
-  if (loading) {
-    return (
-      <Card sx={{ overflow: 'visible' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 2 }}>
-            <CircularProgress size={24} />
-            <Typography variant="body2" sx={{ ml: 2 }}>
-              Loading goals...
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
-    );
-  }
 
   if (error) {
     return (
@@ -431,17 +329,18 @@ const QuickGoalCompletion = () => {
           
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {filteredGoals.map((goal, index) => {
-              const isComplete = completionStates[goal.id] || false;
+              // Get the latest goal from context to ensure we have current entries
+              const latestGoal = allGoals.find(g => g.id === goal.id) || goal;
+              const isComplete = getCompletionState(latestGoal);
               const isUpdating = updating[goal.id] || false;
-              const progress = progressData[goal.id];
-              const displayItems = getGoalDisplayItems(goal);
-              const progressText = goal.type === 'metric' && progress ? getProgressText(goal, progress) : '';
+              const displayItems = getGoalDisplayItems(latestGoal);
+              const progressText = latestGoal.type === 'metric' && latestGoal.progress ? getProgressText(latestGoal, latestGoal.progress) : '';
               
               // For milestones, show completed ones first (no checkbox), then next incomplete (with checkbox)
               // For other goals, show single item with checkbox
-              if (goal.type === 'milestone') {
+              if (latestGoal.type === 'milestone') {
                 return (
-                  <Box key={goal.id}>
+                  <Box key={latestGoal.id}>
                     {displayItems.map((item, itemIndex) => {
                       const itemComplete = item.completed || false;
                       const isLastItem = itemIndex === displayItems.length - 1;
@@ -463,8 +362,8 @@ const QuickGoalCompletion = () => {
                           {isNextIncomplete && (
                             <>
                               <Chip
-                                label={getGoalTypeLabel(goal)}
-                                color={getGoalTypeColor(goal.type)}
+                                label={getGoalTypeLabel(latestGoal)}
+                                color={getGoalTypeColor(latestGoal.type)}
                                 size="small"
                                 variant="outlined"
                               />
@@ -482,7 +381,7 @@ const QuickGoalCompletion = () => {
                             control={
                               <Checkbox
                                 checked={false}
-                                onChange={() => handleGoalToggle(goal)}
+                                onChange={() => handleGoalToggle(latestGoal)}
                                 disabled={isUpdating}
                                 color="primary"
                               />
@@ -506,12 +405,12 @@ const QuickGoalCompletion = () => {
               
               // For non-milestone goals, show single item
               return (
-                <Box key={goal.id}>
+                <Box key={latestGoal.id}>
                   <FormControlLabel
                     control={
                       <Checkbox
                         checked={isComplete}
-                        onChange={() => handleGoalToggle(goal)}
+                        onChange={() => handleGoalToggle(latestGoal)}
                         disabled={isUpdating}
                         color="primary"
                       />
@@ -526,7 +425,7 @@ const QuickGoalCompletion = () => {
                             flex: 1
                           }}
                         >
-                          {getGoalDisplayText(goal)}
+                          {getGoalDisplayText(latestGoal)}
                           {progressText && (
                             <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
                               ({progressText})
@@ -534,8 +433,8 @@ const QuickGoalCompletion = () => {
                           )}
                         </Typography>
                         <Chip
-                          label={getGoalTypeLabel(goal)}
-                          color={getGoalTypeColor(goal.type)}
+                          label={getGoalTypeLabel(latestGoal)}
+                          color={getGoalTypeColor(latestGoal.type)}
                           size="small"
                           variant="outlined"
                         />

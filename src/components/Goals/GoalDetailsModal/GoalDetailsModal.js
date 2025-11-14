@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,23 +16,13 @@ import {
   TableRow,
   Paper,
   CircularProgress,
-  Divider,
   Checkbox,
 } from '@mui/material';
 import { Close, Add, Edit, Delete, DragIndicator } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
-import { 
-  getGoalEntries,
-  createGoalEntry,
-  updateGoalEntry,
-  deleteGoalEntry,
-  updateMilestone,
-} from 'services/goals/goals.service';
-import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
 import { 
-  getPeriodBoundaries, 
   getProgressText, 
   getProgressBarValue,
   formatDate,
@@ -40,78 +30,52 @@ import {
 
 const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const { user } = useAuth();
-  const { currentClub } = useClubContext();
-  const { goals, updateGoal: updateGoalInContext } = useGoalsContext();
-  const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const { 
+    goals, 
+    updateGoal,
+    createEntry,
+    updateEntry,
+    deleteEntry,
+    fetchGoalEntries,
+    updateMilestone,
+    bulkUpdateMilestones,
+  } = useGoalsContext();
   const [entryDialog, setEntryDialog] = useState({ open: false, entry: null, saving: false, error: null });
   const [draggedMilestoneId, setDraggedMilestoneId] = useState(null);
   const [draggedOverMilestoneId, setDraggedOverMilestoneId] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [updatingMilestones, setUpdatingMilestones] = useState({});
   const observerTarget = useRef(null);
-  const currentOffset = useRef(0);
   const INITIAL_LIMIT = 10;
   const LOAD_MORE_LIMIT = 10;
 
   // Get the current goal from the provider context to ensure we have the latest version
   // This ensures the UI updates when milestones are toggled
   const goal = goalProp?.id ? goals.find(g => g.id === goalProp.id) || goalProp : goalProp;
-
-  const fetchEntries = useCallback(async (offset = 0, limit = INITIAL_LIMIT, append = false) => {
-    if (!user || !goal || (goal.type !== 'habit' && goal.type !== 'metric') || !goal.cadence) {
-      return;
-    }
-
-    try {
-      if (offset === 0) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
-
-      // For habit/metric goals, fetch all entries (no period filter for full history)
-      const fetchedEntries = await getGoalEntries(user.uid, goal.id, null, null, limit, offset);
-
-      // Sort entries by occurred_at (habit date) in descending order (most recent first)
-      // Handle both occurred_at and occurredAt field names for compatibility
-      const sortedEntries = fetchedEntries.sort((a, b) => {
-        const dateA = new Date(a.occurred_at || a.occurredAt || 0);
-        const dateB = new Date(b.occurred_at || b.occurredAt || 0);
-        return dateB - dateA; // Descending order (newest first)
-      });
-
-      if (append) {
-        setEntries(prev => {
-          // Combine and re-sort all entries
-          const combined = [...prev, ...sortedEntries];
-          return combined.sort((a, b) => {
-            const dateA = new Date(a.occurred_at || a.occurredAt || 0);
-            const dateB = new Date(b.occurred_at || b.occurredAt || 0);
-            return dateB - dateA; // Descending order (newest first)
-          });
-        });
-      } else {
-        setEntries(sortedEntries);
-      }
-
-      // Check if there are more entries to load
-      setHasMore(fetchedEntries.length === limit);
-      currentOffset.current = offset + fetchedEntries.length;
-    } catch (err) {
-      console.error('Failed to fetch entries:', err);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [user, goal]);
+  
+  // Get entries and pagination from goal
+  const entries = goal?.entries || [];
+  const entriesPagination = useMemo(() => {
+    return goal?.entriesPagination || { hasMore: true, offset: 0, limit: INITIAL_LIMIT };
+  }, [goal?.entriesPagination]);
+  const hasMore = entriesPagination.hasMore;
 
   // Load more entries when scrolling to bottom
   useEffect(() => {
+    if (!open || !goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
+
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchEntries(currentOffset.current, LOAD_MORE_LIMIT, true);
+      async (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          try {
+            setLoadingMore(true);
+            const currentOffset = entriesPagination.offset || 0;
+            await fetchGoalEntries(goal.id, LOAD_MORE_LIMIT, currentOffset, true);
+          } catch (err) {
+            console.error('Failed to load more entries:', err);
+          } finally {
+            setLoadingMore(false);
+          }
         }
       },
       { threshold: 0.1 }
@@ -127,18 +91,17 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         observer.unobserve(currentTarget);
       }
     };
-  }, [hasMore, loadingMore, loading, fetchEntries]);
+  }, [open, goal, hasMore, loadingMore, entriesPagination, fetchGoalEntries]);
 
-  // Fetch entries when modal opens or goal changes
+  // Fetch initial entries when modal opens or goal changes
   useEffect(() => {
-    if (open && goal) {
-      currentOffset.current = 0;
-      fetchEntries(0, INITIAL_LIMIT, false);
-    } else {
-      setEntries([]);
-      setHasMore(true);
+    if (open && goal && (goal.type === 'habit' || goal.type === 'metric')) {
+      // Only fetch if entries are not already cached
+      if (!goal.entries || goal.entries.length === 0) {
+        fetchGoalEntries(goal.id, INITIAL_LIMIT, 0, false);
+      }
     }
-  }, [open, goal, fetchEntries]);
+  }, [open, goal, fetchGoalEntries]);
 
   const handleAddEntry = () => {
     setEntryDialog({ open: true, entry: null, saving: false, error: null });
@@ -152,13 +115,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     if (!user || !window.confirm('Are you sure you want to delete this entry?')) return;
 
     try {
-      const updatedGoal = await deleteGoalEntry(user.uid, goal.id, entry.id);
-      // Remove from local state
-      setEntries(prev => prev.filter(e => e.id !== entry.id));
-      // Update the goal in context with the returned goal data
-      if (updatedGoal) {
-        await updateGoalInContext(goal.id, updatedGoal);
-      }
+      await deleteEntry(goal.id, entry.id);
     } catch (err) {
       console.error('Failed to delete entry:', err);
     }
@@ -172,41 +129,10 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     setEntryDialog(prev => ({ ...prev, saving: true, error: null }));
 
     try {
-      let savedEntry;
-      let updatedGoal = null;
       if (isUpdate) {
-        const result = await updateGoalEntry(user.uid, goal.id, entryDialog.entry.id, entryData);
-        savedEntry = result.entry || result;
-        updatedGoal = result.goal;
-        setEntries(prev => {
-          // Update the entry and re-sort by occurred_at
-          const updated = prev.map(e => 
-            e.id === entryDialog.entry.id ? { ...e, ...entryData, ...savedEntry } : e
-          );
-          return updated.sort((a, b) => {
-            const dateA = new Date(a.occurred_at || a.occurredAt || 0);
-            const dateB = new Date(b.occurred_at || b.occurredAt || 0);
-            return dateB - dateA; // Descending order (newest first)
-          });
-        });
+        await updateEntry(goal.id, entryDialog.entry.id, entryData);
       } else {
-        const result = await createGoalEntry(user.uid, goal.id, entryData);
-        savedEntry = result.entry || result;
-        updatedGoal = result.goal;
-        // Add entry and sort by occurred_at (most recent first)
-        setEntries(prev => {
-          const combined = [savedEntry, ...prev];
-          return combined.sort((a, b) => {
-            const dateA = new Date(a.occurred_at || a.occurredAt || 0);
-            const dateB = new Date(b.occurred_at || b.occurredAt || 0);
-            return dateB - dateA; // Descending order (newest first)
-          });
-        });
-      }
-      
-      // Update the goal in context with the returned goal data
-      if (updatedGoal) {
-        await updateGoalInContext(goal.id, updatedGoal);
+        await createEntry(goal.id, entryData);
       }
       
       setEntryDialog({ open: false, entry: null, saving: false, error: null });
@@ -220,37 +146,32 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   };
 
   const handleToggleMilestone = async (milestone) => {
-    if (!user || !goal || !currentClub) return;
+    if (!user || !goal) return;
+
+    const milestoneId = milestone.id || milestone.ID;
+    const milestoneIdNum = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+    
+    // Prevent multiple clicks
+    if (updatingMilestones[milestoneIdNum]) {
+      return;
+    }
 
     const newDoneState = !milestone.done;
 
     try {
-      await updateMilestone(user.uid, goal.id, milestone.id, { done: newDoneState });
-      
-      // Update the goal in the context provider so it updates everywhere
-      // Update the milestones array with the new state
-      const updatedMilestones = (goal.milestones || []).map(m => {
-        if (m.id === milestone.id) {
-          return {
-            ...m,
-            done: newDoneState,
-            doneAt: newDoneState ? new Date().toISOString() : null,
-          };
-        }
-        return m;
+      setUpdatingMilestones(prev => ({ ...prev, [milestoneIdNum]: true }));
+      await updateMilestone(goal.id, milestoneIdNum, { 
+        done: newDoneState,
+        doneAt: newDoneState ? new Date().toISOString() : null
       });
-      
-      // Use the context's updateGoal to update the goal, which will update the provider state
-      await updateGoalInContext(goal.id, {
-        milestones: updatedMilestones,
-      });
-      
-      // Refresh entries to update any related data
-      if (goal.type === 'habit' || goal.type === 'metric') {
-        fetchEntries(0, currentOffset.current || INITIAL_LIMIT, false);
-      }
     } catch (err) {
       console.error('Failed to update milestone:', err);
+    } finally {
+      setUpdatingMilestones(prev => {
+        const next = { ...prev };
+        delete next[milestoneIdNum];
+        return next;
+      });
     }
   };
 
@@ -281,7 +202,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
       return;
     }
 
-    if (!user || !goal || !currentClub) {
+    if (!user || !goal) {
       setDraggedMilestoneId(null);
       return;
     }
@@ -307,25 +228,14 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
       const [draggedMilestone] = reorderedMilestones.splice(draggedIndex, 1);
       reorderedMilestones.splice(targetIndex, 0, draggedMilestone);
 
-      // Update order for all affected milestones
-      const updatePromises = reorderedMilestones.map((milestone, index) => {
-        if (milestone.order !== index) {
-          return updateMilestone(user.uid, goal.id, milestone.id, { order: index });
-        }
-        return Promise.resolve();
-      });
-
-      await Promise.all(updatePromises);
-
-      // Update the goal in context with new order
+      // Update order for all milestones
       const updatedMilestones = reorderedMilestones.map((milestone, index) => ({
         ...milestone,
         order: index,
       }));
 
-      await updateGoalInContext(goal.id, {
-        milestones: updatedMilestones,
-      });
+      // Use bulk update to update all milestones at once
+      await bulkUpdateMilestones(goal.id, updatedMilestones);
     } catch (err) {
       console.error('Failed to reorder milestones:', err);
     } finally {
@@ -339,13 +249,12 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   };
 
   const handleToggleOneTimeGoal = async () => {
-    if (!user || !goal || goal.type !== 'one_time' || !currentClub) return;
+    if (!user || !goal || goal.type !== 'one_time') return;
 
     const newCompleted = !goal.completed;
 
     try {
-      // Use the context's updateGoal to update the goal, which will update the provider state
-      await updateGoalInContext(goal.id, {
+      await updateGoal(goal.id, {
         completed: newCompleted,
         completedAt: newCompleted ? new Date().toISOString() : null,
       });
@@ -485,9 +394,12 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                             <Checkbox
                               checked={milestone.done || false}
                               onChange={() => handleToggleMilestone(milestone)}
-                              disabled={!milestone.id}
+                              disabled={!milestone.id || updatingMilestones[milestone.id]}
                               size="small"
                             />
+                            {updatingMilestones[milestone.id] && (
+                              <CircularProgress size={16} sx={{ ml: 1 }} />
+                            )}
                             <Typography
                               variant="body2"
                               sx={{
@@ -546,11 +458,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                   </Button>
                 </Box>
 
-                {loading && entries.length === 0 ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : entries.length === 0 ? (
+                {entries.length === 0 ? (
                   <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
                     No entries yet
                   </Typography>
