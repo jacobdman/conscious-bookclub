@@ -18,6 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import ClubCreationRequest from 'components/ClubCreationRequest';
 import PublicHeader from 'components/PublicHeader';
+import PublicFooter from 'components/PublicFooter';
 import { theme } from '../../theme';
 import { getStorageFileUrl } from 'services/storage';
 
@@ -803,6 +804,8 @@ const Landing = () => {
           </Typography>
           <ClubCreationRequest />
           </Container>
+
+          <PublicFooter />
         </Box>
       </Box>
     </ThemeProvider>

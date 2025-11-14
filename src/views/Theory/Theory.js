@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { theme } from '../../theme';
 import PublicHeader from 'components/PublicHeader';
+import PublicFooter from 'components/PublicFooter';
 import { Link } from 'react-router-dom';
 
 const Theory = () => {
@@ -275,6 +276,7 @@ const Theory = () => {
             </Paper>
           </Paper>
           </Container>
+          <PublicFooter />
         </Box>
       </Box>
     </ThemeProvider>

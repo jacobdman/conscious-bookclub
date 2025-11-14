@@ -225,6 +225,15 @@ const NavigationDrawer = ({ open, onClose, onLogout }) => {
             <ListItem button onClick={onLogout}>
               <ListItemText primary="Sign Out" sx={{ color: 'text.secondary' }} />
             </ListItem>
+            <ListItem 
+              button 
+              onClick={() => handleNavigation('/landing')}
+            >
+              <ListItemText 
+                primary="Landing Page" 
+                sx={{ color: 'text.secondary' }} 
+              />
+            </ListItem>
           </List>
         </Box>
 
