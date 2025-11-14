@@ -6,6 +6,7 @@ import useClubContext from 'contexts/Club';
 import { theme } from 'theme';
 import Header from 'components/Header';
 import NavigationDrawer from 'components/NavigationDrawer';
+import { setupMobileInputFocusHandler } from 'utils/mobileInputFocus';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -32,6 +33,11 @@ const Layout = ({ children }) => {
     
     document.title = title;
   }, [location.pathname, currentClub]);
+
+  // Setup global mobile input focus handler
+  useEffect(() => {
+    return setupMobileInputFocusHandler();
+  }, []);
 
   const handleLogout = async () => {
     try {

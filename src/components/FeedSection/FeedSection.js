@@ -27,7 +27,13 @@ const FeedSection = () => {
   const previousFirstPostIdRef = useRef(null); // Track first post ID to detect new posts
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll within the container, not the entire page
+    if (scrollContainerRef.current && messagesEndRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
   };
 
   // Scroll to bottom when new posts arrive (but not when loading more at top)
