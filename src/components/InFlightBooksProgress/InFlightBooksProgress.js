@@ -16,6 +16,7 @@ import { getBooksProgress } from 'services/books/books.service';
 import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
 import BookProgressRing from './BookProgressRing';
+import { parseLocalDate } from 'utils/dateHelpers';
 
 const InFlightBooksProgress = () => {
   const { currentClub } = useClubContext();
@@ -78,8 +79,8 @@ const InFlightBooksProgress = () => {
         const datesMap = {};
         meetings.forEach(meeting => {
           if (meeting.bookId) {
-            const meetingDate = new Date(meeting.date);
-            if (!datesMap[meeting.bookId] || meetingDate < new Date(datesMap[meeting.bookId])) {
+            const meetingDate = parseLocalDate(meeting.date);
+            if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
               datesMap[meeting.bookId] = meeting.date;
             }
           }

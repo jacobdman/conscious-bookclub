@@ -13,6 +13,7 @@ import FeedPreview from 'components/FeedPreview';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
 import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
+import { parseLocalDate } from 'utils/dateHelpers';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -53,8 +54,8 @@ const Dashboard = () => {
             });
           } else {
             const existing = bookMap.get(bookId);
-            const meetingDate = new Date(meeting.date);
-            const existingDate = new Date(existing.meetingDate);
+            const meetingDate = parseLocalDate(meeting.date);
+            const existingDate = parseLocalDate(existing.meetingDate);
             if (meetingDate < existingDate) {
               // This meeting is earlier, update the meeting date
               bookMap.set(bookId, {
@@ -69,8 +70,8 @@ const Dashboard = () => {
       // Convert map to array and sort by meeting date
       const upcomingBooks = Array.from(bookMap.values())
         .sort((a, b) => {
-          const aDate = new Date(a.meetingDate);
-          const bDate = new Date(b.meetingDate);
+          const aDate = parseLocalDate(a.meetingDate);
+          const bDate = parseLocalDate(b.meetingDate);
           return aDate - bDate;
         })
         .map(item => item.book);

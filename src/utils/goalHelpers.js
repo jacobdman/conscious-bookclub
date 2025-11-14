@@ -214,16 +214,16 @@ export const filterGoalsForQuickCompletion = (goals) => {
 };
 
 /**
- * Get today's date boundaries (start and end of today in UTC)
+ * Get today's date boundaries (start and end of today in local time)
  * @returns {Object} - Object with start and end Date objects for today
  */
 export const getTodayBoundaries = () => {
   const now = new Date();
-  const utcNow = new Date(now.toISOString());
   
-  const start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate()));
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
+  // Use local time components to get start of today
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  // End is start of tomorrow
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
   
   return {start, end};
 };

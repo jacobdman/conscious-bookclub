@@ -22,6 +22,7 @@ import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { createMeeting, updateMeeting } from 'services/meetings/meetings.service';
 import { getBooks } from 'services/books/books.service';
+import { formatLocalDate } from 'utils/dateHelpers';
 
 const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
   const { user } = useAuth();
@@ -98,7 +99,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
       setError(null);
 
       const meetingData = {
-        date: formData.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        date: formatLocalDate(formData.date), // Format as YYYY-MM-DD using local time
         startTime: formData.startTime || null,
         duration: formData.duration || 120,
         location: formData.location || null,

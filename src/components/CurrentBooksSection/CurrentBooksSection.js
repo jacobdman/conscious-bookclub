@@ -13,6 +13,7 @@ import { useAuth } from 'AuthContext';
 import { getUserBookProgress, updateUserBookProgress } from 'services/progress/progress.service';
 import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
+import { parseLocalDate } from 'utils/dateHelpers';
 
 const CurrentBooksSection = ({ books }) => {
   const { user } = useAuth();
@@ -34,8 +35,8 @@ const CurrentBooksSection = ({ books }) => {
         const datesMap = {};
         meetings.forEach(meeting => {
           if (meeting.bookId) {
-            const meetingDate = new Date(meeting.date);
-            if (!datesMap[meeting.bookId] || meetingDate < new Date(datesMap[meeting.bookId])) {
+            const meetingDate = parseLocalDate(meeting.date);
+            if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
               datesMap[meeting.bookId] = meeting.date;
             }
           }

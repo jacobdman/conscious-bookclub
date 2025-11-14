@@ -22,6 +22,7 @@ import { getMeetings } from 'services/meetings/meetings.service';
 import MeetingForm from 'components/MeetingForm';
 import CalendarSubscription from 'components/CalendarSubscription';
 import { format } from 'date-fns';
+import { parseLocalDate } from 'utils/dateHelpers';
 
 const Meetings = () => {
   const { currentClub } = useClubContext();
@@ -148,7 +149,7 @@ const Meetings = () => {
                       {upcomingMeetings.map((meeting) => (
                         <TableRow key={meeting.id}>
                           <TableCell>
-                            {format(new Date(meeting.date), 'MMM d, yyyy')}
+                            {format(parseLocalDate(meeting.date), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell>
                             {meeting.book ? (
@@ -209,7 +210,7 @@ const Meetings = () => {
                       {pastMeetings.map((meeting) => (
                         <TableRow key={meeting.id}>
                           <TableCell>
-                            {format(new Date(meeting.date), 'MMM d, yyyy')}
+                            {format(parseLocalDate(meeting.date), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell>
                             {meeting.book ? (

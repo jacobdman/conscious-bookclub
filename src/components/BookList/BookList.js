@@ -29,6 +29,7 @@ import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import Layout from 'components/Layout';
 import AddBookForm from 'components/AddBookForm';
+import { parseLocalDate } from 'utils/dateHelpers';
 
 const BookList = () => {
   const { user } = useAuth();
@@ -411,8 +412,8 @@ const BookList = () => {
         const datesMap = {};
         meetings.forEach(meeting => {
           if (meeting.bookId) {
-            const meetingDate = new Date(meeting.date);
-            if (!datesMap[meeting.bookId] || meetingDate < new Date(datesMap[meeting.bookId])) {
+            const meetingDate = parseLocalDate(meeting.date);
+            if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
               datesMap[meeting.bookId] = meeting.date;
             }
           }

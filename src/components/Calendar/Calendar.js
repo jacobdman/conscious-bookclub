@@ -30,6 +30,7 @@ import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
 import Layout from 'components/Layout';
 import CalendarSubscription from 'components/CalendarSubscription';
+import { parseLocalDate } from 'utils/dateHelpers';
 
 // Setup moment localizer for react-big-calendar
 const localizer = momentLocalizer(moment);
@@ -61,7 +62,7 @@ const CalendarComponent = () => {
       
       // Transform meetings for react-big-calendar
       const transformedEvents = meetings.map(meeting => {
-        const meetingDate = new Date(meeting.date);
+        const meetingDate = parseLocalDate(meeting.date);
         
         // If startTime is provided, combine date and time
         let startDateTime = meetingDate;

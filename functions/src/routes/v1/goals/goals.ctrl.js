@@ -226,12 +226,24 @@ const getGoals = async (req, res, next) => {
       ],
     });
 
-    // Helper to get today's boundaries
+    // Helper to get today's boundaries in UTC
+    // We use UTC boundaries for consistency, and fetch a wider window to cover
+    // "today" in any timezone (up to UTC-12, which is 12 hours behind UTC)
     const getTodayBoundaries = () => {
       const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const utcNow = new Date(now.toISOString());
+      
+      // Start of today in UTC
+      const start = new Date(Date.UTC(
+        utcNow.getUTCFullYear(),
+        utcNow.getUTCMonth(),
+        utcNow.getUTCDate()
+      ));
+      
+      // End of today in UTC (start of tomorrow)
       const end = new Date(start);
-      end.setDate(end.getDate() + 1);
+      end.setUTCDate(end.getUTCDate() + 1);
+      
       return { start, end };
     };
 
@@ -253,12 +265,23 @@ const getGoals = async (req, res, next) => {
             console.error(`Error calculating progress for goal ${goal.id}:`, err);
           }
 
-          // For habit/metric goals, include today's entries by default
+          // For habit/metric goals, include recent entries by default
+          // Fetch a wider window (yesterday to tomorrow in UTC) to cover "today" in any timezone
+          // The frontend will filter these entries using local time boundaries
           let todayEntries = [];
           if ((goalData.type === 'habit' || goalData.type === 'metric') && goalData.cadence) {
             try {
               const todayBoundaries = getTodayBoundaries();
-              todayEntries = await getGoalEntries(userId, goal.id, todayBoundaries.start, todayBoundaries.end);
+              // Expand window to cover "today" in any timezone (UTC-12 to UTC+14)
+              // Fetch from 24 hours before UTC today start to 24 hours after UTC today start
+              const expandedStart = new Date(todayBoundaries.start);
+              expandedStart.setUTCDate(expandedStart.getUTCDate() - 1);
+              const expandedEnd = new Date(todayBoundaries.end);
+              expandedEnd.setUTCDate(expandedEnd.getUTCDate() + 1);
+              
+              // Return all entries from the expanded window
+              // Frontend will filter to "today" using local time boundaries
+              todayEntries = await getGoalEntries(userId, goal.id, expandedStart, expandedEnd);
             } catch (err) {
               // If fetching today's entries fails, continue without them
               console.error(`Error fetching today's entries for goal ${goal.id}:`, err);

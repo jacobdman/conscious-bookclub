@@ -12,6 +12,7 @@ import { LocationOn } from '@mui/icons-material';
 import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
 import moment from 'moment';
+import { parseLocalDate } from 'utils/dateHelpers';
 
 const NextMeetingCard = () => {
   const { currentClub } = useClubContext();
@@ -40,16 +41,16 @@ const NextMeetingCard = () => {
         
         const upcomingMeetings = meetings
           .filter(meeting => {
-            const meetingDate = new Date(meeting.date);
+            const meetingDate = parseLocalDate(meeting.date);
             meetingDate.setHours(0, 0, 0, 0);
             return meetingDate >= now;
           })
-          .sort((a, b) => new Date(a.date) - new Date(b.date));
+          .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
         
         if (upcomingMeetings.length > 0) {
           const nextMeeting = upcomingMeetings[0];
           // Transform meeting to event-like format for compatibility
-          const meetingDate = new Date(nextMeeting.date);
+          const meetingDate = parseLocalDate(nextMeeting.date);
           setNextEvent({
             id: nextMeeting.id,
             title: nextMeeting.book ? 
