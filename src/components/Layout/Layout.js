@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, CssBaseline, ThemeProvider } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from 'AuthContext';
@@ -13,6 +13,8 @@ const Layout = ({ children }) => {
   const { currentClub } = useClubContext();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const headerRef = useRef(null);
+  const [headerHeight, setHeaderHeight] = useState(80);
 
   // Update page title based on route and club
   useEffect(() => {
@@ -39,6 +41,14 @@ const Layout = ({ children }) => {
     return setupMobileInputFocusHandler();
   }, []);
 
+  // Measure header height for proper spacing
+  useEffect(() => {
+    if (headerRef.current) {
+      const height = headerRef.current.offsetHeight;
+      setHeaderHeight(height);
+    }
+  }, [currentClub]); // Re-measure when club changes (affects header height)
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -50,28 +60,42 @@ const Layout = ({ children }) => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Header 
-        user={user} 
-        onMenuClick={() => setDrawerOpen(true)} 
-        onLogout={handleLogout} 
-      />
-      
-      <NavigationDrawer 
-        open={drawerOpen} 
-        onClose={() => setDrawerOpen(false)} 
-        onLogout={handleLogout} 
-      />
-
-      <Box 
-        component="main"
+      <Box
         sx={{
+          height: '100vh',
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          height: 'calc(100vh - 64px)', // AppBar default height
-          overflow: 'auto',
         }}
       >
-        {children}
+        <Box ref={headerRef}>
+          <Header 
+            user={user} 
+            onMenuClick={() => setDrawerOpen(true)} 
+            onLogout={handleLogout} 
+          />
+        </Box>
+        
+        <NavigationDrawer 
+          open={drawerOpen} 
+          onClose={() => setDrawerOpen(false)} 
+          onLogout={handleLogout} 
+        />
+
+        <Box 
+          component="main"
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            overflow: 'auto',
+            minHeight: 0,
+            marginTop: `${headerHeight}px`,
+            paddingBottom: 2,
+          }}
+        >
+          {children}
+        </Box>
       </Box>
     </ThemeProvider>
   );

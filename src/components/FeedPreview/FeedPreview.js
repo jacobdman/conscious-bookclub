@@ -7,7 +7,9 @@ import {
   Paper,
   CircularProgress,
   Badge,
+  IconButton,
 } from '@mui/material';
+import { ArrowForward } from '@mui/icons-material';
 import useFeedContext from 'contexts/Feed';
 import EmojiInput from 'components/EmojiInput';
 import ReplyQuote from 'components/ReplyQuote';
@@ -46,18 +48,40 @@ const FeedPreview = () => {
     }
   };
 
+  const handleHeaderClick = () => {
+    navigate('/feed');
+  };
+
   return (
     <Box>
       {/* Feed Header */}
       <Box
+        onClick={handleHeaderClick}
         sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           px: 2,
           py: 1.5,
           backgroundColor: 'background.paper',
           borderRadius: 1,
+          mb: 1,
+          cursor: 'pointer',
+          '&:hover': {
+            backgroundColor: 'action.hover',
+          },
+          transition: 'background-color 0.2s',
         }}
       >
-        <Typography variant="h6" component="h1" sx={{ display: 'inline-flex', alignItems: 'center' }}>
+        <Typography 
+          variant="h6" 
+          component="h1" 
+          sx={{ 
+            display: 'inline-flex', 
+            alignItems: 'center',
+            fontWeight: 600,
+          }}
+        >
           {unreadCount > 0 ? (
             <Badge
               badgeContent={unreadCount > 99 ? '99+' : unreadCount}
@@ -83,6 +107,23 @@ const FeedPreview = () => {
             'Feed'
           )}
         </Typography>
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate('/feed');
+          }}
+          sx={{
+            color: 'text.secondary',
+            '&:hover': {
+              color: 'primary.main',
+              backgroundColor: 'action.selected',
+            },
+          }}
+          aria-label="View full feed"
+        >
+          <ArrowForward fontSize="small" />
+        </IconButton>
       </Box>
 
       <Paper
@@ -271,21 +312,6 @@ const FeedPreview = () => {
             );
           })}
         </Box>
-      )}
-
-      {latestPosts.length > 0 && (
-        <Typography
-          variant="caption"
-          color="primary"
-          sx={{
-            display: 'block',
-            textAlign: 'center',
-            mt: 2,
-            fontWeight: 500,
-          }}
-        >
-          Click to view full feed →
-        </Typography>
       )}
     </Paper>
     </Box>

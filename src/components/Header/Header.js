@@ -41,7 +41,16 @@ const Header = ({ user, onMenuClick, onLogout }) => {
   };
 
   return (
-    <AppBar position="static" color="primary">
+    <AppBar 
+      position="fixed" 
+      color="primary"
+      sx={{
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1100,
+      }}
+    >
       <Toolbar>
         <IconButton edge="start" color="inherit" onClick={onMenuClick}>
           <MenuIcon />
