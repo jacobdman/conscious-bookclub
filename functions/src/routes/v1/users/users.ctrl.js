@@ -32,13 +32,64 @@ const getUser = async (req, res, next) => {
 const createUser = async (req, res, next) => {
   try {
     const userData = req.body;
-    const [user] = await db.User.upsert({
+    const [user, created] = await db.User.upsert({
       uid: userData.uid,
       email: userData.email,
       displayName: userData.displayName,
       photoUrl: userData.photoURL,
       lastLoginAt: new Date(),
     });
+
+    // If this is a new user, check for pending club requests
+    if (created && userData.email) {
+      try {
+        const normalizedEmail = userData.email.trim().toLowerCase();
+
+        // Find pending club request with club_id set (case-insensitive email match)
+        const pendingRequest = await db.PendingClubRequest.findOne({
+          where: {
+            email: normalizedEmail,
+            clubId: {[db.Op.ne]: null},
+          },
+          include: [
+            {
+              model: db.Club,
+              as: "club",
+            },
+          ],
+        });
+
+        if (pendingRequest && pendingRequest.club) {
+          // Verify club still exists
+          const club = await db.Club.findByPk(pendingRequest.clubId);
+          if (club) {
+            // Check if user is already a member (shouldn't happen, but safety check)
+            const existingMember = await db.ClubMember.findOne({
+              where: {
+                clubId: club.id,
+                userId: user.uid,
+              },
+            });
+
+            if (!existingMember) {
+              // Create club membership with owner role
+              await db.ClubMember.create({
+                clubId: club.id,
+                userId: user.uid,
+                role: "owner",
+              });
+
+              // Delete the pending request
+              await pendingRequest.destroy();
+            }
+          }
+        }
+      } catch (associationError) {
+        // Log error but don't fail user creation
+        console.error("Error associating user with pending club request:", associationError);
+      }
+    }
+
     res.status(201).json({id: user.uid, ...user.toJSON()});
   } catch (e) {
     next(e);

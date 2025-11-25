@@ -560,6 +560,73 @@ const deleteClub = async (req, res, next) => {
   }
 };
 
+// POST /v1/clubs/:clubId/link-pending-request?userId=xxx
+// Link pending club request to club (owner only)
+const linkPendingRequest = async (req, res, next) => {
+  try {
+    const {clubId} = req.params;
+    const userId = req.query.userId;
+    const {email} = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    if (!email || !email.trim()) {
+      const error = new Error("email is required");
+      error.status = 400;
+      throw error;
+    }
+
+    // Verify ownership
+    const ownership = await verifyOwnership(parseInt(clubId), userId);
+    if (!ownership) {
+      const error = new Error("Only club owners can link pending requests");
+      error.status = 403;
+      throw error;
+    }
+
+    const club = await db.Club.findByPk(clubId);
+    if (!club) {
+      const error = new Error("Club not found");
+      error.status = 404;
+      throw error;
+    }
+
+    // Find pending request by email (case-insensitive)
+    const normalizedEmail = email.trim().toLowerCase();
+    const pendingRequest = await db.PendingClubRequest.findOne({
+      where: {
+        email: normalizedEmail,
+      },
+    });
+
+    if (!pendingRequest) {
+      const error = new Error("Pending club request not found for this email");
+      error.status = 404;
+      throw error;
+    }
+
+    // Update pending request with club_id
+    await pendingRequest.update({
+      clubId: parseInt(clubId),
+    });
+
+    res.json({
+      message: "Pending club request linked successfully",
+      pendingRequest: {
+        id: pendingRequest.id,
+        email: pendingRequest.email,
+        clubId: pendingRequest.clubId,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   getUserClubs,
   getClub,
@@ -571,5 +638,6 @@ module.exports = {
   joinClubByInviteCode,
   rotateInviteCode,
   deleteClub,
+  linkPendingRequest,
 };
 

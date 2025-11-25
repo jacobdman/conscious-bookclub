@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const db = require("../../../../db/models/index");
 
 // Get email configuration from environment variables
 const supportEmail = process.env.SUPPORT_EMAIL;
@@ -96,6 +97,29 @@ This email was sent from the Conscious Book Club app.
 
     // Send email
     await transporter.sendMail(mailOptions);
+
+    // Create or update pending club request
+    const normalizedEmail = email.trim().toLowerCase();
+    try {
+      const [pendingRequest] = await db.PendingClubRequest.findOrCreate({
+        where: {email: normalizedEmail},
+        defaults: {
+          email: normalizedEmail,
+          message: message.trim(),
+          clubId: null,
+        },
+      });
+
+      // If it already existed, update the message
+      if (!pendingRequest.isNewRecord) {
+        await pendingRequest.update({
+          message: message.trim(),
+        });
+      }
+    } catch (dbError) {
+      // Log error but don't fail the request - email was already sent
+      console.error("Error creating pending club request:", dbError);
+    }
 
     res.status(200).json({
       message: "Club creation request submitted successfully",
