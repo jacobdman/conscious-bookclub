@@ -10,6 +10,7 @@ const health = require("./health");
 const notifications = require("./notifications");
 const support = require("./support");
 const feed = require("./feed");
+const reports = require("./reports");
 
 const router = express.Router(); // eslint-disable-line new-cap
 
@@ -24,6 +25,7 @@ router.use("/health", health);
 router.use("/notifications", notifications);
 router.use("/support", support);
 router.use("/feed", feed);
+router.use("/reports", reports);
 
 module.exports = router;
 

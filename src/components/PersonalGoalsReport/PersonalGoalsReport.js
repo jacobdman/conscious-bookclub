@@ -22,7 +22,9 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { getPersonalGoalsReport } from 'services/goals/personalGoalsReport.service';
+import { getWeeklyGoalsBreakdownReport } from 'services/reports/reports.service';
 import { WeeklyCompletionTrend, GoalTypeDistribution } from 'components/GoalsReport';
+import WeeklyGoalsBreakdownChart from 'components/GoalsReport/WeeklyGoalsBreakdownChart';
 
 const formatDateRange = (startDate, endDate) => {
   if (!startDate || !endDate) return '';
@@ -67,7 +69,9 @@ const PersonalGoalsReport = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [reportData, setReportData] = useState(null);
+  const [weeklyBreakdown, setWeeklyBreakdown] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [error, setError] = useState(null);
   const [habitDetailsExpanded, setHabitDetailsExpanded] = useState(false);
   
@@ -120,6 +124,31 @@ const PersonalGoalsReport = () => {
     };
 
     fetchReport();
+  }, [user, currentClub, startDate, endDate]);
+
+  // Fetch weekly breakdown separately
+  useEffect(() => {
+    const fetchBreakdown = async () => {
+      if (!user || !currentClub) return;
+
+      try {
+        setBreakdownLoading(true);
+        const data = await getWeeklyGoalsBreakdownReport(
+          user.uid,
+          currentClub.id,
+          startDate,
+          endDate
+        );
+        setWeeklyBreakdown(data.weeklyBreakdown || []);
+      } catch (err) {
+        console.error('Error fetching weekly goals breakdown:', err);
+        setWeeklyBreakdown([]);
+      } finally {
+        setBreakdownLoading(false);
+      }
+    };
+
+    fetchBreakdown();
   }, [user, currentClub, startDate, endDate]);
 
   if (loading) {
@@ -324,7 +353,22 @@ const PersonalGoalsReport = () => {
             </Card>
           </Grid>
 
-          {/* Section 1.2: Weekly Completion Trend */}
+          {/* Section 1.2: Weekly Goals Breakdown */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Weekly Goals Breakdown
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  See which specific goals you completed or missed each week
+                </Typography>
+                <WeeklyGoalsBreakdownChart weeklyBreakdown={weeklyBreakdown} loading={breakdownLoading} />
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Section 1.3: Weekly Completion Trend */}
           <Grid item xs={12} sm={6} sx={{ display: 'flex', flexGrow: 1 }}>
             <Card sx={{ height: '100%', width: '100%' }}>
               <CardContent>
@@ -339,7 +383,7 @@ const PersonalGoalsReport = () => {
             </Card>
           </Grid>
 
-          {/* Section 1.3: Goal Type Distribution */}
+          {/* Section 1.4: Goal Type Distribution */}
           <Grid item xs={12} sm={6} sx={{ display: 'flex', flexGrow: 1 }}>
             <Card sx={{ height: '100%', width: '100%' }}>
               <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>

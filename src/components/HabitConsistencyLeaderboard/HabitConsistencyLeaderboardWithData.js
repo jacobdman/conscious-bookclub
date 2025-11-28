@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
-import { getClubGoalsReport } from 'services/clubs/goalsReport.service';
+import { getLeaderboardReport } from 'services/reports/reports.service';
 import HabitConsistencyLeaderboard from './HabitConsistencyLeaderboard';
 
 const formatDateRange = (startDate, endDate) => {
@@ -51,7 +51,7 @@ const HabitConsistencyLeaderboardWithData = ({
       try {
         setLoading(true);
         setError(null);
-        const data = await getClubGoalsReport(
+        const data = await getLeaderboardReport(
           currentClub.id,
           user.uid,
           startDate,

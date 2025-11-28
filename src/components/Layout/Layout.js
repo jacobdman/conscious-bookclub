@@ -43,10 +43,45 @@ const Layout = ({ children }) => {
 
   // Measure header height for proper spacing
   useEffect(() => {
-    if (headerRef.current) {
-      const height = headerRef.current.offsetHeight;
-      setHeaderHeight(height);
+    const measureHeader = () => {
+      // Since AppBar is fixed, we need to find it in the document
+      const appBar = document.querySelector('.MuiAppBar-root');
+      if (appBar) {
+        const height = appBar.offsetHeight;
+        setHeaderHeight(height);
+      } else {
+        // Fallback: measure wrapper if AppBar not found yet
+        if (headerRef.current) {
+          const height = headerRef.current.offsetHeight;
+          if (height > 0) {
+            setHeaderHeight(height);
+          }
+        }
+      }
+    };
+    
+    // Measure immediately
+    measureHeader();
+    
+    // Also measure after a delay to catch slower renders
+    const timeout = setTimeout(measureHeader, 100);
+    const timeout2 = setTimeout(measureHeader, 300);
+    
+    // Use ResizeObserver if available
+    let resizeObserver;
+    const appBar = document.querySelector('.MuiAppBar-root');
+    if (appBar && window.ResizeObserver) {
+      resizeObserver = new ResizeObserver(measureHeader);
+      resizeObserver.observe(appBar);
     }
+    
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(timeout2);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
   }, [currentClub]); // Re-measure when club changes (affects header height)
 
   const handleLogout = async () => {
@@ -82,6 +117,9 @@ const Layout = ({ children }) => {
           onLogout={handleLogout} 
         />
 
+        {/* Spacer for fixed header */}
+        <Box sx={{ height: `${headerHeight}px`, flexShrink: 0 }} />
+
         <Box 
           component="main"
           sx={{
@@ -90,8 +128,8 @@ const Layout = ({ children }) => {
             flex: 1,
             overflow: 'auto',
             minHeight: 0,
-            marginTop: `${headerHeight}px`,
-            paddingBottom: 2,
+            paddingBottom: 4, // Extra padding for mobile
+            WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
           }}
         >
           {children}

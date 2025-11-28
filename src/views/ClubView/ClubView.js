@@ -70,9 +70,10 @@ const ClubView = () => {
     <Layout>
       <Box sx={{ 
         width: '100%', 
-        height: '100%', 
         display: 'flex', 
         flexDirection: 'column',
+        flex: 1,
+        minHeight: 0,
         overflow: 'hidden',
       }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>

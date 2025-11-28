@@ -104,9 +104,6 @@ const Dashboard = () => {
               display: 'flex', 
               flexDirection: 'column', 
               gap: 2,
-              height: '100%',
-              overflowY: 'auto',
-              overflowX: 'hidden',
             }}
           >
           <PWAInstallPrompt />
