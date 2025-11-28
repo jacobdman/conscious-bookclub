@@ -78,6 +78,11 @@ exports.meetingReminder = onSchedule(
     {
       schedule: "0 * * * *", // Every hour
       timeZone: "UTC",
+      // Optimize for faster deployments and better performance
+      region: "us-central1",
+      maxInstances: 1, // Only one instance needed for scheduled tasks
+      memory: "512MiB", // Sufficient for database queries and notifications
+      timeoutSeconds: 540, // 9 minutes (max for scheduled functions)
     },
     async (event) => {
       console.log("Meeting reminder function triggered");

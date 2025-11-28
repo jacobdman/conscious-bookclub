@@ -132,6 +132,12 @@ function ensureSocketServer() {
 // Export Socket.io function for Firebase Functions
 // Initialize server lazily when function is first called, not at module load
 exports.socket = onRequest({
+  // Optimize for faster deployments and better performance
+  region: "us-central1",
+  maxInstances: 5, // Limit concurrent instances for socket connections
+  memory: "512MiB", // Sufficient for Socket.io server
+  timeoutSeconds: 60, // Default timeout
+  concurrency: 80, // Handle 80 concurrent requests per instance
   cors: true,
 }, (req, res) => {
   // Lazy initialization: only start server when function is actually called

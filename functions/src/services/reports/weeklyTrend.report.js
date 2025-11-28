@@ -3,36 +3,36 @@ const {getGoalEntries} = require("../../../utils/goalHelpers");
 
 /**
  * Calculates weekly completion trend for a user over a date range
- * 
+ *
  * SQL/Sequelize Query Logic:
- * 
+ *
  * 1. SELECT goals WHERE user_id = ? AND club_id = ? AND cadence = 'week' AND archived = false
  *    - Get all weekly goals (habits, metrics, etc.)
- * 
+ *
  * 2. Generate week boundaries (Monday to Sunday) within date range
  *    - Start from Monday of the week containing startDate
  *    - Iterate week by week until endDate
  *    - CRITICAL: Only include complete weeks (weekEnd <= now)
  *    - Exclude any week that hasn't finished yet
- * 
+ *
  * 3. For each complete week:
  *    - For each weekly goal:
- *      - SELECT goal_entry WHERE goal_id = ? AND user_id = ? 
+ *      - SELECT goal_entry WHERE goal_id = ? AND user_id = ?
  *        AND occurred_at >= week_start AND occurred_at < week_end
  *      - Check if entries meet target (count or quantity)
  *      - Mark goal as completed or not for that week
  *    - Calculate completion rate: (completed_goals / total_goals) * 100
- * 
+ *
  * 4. Return weekly trend data
  *    - Only includes weeks that are fully complete
  *    - Requires minimum 2+ complete weeks before returning data
  *    - Returns null/empty if insufficient data
- * 
+ *
  * @param {string} userId - User ID
  * @param {number} clubId - Club ID
  * @param {Date} startDate - Start date for the report (optional)
  * @param {Date} endDate - End date for the report (optional, defaults to now)
- * @returns {Promise<Array|null>} Array of weekly trend data points, or null if insufficient data
+ * @return {Promise<Array|null>} Array of weekly trend data points, or null if insufficient data
  */
 const getWeeklyTrendReport = async (userId, clubId, startDate = null, endDate = null) => {
   const now = new Date();
@@ -47,14 +47,14 @@ const getWeeklyTrendReport = async (userId, clubId, startDate = null, endDate = 
   const effectiveStartDate = startDate || defaultStartDate;
 
   // SQL Query 1: Get all weekly goals for this user in this club
-  // SELECT * FROM goals 
+  // SELECT * FROM goals
   // WHERE user_id = ? AND club_id = ? AND cadence = 'week' AND archived = false
   const goals = await db.Goal.findAll({
     where: {
       userId,
       clubId: parseInt(clubId),
       archived: false,
-      cadence: 'week',
+      cadence: "week",
     },
     order: [["created_at", "ASC"]],
   });
@@ -90,15 +90,15 @@ const getWeeklyTrendReport = async (userId, clubId, startDate = null, endDate = 
       // For each weekly goal, check if it was completed this week
       for (const goal of weeklyGoals) {
         // SQL Query 2: Get entries for this week
-        // SELECT * FROM goal_entry 
-        // WHERE goal_id = ? AND user_id = ? 
+        // SELECT * FROM goal_entry
+        // WHERE goal_id = ? AND user_id = ?
         // AND occurred_at >= ? AND occurred_at < ?
         // ORDER BY occurred_at DESC
         const entries = await getGoalEntries(
-          userId,
-          goal.id,
-          currentWeekStart,
-          weekEnd,
+            userId,
+            goal.id,
+            currentWeekStart,
+            weekEnd,
         );
 
         // Check if goal was completed this week

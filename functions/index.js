@@ -90,8 +90,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Export the API function with CORS enabled
-exports.api = onRequest(app);
+// Export the API function with optimized configuration
+exports.api = onRequest({
+  // Optimize for faster cold starts and better performance
+  region: "us-central1",
+  maxInstances: 10, // Limit concurrent instances to control costs
+  memory: "512MiB", // Sufficient for Express API
+  timeoutSeconds: 60, // Default timeout
+  concurrency: 80, // Handle 80 concurrent requests per instance
+}, app);
 
 // Export scheduled functions
 exports.dailyGoalReminder =

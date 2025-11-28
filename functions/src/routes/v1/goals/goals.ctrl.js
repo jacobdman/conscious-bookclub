@@ -232,19 +232,19 @@ const getGoals = async (req, res, next) => {
     const getTodayBoundaries = () => {
       const now = new Date();
       const utcNow = new Date(now.toISOString());
-      
+
       // Start of today in UTC
       const start = new Date(Date.UTC(
-        utcNow.getUTCFullYear(),
-        utcNow.getUTCMonth(),
-        utcNow.getUTCDate()
+          utcNow.getUTCFullYear(),
+          utcNow.getUTCMonth(),
+          utcNow.getUTCDate(),
       ));
-      
+
       // End of today in UTC (start of tomorrow)
       const end = new Date(start);
       end.setUTCDate(end.getUTCDate() + 1);
-      
-      return { start, end };
+
+      return {start, end};
     };
 
     // Compute progress for each goal and build response
@@ -269,7 +269,7 @@ const getGoals = async (req, res, next) => {
           // Fetch a wider window (yesterday to tomorrow in UTC) to cover "today" in any timezone
           // The frontend will filter these entries using local time boundaries
           let todayEntries = [];
-          if ((goalData.type === 'habit' || goalData.type === 'metric') && goalData.cadence) {
+          if ((goalData.type === "habit" || goalData.type === "metric") && goalData.cadence) {
             try {
               const todayBoundaries = getTodayBoundaries();
               // Expand window to cover "today" in any timezone (UTC-12 to UTC+14)
@@ -278,7 +278,7 @@ const getGoals = async (req, res, next) => {
               expandedStart.setUTCDate(expandedStart.getUTCDate() - 1);
               const expandedEnd = new Date(todayBoundaries.end);
               expandedEnd.setUTCDate(expandedEnd.getUTCDate() + 1);
-              
+
               // Return all entries from the expanded window
               // Frontend will filter to "today" using local time boundaries
               todayEntries = await getGoalEntries(userId, goal.id, expandedStart, expandedEnd);
@@ -806,7 +806,7 @@ const updateMilestone = async (req, res, next) => {
         doneAtValue = milestone.doneAt || new Date();
       }
     }
-    
+
     await milestone.update({
       title: updates.title !== undefined ? updates.title : milestone.title,
       done: updates.done !== undefined ? updates.done : milestone.done,

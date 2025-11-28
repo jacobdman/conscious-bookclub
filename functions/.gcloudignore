@@ -1,0 +1,64 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore
+
+# Node modules - will be installed during build
+node_modules/
+
+# Git files
+.git/
+.gitignore
+
+# Documentation
+*.md
+README*
+LICENSE*
+
+# Development files
+.env
+.env.local
+*.local
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test files
+**/__tests__/
+**/*.test.js
+**/*.spec.js
+coverage/
+
+# Build artifacts (if any)
+dist/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Socket service (separate deployment)
+socket-service/
+
+# Migration files (keep migrations folder but ignore other files)
+migrations/*.sql
+schema.sql
+
+# Scripts that aren't needed in production
+scripts/
+
+# Config files that might have local overrides
+config/*.local.js
+

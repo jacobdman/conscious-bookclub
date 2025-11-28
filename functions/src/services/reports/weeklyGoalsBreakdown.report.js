@@ -3,35 +3,35 @@ const {getGoalEntries} = require("../../../utils/goalHelpers");
 
 /**
  * Calculates detailed week-by-week breakdown of individual goals
- * 
+ *
  * SQL/Sequelize Query Logic:
- * 
+ *
  * 1. SELECT goals WHERE user_id = ? AND club_id = ? AND cadence = 'week' AND archived = false
  *    - Get all weekly goals (habits, metrics, etc.)
- * 
+ *
  * 2. Generate week boundaries (Monday to Sunday) within date range
  *    - Start from Monday of the week containing startDate
  *    - Iterate week by week until endDate
  *    - CRITICAL: Only include complete weeks (weekEnd <= now)
  *    - Exclude any week that hasn't finished yet
- * 
+ *
  * 3. For each complete week:
  *    - For each weekly goal:
- *      - SELECT goal_entry WHERE goal_id = ? AND user_id = ? 
+ *      - SELECT goal_entry WHERE goal_id = ? AND user_id = ?
  *        AND occurred_at >= week_start AND occurred_at < week_end
  *      - Calculate actual vs target
  *      - Determine completion status
  *      - Get all entries with dates
  *      - Calculate completion percentage
  *    - Calculate overall completion rate for the week
- * 
+ *
  * 4. Return detailed breakdown with goal-level information
- * 
+ *
  * @param {string} userId - User ID
  * @param {number} clubId - Club ID
  * @param {Date} startDate - Start date for the report (optional)
  * @param {Date} endDate - End date for the report (optional, defaults to now)
- * @returns {Promise<Object>} Weekly breakdown with goal-level details
+ * @return {Promise<Object>} Weekly breakdown with goal-level details
  */
 const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate = null, endDate = null) => {
   const now = new Date();
@@ -46,14 +46,14 @@ const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate = null, e
   const effectiveStartDate = startDate || defaultStartDate;
 
   // SQL Query 1: Get all weekly goals for this user in this club
-  // SELECT * FROM goals 
+  // SELECT * FROM goals
   // WHERE user_id = ? AND club_id = ? AND cadence = 'week' AND archived = false
   const goals = await db.Goal.findAll({
     where: {
       userId,
       clubId: parseInt(clubId),
       archived: false,
-      cadence: 'week',
+      cadence: "week",
     },
     order: [["created_at", "ASC"]],
   });
@@ -61,7 +61,7 @@ const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate = null, e
   const weeklyGoals = goals.map((g) => g.toJSON());
 
   if (weeklyGoals.length === 0) {
-    return { weeklyBreakdown: [] };
+    return {weeklyBreakdown: []};
   }
 
   // Generate weeks in date range
@@ -90,15 +90,15 @@ const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate = null, e
       // For each weekly goal, get detailed breakdown
       for (const goal of weeklyGoals) {
         // SQL Query 2: Get entries for this week
-        // SELECT * FROM goal_entry 
-        // WHERE goal_id = ? AND user_id = ? 
+        // SELECT * FROM goal_entry
+        // WHERE goal_id = ? AND user_id = ?
         // AND occurred_at >= ? AND occurred_at < ?
         // ORDER BY occurred_at DESC
         const entries = await getGoalEntries(
-          userId,
-          goal.id,
-          currentWeekStart,
-          weekEnd,
+            userId,
+            goal.id,
+            currentWeekStart,
+            weekEnd,
         );
 
         // Calculate actual vs target
@@ -122,7 +122,7 @@ const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate = null, e
 
         // Format entries with dates
         const formattedEntries = entries.map((entry) => ({
-          date: new Date(entry.occurredAt || entry.occurred_at).toISOString().split('T')[0],
+          date: new Date(entry.occurredAt || entry.occurred_at).toISOString().split("T")[0],
           quantity: parseFloat(entry.quantity) || 1,
           occurredAt: entry.occurredAt || entry.occurred_at,
         }));
@@ -167,7 +167,7 @@ const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate = null, e
     currentWeekStart = new Date(weekEnd);
   }
 
-  return { weeklyBreakdown };
+  return {weeklyBreakdown};
 };
 
 module.exports = getWeeklyGoalsBreakdownReport;
