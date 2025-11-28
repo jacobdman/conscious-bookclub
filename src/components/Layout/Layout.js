@@ -6,7 +6,6 @@ import useClubContext from 'contexts/Club';
 import { theme } from 'theme';
 import Header from 'components/Header';
 import NavigationDrawer from 'components/NavigationDrawer';
-import { setupMobileInputFocusHandler } from 'utils/mobileInputFocus';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -35,54 +34,6 @@ const Layout = ({ children }) => {
     
     document.title = title;
   }, [location.pathname, currentClub]);
-
-  // Setup global mobile input focus handler
-  useEffect(() => {
-    return setupMobileInputFocusHandler();
-  }, []);
-
-  // Measure header height for proper spacing
-  useEffect(() => {
-    const measureHeader = () => {
-      // Since AppBar is fixed, we need to find it in the document
-      const appBar = document.querySelector('.MuiAppBar-root');
-      if (appBar) {
-        const height = appBar.offsetHeight;
-        setHeaderHeight(height);
-      } else {
-        // Fallback: measure wrapper if AppBar not found yet
-        if (headerRef.current) {
-          const height = headerRef.current.offsetHeight;
-          if (height > 0) {
-            setHeaderHeight(height);
-          }
-        }
-      }
-    };
-    
-    // Measure immediately
-    measureHeader();
-    
-    // Also measure after a delay to catch slower renders
-    const timeout = setTimeout(measureHeader, 100);
-    const timeout2 = setTimeout(measureHeader, 300);
-    
-    // Use ResizeObserver if available
-    let resizeObserver;
-    const appBar = document.querySelector('.MuiAppBar-root');
-    if (appBar && window.ResizeObserver) {
-      resizeObserver = new ResizeObserver(measureHeader);
-      resizeObserver.observe(appBar);
-    }
-    
-    return () => {
-      clearTimeout(timeout);
-      clearTimeout(timeout2);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-    };
-  }, [currentClub]); // Re-measure when club changes (affects header height)
 
   const handleLogout = async () => {
     try {
