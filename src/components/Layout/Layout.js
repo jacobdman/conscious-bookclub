@@ -13,7 +13,53 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const headerRef = useRef(null);
-  const [headerHeight, setHeaderHeight] = useState(80);
+  const [headerHeight, setHeaderHeight] = useState(56); // Default to 56px (MUI Toolbar default)
+
+  // Measure header height for proper spacing
+  useEffect(() => {
+    const measureHeader = () => {
+      // Since AppBar is fixed, we need to find it in the document
+      const appBar = document.querySelector('.MuiAppBar-root');
+      if (appBar) {
+        const height = appBar.offsetHeight;
+        setHeaderHeight(height);
+      } else {
+        // Fallback: measure wrapper if AppBar not found yet
+        if (headerRef.current) {
+          const toolbar = headerRef.current.querySelector('.MuiToolbar-root');
+          if (toolbar) {
+            const height = toolbar.offsetHeight;
+            if (height > 0) {
+              setHeaderHeight(height);
+            }
+          }
+        }
+      }
+    };
+    
+    // Measure immediately
+    measureHeader();
+    
+    // Also measure after a delay to catch slower renders
+    const timeout = setTimeout(measureHeader, 100);
+    const timeout2 = setTimeout(measureHeader, 300);
+    
+    // Use ResizeObserver if available
+    let resizeObserver;
+    const appBar = document.querySelector('.MuiAppBar-root');
+    if (appBar && window.ResizeObserver) {
+      resizeObserver = new ResizeObserver(measureHeader);
+      resizeObserver.observe(appBar);
+    }
+    
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(timeout2);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [currentClub]); // Re-measure when club changes (affects header height)
 
   // Update page title based on route and club
   useEffect(() => {
