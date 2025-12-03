@@ -125,7 +125,6 @@ const Layout = ({ children }) => {
             flex: 1,
             overflow: 'auto',
             minHeight: 0,
-            paddingBottom: 4, // Extra padding for mobile
             WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
           }}
         >

@@ -106,12 +106,25 @@ exports.meetingReminder = onSchedule(
         oneWeekFromNow.setUTCHours(0, 0, 0, 0);
         const oneWeekFromNowStr = oneWeekFromNow.toISOString().split("T")[0]; // YYYY-MM-DD
 
-        // Get only meetings that are 1 day or 7 days away (filtered at SQL level)
-        const meetings = await db.Meeting.findAll({
+        // Get meetings with startTime that match the current hour
+        const meetingsWithTime = await db.Meeting.findAll({
           where: {
-            date: {
-              [db.Sequelize.Op.in]: [oneDayFromNowStr, oneWeekFromNowStr],
-            },
+            [db.Sequelize.Op.and]: [
+              {
+                date: {
+                  [db.Sequelize.Op.in]: [oneDayFromNowStr, oneWeekFromNowStr],
+                },
+              },
+              {
+                startTime: {
+                  [db.Sequelize.Op.ne]: null,
+                },
+              },
+              // Match the hour: meeting hour must equal current hour
+              db.Sequelize.literal(
+                  "EXTRACT(HOUR FROM start_time) = EXTRACT(HOUR FROM NOW())",
+              ),
+            ],
           },
           include: [
             {
@@ -121,7 +134,73 @@ exports.meetingReminder = onSchedule(
           ],
         });
 
-        console.log(`Found ${meetings.length} meeting(s) at notification time (1 or 7 days away)`);
+        // Get meetings without startTime - we'll check if it's 9am in owner's timezone
+        const meetingsWithoutTime = await db.Meeting.findAll({
+          where: {
+            [db.Sequelize.Op.and]: [
+              {
+                date: {
+                  [db.Sequelize.Op.in]: [oneDayFromNowStr, oneWeekFromNowStr],
+                },
+              },
+              {
+                startTime: null,
+              },
+            ],
+          },
+          include: [
+            {
+              model: db.Book,
+              as: "book",
+            },
+          ],
+        });
+
+        // Filter meetings without time to only those where it's 9am in owner's timezone
+        const validMeetingsWithoutTime = [];
+        for (const meeting of meetingsWithoutTime) {
+          // Get the club owner for this meeting
+          const ownerMember = await db.ClubMember.findOne({
+            where: {
+              clubId: meeting.clubId,
+              role: "owner",
+            },
+            include: [
+              {
+                model: db.User,
+                as: "user",
+                attributes: ["uid", "timezone"],
+              },
+            ],
+          });
+
+          if (!ownerMember || !ownerMember.user) {
+            continue;
+          }
+
+          const ownerTimezone = ownerMember.user.timezone || "UTC";
+
+          // Check if it's 9am in owner's timezone
+          // Convert current UTC time to owner's timezone and check if hour is 9
+          const currentTimeInOwnerTz = new Intl.DateTimeFormat("en-US", {
+            timeZone: ownerTimezone,
+            hour: "2-digit",
+            hour12: false,
+          }).format(now);
+          const [hourInOwnerTz] = currentTimeInOwnerTz.split(":").map(Number);
+
+          if (hourInOwnerTz === 9) {
+            validMeetingsWithoutTime.push(meeting);
+          }
+        }
+
+        // Combine both sets of meetings
+        const meetings = [...meetingsWithTime, ...validMeetingsWithoutTime];
+
+        console.log(
+            `Found ${meetings.length} meeting(s) at notification time ` +
+            `(${meetingsWithTime.length} with time, ` +
+            `${validMeetingsWithoutTime.length} without time at 9am)`);
 
         let meetingsProcessed = 0;
         let meetingsSkipped = 0;
@@ -133,19 +212,24 @@ exports.meetingReminder = onSchedule(
 
         for (const meeting of meetings) {
           meetingsProcessed++;
-          const meetingDate = new Date(meeting.date);
-          const daysUntilMeeting = Math.ceil(
-              (meetingDate - now) / (1000 * 60 * 60 * 24),
-          );
+          // Determine reminder type based on which target date the meeting matches
+          // Since SQL already filtered by date and hour, we can determine type from date string
+          // DATEONLY fields in Sequelize are returned as strings in YYYY-MM-DD format
+          const meetingDateStr = typeof meeting.date === "string" ?
+            meeting.date :
+            new Date(meeting.date).toISOString().split("T")[0];
+          const shouldNotifyOneDay = meetingDateStr === oneDayFromNowStr;
+          const reminderType = shouldNotifyOneDay ? "oneDayBefore" : "oneWeekBefore";
+          const daysText = shouldNotifyOneDay ? "1 day" : "1 week";
 
+          const timeInfo = meeting.startTime ?
+            `hour: ${meeting.startTime}` :
+            "no startTime (9am in owner timezone)";
           console.log(
               `Processing meeting ${meeting.id} (${meetingsProcessed}/${meetings.length}): ` +
               `"${meeting.book ? meeting.book.title : "Unknown"}" ` +
-              `(${daysUntilMeeting} day(s) away)`,
+              `(${daysText} away, ${timeInfo})`,
           );
-
-          const shouldNotifyOneDay = daysUntilMeeting === 1;
-          const reminderType = shouldNotifyOneDay ? "oneDayBefore" : "oneWeekBefore";
 
           // Build SQL filter for users with appropriate notification preferences
           // For 1 day: enabled=true AND oneDayBefore=true
@@ -186,7 +270,6 @@ exports.meetingReminder = onSchedule(
           // Prepare notification message
           const bookTitle = meeting.book ? meeting.book.title : "your book club";
           const meetingDateFormatted = formatDate(meeting.date);
-          const daysText = shouldNotifyOneDay ? "1 day" : "1 week";
 
           // Send notifications to all filtered users
           let meetingNotificationsSent = 0;

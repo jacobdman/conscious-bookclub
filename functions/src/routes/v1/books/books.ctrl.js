@@ -357,10 +357,20 @@ const getBooksProgress = async (req, res, next) => {
         group: ["status"],
       });
 
+      // Calculate overall average percent, treating finished users as 100%
+      const allProgress = await db.BookProgress.findAll({
+        attributes: [
+          "status",
+          "percent_complete",
+        ],
+        where: {bookId: bookIdInt},
+      });
+
       let activeReaders = 0;
       let finishedReaders = 0;
       let avgPercent = 0;
       let readerCount = 0;
+      let totalPercent = 0;
 
       statsData.forEach((stat) => {
         const count = parseInt(stat.dataValues.count);
@@ -371,11 +381,20 @@ const getBooksProgress = async (req, res, next) => {
         } else if (stat.status === "finished") {
           finishedReaders = count;
         }
+      });
 
-        if (stat.dataValues.avgPercent) {
-          avgPercent = parseFloat(stat.dataValues.avgPercent);
+      // Calculate weighted average: finished users count as 100%
+      allProgress.forEach((progress) => {
+        if (progress.status === "finished") {
+          totalPercent += 100;
+        } else {
+          totalPercent += parseFloat(progress.percentComplete || 0);
         }
       });
+
+      if (readerCount > 0) {
+        avgPercent = totalPercent / readerCount;
+      }
 
       // Get paginated user progress
       const offset = (pageNum - 1) * pageSizeNum;
@@ -457,10 +476,20 @@ const getBooksProgress = async (req, res, next) => {
               group: ["status"],
             });
 
+            // Get all progress entries to calculate average with finished users as 100%
+            const allProgress = await db.BookProgress.findAll({
+              attributes: [
+                "status",
+                "percent_complete",
+              ],
+              where: {bookId},
+            });
+
             let activeReaders = 0;
             let finishedReaders = 0;
             let avgPercent = 0;
             let readerCount = 0;
+            let totalPercent = 0;
 
             statsData.forEach((stat) => {
               const count = parseInt(stat.dataValues.count);
@@ -471,11 +500,20 @@ const getBooksProgress = async (req, res, next) => {
               } else if (stat.status === "finished") {
                 finishedReaders = count;
               }
+            });
 
-              if (stat.dataValues.avgPercent) {
-                avgPercent = parseFloat(stat.dataValues.avgPercent);
+            // Calculate weighted average: finished users count as 100%
+            allProgress.forEach((progress) => {
+              if (progress.status === "finished") {
+                totalPercent += 100;
+              } else {
+                totalPercent += parseFloat(progress.percentComplete || 0);
               }
             });
+
+            if (readerCount > 0) {
+              avgPercent = totalPercent / readerCount;
+            }
 
             // Get first page of user progress (10 users)
             const userProgress = await db.BookProgress.findAll({
