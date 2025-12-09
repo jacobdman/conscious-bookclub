@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -21,9 +21,19 @@ import {
   Select,
   MenuItem,
   TextField,
-  InputAdornment
+  InputAdornment,
+  Collapse,
+  IconButton,
+  ClickAwayListener,
+  Tooltip
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Search as SearchIcon } from '@mui/icons-material';
+import { 
+  Add as AddIcon, 
+  Edit as EditIcon, 
+  Search as SearchIcon, 
+  FilterList as FilterListIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -58,6 +68,11 @@ const BookList = () => {
   // Local UI state for button loading
   const [loadingProgress, setLoadingProgress] = useState({});
   const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
+
+  // UI Enhancement States
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Load meetings to get discussion dates (keeping this logic for now as it aggregates meetings)
   useEffect(() => {
@@ -104,6 +119,33 @@ const BookList = () => {
   
   const handleSearchChange = (event) => {
     setSearch(event.target.value);
+  };
+
+  const handleSearchClick = () => {
+    setIsSearchExpanded(true);
+    // Give time for render
+    setTimeout(() => {
+        if (searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, 100);
+  };
+
+  const handleSearchClickAway = () => {
+      if (!search) {
+          setIsSearchExpanded(false);
+      }
+  };
+
+  const handleClearSearch = () => {
+      setSearch('');
+      if (searchInputRef.current) {
+          searchInputRef.current.focus();
+      }
+  };
+
+  const toggleFilters = () => {
+      setShowFilters(prev => !prev);
   };
 
   const handleProgressUpdate = async (book) => {
@@ -213,27 +255,29 @@ const BookList = () => {
   return (
     <Layout>
       <Box sx={{ 
-        p: 3, 
+        p: 2, 
         height: '100%', 
         overflowY: 'auto', 
         overflowX: 'hidden' 
       }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" gutterBottom>
+        
+        {/* Header Section */}
+        <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            mb: 1
+        }}>
+          {/* <Box> */}
+            <Typography variant="h4" fontWeight="bold">
               Book List
             </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Showing {books.length} of {totalCount} books
-              {filters.theme !== 'all' && ' (filtered)'}
-            </Typography>
-          </Box>
+          {/* </Box> */}
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setAddBookOpen(true)}
             sx={{ 
-              minWidth: 140,
               display: { xs: 'none', md: 'flex' }
             }}
           >
@@ -241,68 +285,152 @@ const BookList = () => {
           </Button>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-          <TextField
-            label="Search Books"
-            variant="outlined"
-            size="medium"
-            value={search}
-            onChange={handleSearchChange}
-            sx={{ minWidth: 200, flexGrow: 1, maxWidth: 400 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+        {/* Controls Toolbar */}
+        <Paper 
+            elevation={0}
+            sx={{ 
+                p: 2, 
+                mb: 1, 
+                borderRadius: 3, 
+                backgroundColor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2
             }}
-          />
+        >
+            {/* Expandable Search */}
+            <ClickAwayListener onClickAway={handleSearchClickAway}>
+                <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    transition: 'all 0.3s ease',
+                    width: isSearchExpanded || search ? '100%' : 'auto',
+                    maxWidth: isSearchExpanded || search ? 400 : 48,
+                    position: 'relative',
+                    flexGrow: isSearchExpanded || search ? 1 : 0
+                }}>
+                    {!isSearchExpanded && !search ? (
+                         <Tooltip title="Search Books">
+                            <IconButton onClick={handleSearchClick} color="primary">
+                                <SearchIcon />
+                            </IconButton>
+                        </Tooltip>
+                    ) : (
+                        <TextField
+                            inputRef={searchInputRef}
+                            placeholder="Search Books..."
+                            variant="outlined"
+                            size="small"
+                            value={search}
+                            onChange={handleSearchChange}
+                            fullWidth
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 5,
+                                    backgroundColor: 'action.hover'
+                                }
+                            }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon color="action" />
+                                    </InputAdornment>
+                                ),
+                                endAdornment: search && (
+                                    <InputAdornment position="end">
+                                        <IconButton size="small" onClick={handleClearSearch}>
+                                            <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                    </InputAdornment>
+                                )
+                            }}
+                        />
+                    )}
+                </Box>
+            </ClickAwayListener>
 
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Theme Filter</InputLabel>
-            <Select
-              value={filters.theme}
-              onChange={handleThemeChange}
-              label="Theme Filter"
+            {/* Filter Toggle and Per Page */}
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Button 
+                    startIcon={<FilterListIcon />}
+                    endIcon={showFilters ? <CloseIcon fontSize="small" /> : null}
+                    onClick={toggleFilters}
+                    color={showFilters || filters.theme !== 'all' || filters.status !== 'all' ? "primary" : "inherit"}
+                    sx={{ 
+                        textTransform: 'none',
+                        borderRadius: 2
+                    }}
+                >
+                    Filters
+                </Button>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                    <InputLabel>Per Page</InputLabel>
+                    <Select
+                        value={pagination.pageSize}
+                        onChange={handlePageSizeChange}
+                        label="Per Page"
+                    >
+                        <MenuItem value={10}>10</MenuItem>
+                        <MenuItem value={25}>25</MenuItem>
+                        <MenuItem value={50}>50</MenuItem>
+                    </Select>
+                </FormControl>
+            </Box>
+        </Paper>
+
+        {/* Collapsible Filters Section */}
+        <Collapse in={showFilters}>
+            <Paper 
+                elevation={0}
+                sx={{ 
+                    p: 2, 
+                    mb: 1, 
+                    borderRadius: 3, 
+                    backgroundColor: 'background.default', 
+                    border: '1px dashed',
+                    borderColor: 'divider'
+                }}
             >
-              <MenuItem value="all">All Themes</MenuItem>
-              <MenuItem value="Creative">Creative</MenuItem>
-              <MenuItem value="Curious">Curious</MenuItem>
-              <MenuItem value="Classy">Classy</MenuItem>
-              <MenuItem value="no-theme">No Theme</MenuItem>
-            </Select>
-          </FormControl>
-          
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Book Filter</InputLabel>
-            <Select
-              value={filters.status}
-              onChange={handleFilterChange}
-              label="Book Filter"
-            >
-              <MenuItem value="all">All Books</MenuItem>
-              <MenuItem value="scheduled">Books Scheduled for Meetings</MenuItem>
-              <MenuItem value="read">Books I've Read</MenuItem>
-            </Select>
-          </FormControl>
-          
-          <FormControl sx={{ minWidth: 120 }}>
-            <InputLabel>Per Page</InputLabel>
-            <Select
-              value={pagination.pageSize}
-              onChange={handlePageSizeChange}
-              label="Per Page"
-            >
-              <MenuItem value={10}>10</MenuItem>
-              <MenuItem value={25}>25</MenuItem>
-              <MenuItem value={50}>50</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <FormControl sx={{ minWidth: 200 }} size="small">
+                        <InputLabel>Theme Filter</InputLabel>
+                        <Select
+                            value={filters.theme}
+                            onChange={handleThemeChange}
+                            label="Theme Filter"
+                            sx={{ borderRadius: 2 }}
+                        >
+                            <MenuItem value="all">All Themes</MenuItem>
+                            <MenuItem value="Creative">Creative</MenuItem>
+                            <MenuItem value="Curious">Curious</MenuItem>
+                            <MenuItem value="Classy">Classy</MenuItem>
+                            <MenuItem value="no-theme">No Theme</MenuItem>
+                        </Select>
+                    </FormControl>
+                
+                    <FormControl sx={{ minWidth: 250 }} size="small">
+                        <InputLabel>Book Filter</InputLabel>
+                        <Select
+                            value={filters.status}
+                            onChange={handleFilterChange}
+                            label="Book Filter"
+                            sx={{ borderRadius: 2 }}
+                        >
+                            <MenuItem value="all">All Books</MenuItem>
+                            <MenuItem value="scheduled">Books Scheduled for Meetings</MenuItem>
+                            <MenuItem value="read">Books I've Read</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Box>
+            </Paper>
+        </Collapse>
 
         {/* Top Pagination */}
         {totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1, mb: 1 }}>
             <Pagination
               count={totalPages}
               page={pagination.page}
@@ -312,6 +440,11 @@ const BookList = () => {
           </Box>
         )}
 
+        <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'right', mb: 1 }}>
+          Showing {books.length} of {totalCount} books
+          {filters.theme !== 'all' && ' (filtered)'}
+        </Typography>
+
         {/* Loading overlay for list refresh */}
         {contextLoading && books.length > 0 && (
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
@@ -319,10 +452,21 @@ const BookList = () => {
           </Box>
         )}
 
-        <TableContainer component={Paper}>
-          <Table sx={{ minWidth: 650 }} aria-label="books table">
+        <TableContainer 
+            component={Paper} 
+            elevation={2}
+            sx={{ 
+                borderRadius: 3,
+                mb: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                overflowX: 'auto',
+                overflowY: 'visible'
+            }}
+        >
+          <Table stickyHeader aria-label="books table">
             <TableHead>
-              <TableRow>
+              <TableRow sx={{ backgroundColor: 'action.hover' }}>
                 <TableCell>Cover</TableCell>
                 <TableCell>Title</TableCell>
                 <TableCell>Author</TableCell>
@@ -338,23 +482,32 @@ const BookList = () => {
               {books.map((book) => (
                 <TableRow
                   key={book.id}
-                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  sx={{ 
+                      '&:last-child td, &:last-child th': { border: 0 },
+                      '&:hover': { backgroundColor: 'action.hover' },
+                      transition: 'background-color 0.2s'
+                  }}
                 >
                   <TableCell>
                     <Avatar
                       src={book.coverImage}
                       alt={book.title}
                       variant="rounded"
-                      sx={{ width: 60, height: 80 }}
+                      sx={{ 
+                          width: 60, 
+                          height: 85,
+                          boxShadow: 2,
+                          borderRadius: 1
+                      }}
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="subtitle1" fontWeight="medium">
+                    <Typography variant="subtitle1" fontWeight="bold">
                       {book.title}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">
+                    <Typography variant="body2" color="text.secondary">
                       {book.author}
                     </Typography>
                   </TableCell>
@@ -366,7 +519,8 @@ const BookList = () => {
                           label={theme} 
                           size="small" 
                           color="primary" 
-                          variant="outlined"
+                          variant="filled"
+                          sx={{ borderRadius: 1.5 }}
                         />
                       ))}
                     </Box>
@@ -377,7 +531,7 @@ const BookList = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">
+                    <Typography variant="body2" fontWeight="medium">
                       {formatDate(meetingDates[book.id])}
                     </Typography>
                   </TableCell>
@@ -391,14 +545,19 @@ const BookList = () => {
                         color={book.progress?.status === 'finished' ? 'success' : 
                                book.progress?.status === 'reading' ? 'primary' : 
                                'default'}
-                        variant="outlined"
+                        variant={book.progress?.status ? "filled" : "outlined"}
                       />
                       <Button
                         variant="outlined"
                         size="small"
                         onClick={() => handleProgressUpdate(book)}
                         disabled={loadingProgress[book.id]}
-                        sx={{ minWidth: 100 }}
+                        sx={{ 
+                            minWidth: 100, 
+                            borderRadius: 5,
+                            textTransform: 'none',
+                            fontSize: '0.75rem'
+                        }}
                       >
                         {loadingProgress[book.id] ? (
                           <CircularProgress size={16} />
@@ -414,15 +573,13 @@ const BookList = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outlined"
+                    <IconButton
                       size="small"
-                      startIcon={<EditIcon />}
                       onClick={() => handleEditBook(book)}
-                      sx={{ minWidth: 80 }}
+                      color="default"
                     >
-                      Edit
-                    </Button>
+                      <EditIcon />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))}
@@ -431,19 +588,26 @@ const BookList = () => {
         </TableContainer>
 
         {books.length === 0 && !contextLoading && (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="h6" color="text.secondary">
+          <Box sx={{ textAlign: 'center', py: 8, backgroundColor: 'action.hover', borderRadius: 4 }}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
               No books found
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Add some books to get started!
             </Typography>
+            <Button 
+                variant="outlined" 
+                startIcon={<AddIcon />}
+                onClick={() => setAddBookOpen(true)}
+            >
+                Add Your First Book
+            </Button>
           </Box>
         )}
 
         {/* Bottom Pagination */}
         {totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
             <Pagination
               count={totalPages}
               page={pagination.page}
@@ -460,8 +624,8 @@ const BookList = () => {
           onClick={() => setAddBookOpen(true)}
           sx={{
             position: 'fixed',
-            bottom: 16,
-            right: 16,
+            bottom: 72,
+            right: 24,
             display: { xs: 'flex', md: 'none' }
           }}
         >

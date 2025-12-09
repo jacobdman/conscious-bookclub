@@ -1,22 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, CssBaseline, ThemeProvider } from '@mui/material';
+import { Box, CssBaseline, ThemeProvider, useMediaQuery, useTheme, Drawer } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { theme } from 'theme';
 import Header from 'components/Header';
-import NavigationDrawer from 'components/NavigationDrawer';
+import NavigationContent from 'components/NavigationContent';
+import BottomNav from 'components/BottomNav';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
   const { currentClub } = useClubContext();
   const location = useLocation();
+  const muiTheme = useTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   const headerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(56); // Default to 56px (MUI Toolbar default)
 
-  // Measure header height for proper spacing
+  // Measure header height for proper spacing (only relevant on desktop now)
   useEffect(() => {
+    if (isMobile) {
+        setHeaderHeight(0);
+        return;
+    }
+
     const measureHeader = () => {
       // Since AppBar is fixed, we need to find it in the document
       const appBar = document.querySelector('.MuiAppBar-root');
@@ -59,7 +70,7 @@ const Layout = ({ children }) => {
         resizeObserver.disconnect();
       }
     };
-  }, [currentClub]); // Re-measure when club changes (affects header height)
+  }, [currentClub, isMobile]); // Re-measure when club changes (affects header height) or mobile state changes
 
   // Update page title based on route and club
   useEffect(() => {
@@ -100,7 +111,11 @@ const Layout = ({ children }) => {
           flexDirection: 'column',
         }}
       >
-        <Box ref={headerRef}>
+        {/* Desktop Header - Hidden on Mobile */}
+        <Box 
+            ref={headerRef} 
+            sx={{ display: { xs: 'none', md: 'block' } }}
+        >
           <Header 
             user={user} 
             onMenuClick={() => setDrawerOpen(true)} 
@@ -108,14 +123,37 @@ const Layout = ({ children }) => {
           />
         </Box>
         
-        <NavigationDrawer 
-          open={drawerOpen} 
-          onClose={() => setDrawerOpen(false)} 
-          onLogout={handleLogout} 
-        />
+        {/* Desktop Drawer (Left) */}
+        <Drawer 
+            anchor="left" 
+            open={drawerOpen} 
+            onClose={() => setDrawerOpen(false)}
+        >
+            <NavigationContent 
+                onClose={() => setDrawerOpen(false)}
+                onLogout={handleLogout}
+                isMobile={false}
+            />
+        </Drawer>
 
-        {/* Spacer for fixed header */}
-        <Box sx={{ height: `${headerHeight}px`, flexShrink: 0 }} />
+        {/* Mobile Menu Drawer (Right) */}
+        <Drawer
+            anchor="right"
+            open={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            PaperProps={{
+                sx: { width: '85%', maxWidth: 300 }
+            }}
+        >
+            <NavigationContent
+                onClose={() => setMobileMenuOpen(false)}
+                onLogout={handleLogout}
+                isMobile={true}
+            />
+        </Drawer>
+
+        {/* Spacer for fixed header (Desktop only) */}
+        <Box sx={{ height: `${headerHeight}px`, flexShrink: 0, display: { xs: 'none', md: 'block' } }} />
 
         <Box 
           component="main"
@@ -126,9 +164,15 @@ const Layout = ({ children }) => {
             overflow: 'auto',
             minHeight: 0,
             WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+            pb: { xs: 7, md: 0 } // Add padding bottom on mobile for BottomNav
           }}
         >
           {children}
+        </Box>
+
+        {/* Mobile Bottom Nav - Hidden on Desktop */}
+        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+            <BottomNav onMenuClick={() => setMobileMenuOpen(true)} />
         </Box>
       </Box>
     </ThemeProvider>

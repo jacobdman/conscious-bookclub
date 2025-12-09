@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Button, Grid, Paper } from '@mui/material';
 import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -14,11 +14,14 @@ import PWAInstallPrompt from 'components/PWAInstallPrompt';
 import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
 import { parseLocalDate } from 'utils/dateHelpers';
+import { useNavigate } from 'react-router-dom';
+import { ArrowForward } from '@mui/icons-material';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [currentBooks, setCurrentBooks] = useState([]);
+  const navigate = useNavigate();
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -119,8 +122,36 @@ const Dashboard = () => {
           <NextMeetingCard />
           
           <QuickGoalCompletion />
+
+          <Paper 
+                    sx={{ p: 1, textAlign: 'center', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    elevation={1}
+                >
+                    <Button 
+                        fullWidth 
+                        endIcon={<ArrowForward />} 
+                        onClick={() => navigate('/club/goals')}
+                        sx={{ textTransform: 'none', lineHeight: 1.2 }}
+                    >
+                        View Full Goals Report
+                    </Button>
+                </Paper>
           
           <CurrentBooksSection books={currentBooks} />
+
+                <Paper 
+                    sx={{ p: 1, textAlign: 'center', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    elevation={1}
+                >
+                    <Button 
+                        fullWidth 
+                        endIcon={<ArrowForward />} 
+                        onClick={() => navigate('/club/books')}
+                        sx={{ textTransform: 'none', lineHeight: 1.2 }}
+                    >
+                        View Full Book Report
+                    </Button>
+                </Paper>
 
           <FeedPreview />
         </Box>
@@ -131,4 +162,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
