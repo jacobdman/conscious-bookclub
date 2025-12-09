@@ -118,6 +118,14 @@ const createMeeting = async (req, res, next) => {
       clubId: parseInt(clubId),
     });
 
+    // Update book discussion date if book is selected
+    if (meeting.bookId) {
+      await db.Book.update(
+          {discussionDate: meeting.date},
+          {where: {id: meeting.bookId}},
+      );
+    }
+
     const meetingWithBook = await db.Meeting.findByPk(meeting.id, {
       include: [{model: db.Book, as: "book", attributes: ["id", "title", "author"]}],
     });
@@ -191,6 +199,14 @@ const updateMeeting = async (req, res, next) => {
     }
 
     await meeting.save();
+
+    // Update book discussion date if book is selected
+    if (meeting.bookId) {
+      await db.Book.update(
+          {discussionDate: meeting.date},
+          {where: {id: meeting.bookId}},
+      );
+    }
 
     const meetingWithBook = await db.Meeting.findByPk(meeting.id, {
       include: [{model: db.Book, as: "book", attributes: ["id", "title", "author"]}],

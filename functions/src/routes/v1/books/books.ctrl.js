@@ -14,7 +14,15 @@ const mapOrderByField = (field) => {
 };
 
 // Helper function to get books page
-const getBooksPage = async (pageNumber, pageSize, orderByField, orderDirection, userId, clubId) => {
+const getBooksPage = async (
+    pageNumber,
+    pageSize,
+    orderByField,
+    orderDirection,
+    userId,
+    clubId,
+    readStatus,
+) => {
   const offset = (pageNumber - 1) * pageSize;
 
   const whereClause = {};
@@ -24,12 +32,27 @@ const getBooksPage = async (pageNumber, pageSize, orderByField, orderDirection, 
 
   const includeOptions = [];
   if (userId) {
+    const progressWhere = {userId};
+    // If readStatus is 'finished', filter by status and require the association
+    if (readStatus === "finished") {
+      progressWhere.status = "finished";
+    }
+
     includeOptions.push({
       model: db.BookProgress,
       as: "bookProgresses",
-      where: {userId},
-      required: false,
-      attributes: ["id", "userId", "bookId", "status", "percentComplete", "privacy", "updatedAt"],
+      where: progressWhere,
+      // Only include books with finished progress when filtering
+      required: readStatus === "finished",
+      attributes: [
+        "id",
+        "userId",
+        "bookId",
+        "status",
+        "percentComplete",
+        "privacy",
+        "updatedAt",
+      ],
     });
   }
 
@@ -70,6 +93,7 @@ const getBooksPageFiltered = async (
     orderDirection,
     userId,
     clubId,
+    readStatus,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
   let whereClause = {};
@@ -97,12 +121,27 @@ const getBooksPageFiltered = async (
 
   const includeOptions = [];
   if (userId) {
+    const progressWhere = {userId};
+    // If readStatus is 'finished', filter by status and require the association
+    if (readStatus === "finished") {
+      progressWhere.status = "finished";
+    }
+
     includeOptions.push({
       model: db.BookProgress,
       as: "bookProgresses",
-      where: {userId},
-      required: false,
-      attributes: ["id", "userId", "bookId", "status", "percentComplete", "privacy", "updatedAt"],
+      where: progressWhere,
+      // Only include books with finished progress when filtering
+      required: readStatus === "finished",
+      attributes: [
+        "id",
+        "userId",
+        "bookId",
+        "status",
+        "percentComplete",
+        "privacy",
+        "updatedAt",
+      ],
     });
   }
 
@@ -144,6 +183,7 @@ const getBooks = async (req, res, next) => {
       orderDirection = "desc",
       userId,
       clubId,
+      readStatus,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -158,6 +198,7 @@ const getBooks = async (req, res, next) => {
         orderDirection.toUpperCase(),
         userId || null,
         clubId,
+        readStatus || null,
     );
     res.json(result);
   } catch (e) {
@@ -199,6 +240,7 @@ const getFilteredBooks = async (req, res, next) => {
       orderDirection = "desc",
       userId,
       clubId,
+      readStatus,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -214,6 +256,7 @@ const getFilteredBooks = async (req, res, next) => {
         orderDirection.toUpperCase(),
         userId || null,
         clubId,
+        readStatus || null,
     );
     res.json(result);
   } catch (e) {
@@ -361,7 +404,7 @@ const getBooksProgress = async (req, res, next) => {
       const allProgress = await db.BookProgress.findAll({
         attributes: [
           "status",
-          "percent_complete",
+          "percentComplete",
         ],
         where: {bookId: bookIdInt},
       });
@@ -480,7 +523,7 @@ const getBooksProgress = async (req, res, next) => {
             const allProgress = await db.BookProgress.findAll({
               attributes: [
                 "status",
-                "percent_complete",
+                "percentComplete",
               ],
               where: {bookId},
             });

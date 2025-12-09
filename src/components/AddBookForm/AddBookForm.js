@@ -21,12 +21,13 @@ import {
   CircularProgress,
   Avatar
 } from '@mui/material';
-import { addBook, updateBook, deleteBook } from 'services/books/books.service';
 import { debouncedSearchBooks } from 'services/googleBooksService';
 import useClubContext from 'contexts/Club';
+import useBooksContext from 'contexts/Books';
 
 const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = null }) => {
   const { currentClub } = useClubContext();
+  const { createBook, updateBook, deleteBook } = useBooksContext();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -252,14 +253,12 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
 
       if (editingBook) {
         // Update existing book
-        const updatedBook = await updateBook(currentClub.id, editingBook.id, bookData);
-        onBookAdded(updatedBook); // Pass the updated book data
+        const updatedBook = await updateBook(editingBook.id, bookData);
+        if (onBookAdded) onBookAdded(updatedBook); // Call callback if exists, though context handles state
       } else {
         // Add new book
-        const newBookRef = await addBook(currentClub.id, bookData);
-        // Use the full response which includes id, createdAt, and all other fields
-        const newBook = newBookRef;
-        onBookAdded(newBook); // Pass the new book data
+        const newBook = await createBook(bookData);
+        if (onBookAdded) onBookAdded(newBook); // Call callback if exists
       }
       
       // Reset form
@@ -277,6 +276,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       
       onClose();
     } catch (error) {
+      console.error(error);
       setSubmitError('Failed to add book. Please try again.');
     } finally {
       setLoading(false);
@@ -296,8 +296,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       setSubmitError('');
       
       try {
-        await deleteBook(currentClub.id, editingBook.id);
-        onBookDeleted(editingBook.id);
+        await deleteBook(editingBook.id);
+        if (onBookDeleted) onBookDeleted(editingBook.id);
         onClose();
       } catch (error) {
         setSubmitError('Failed to delete book. Please try again.');
