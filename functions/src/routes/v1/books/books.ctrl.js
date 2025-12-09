@@ -22,12 +22,33 @@ const getBooksPage = async (
     userId,
     clubId,
     readStatus,
+    search,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
 
-  const whereClause = {};
+  let whereClause = {};
   if (clubId) {
     whereClause.clubId = parseInt(clubId);
+  }
+
+  // Add search filter
+  if (search) {
+    const searchLower = search.toLowerCase();
+    whereClause = {
+      ...whereClause,
+      [db.Op.or]: [
+        db.sequelize.where(
+            db.sequelize.fn("LOWER", db.sequelize.col("title")),
+            "LIKE",
+            `%${searchLower}%`,
+        ),
+        db.sequelize.where(
+            db.sequelize.fn("LOWER", db.sequelize.col("author")),
+            "LIKE",
+            `%${searchLower}%`,
+        ),
+      ],
+    };
   }
 
   const includeOptions = [];
@@ -94,6 +115,7 @@ const getBooksPageFiltered = async (
     userId,
     clubId,
     readStatus,
+    search,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
   let whereClause = {};
@@ -117,6 +139,41 @@ const getBooksPageFiltered = async (
         [db.Op.contains]: [theme],
       },
     };
+  }
+
+  // Add search filter
+  if (search) {
+    const searchLower = search.toLowerCase();
+    // We need to carefully combine with existing Op.or if present
+    const searchCondition = {
+      [db.Op.or]: [
+        db.sequelize.where(
+            db.sequelize.fn("LOWER", db.sequelize.col("title")),
+            "LIKE",
+            `%${searchLower}%`,
+        ),
+        db.sequelize.where(
+            db.sequelize.fn("LOWER", db.sequelize.col("author")),
+            "LIKE",
+            `%${searchLower}%`,
+        ),
+      ],
+    };
+
+    // If we already have an Op.or (for no-theme), we need to use Op.and to combine them
+    if (whereClause[db.Op.or]) {
+      whereClause = {
+        [db.Op.and]: [
+          whereClause,
+          searchCondition,
+        ],
+      };
+    } else {
+      whereClause = {
+        ...whereClause,
+        ...searchCondition,
+      };
+    }
   }
 
   const includeOptions = [];
@@ -184,6 +241,7 @@ const getBooks = async (req, res, next) => {
       userId,
       clubId,
       readStatus,
+      search,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -199,6 +257,7 @@ const getBooks = async (req, res, next) => {
         userId || null,
         clubId,
         readStatus || null,
+        search,
     );
     res.json(result);
   } catch (e) {
@@ -241,6 +300,7 @@ const getFilteredBooks = async (req, res, next) => {
       userId,
       clubId,
       readStatus,
+      search,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -257,6 +317,7 @@ const getFilteredBooks = async (req, res, next) => {
         userId || null,
         clubId,
         readStatus || null,
+        search,
     );
     res.json(result);
   } catch (e) {
@@ -701,4 +762,3 @@ module.exports = {
   getBooksProgress,
   getTopReaders,
 };
-

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext, useEffect } from 'react';
+import React, { useState, useCallback, useContext, useEffect, useRef } from 'react';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import {
@@ -15,6 +15,23 @@ import {
 } from 'services/progress/progress.service';
 import BooksContext from './BooksContext';
 
+// Simple debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const BooksProvider = ({ children }) => {
   // ******************STATE VALUES**********************
   const { user } = useAuth();
@@ -29,6 +46,10 @@ const BooksProvider = ({ children }) => {
   // New state for filters and pagination
   const [pagination, setPaginationState] = useState({ page: 1, pageSize: 10 });
   const [filters, setFiltersState] = useState({ theme: 'all', status: 'all' });
+  const [search, setSearchState] = useState('');
+  
+  // Debounce search term (500ms delay)
+  const debouncedSearch = useDebounce(search, 500);
 
   // ******************SETTERS FOR STATE**********************
   const setPage = (page) => {
@@ -41,6 +62,11 @@ const BooksProvider = ({ children }) => {
 
   const setFilters = (newFilters) => {
     setFiltersState(prev => ({ ...prev, ...newFilters }));
+    setPaginationState(prev => ({ ...prev, page: 1 }));
+  };
+
+  const setSearch = (term) => {
+    setSearchState(term);
     setPaginationState(prev => ({ ...prev, page: 1 }));
   };
 
@@ -77,6 +103,15 @@ const BooksProvider = ({ children }) => {
             }
         }
 
+        // Apply search filter in memory if needed
+        if (debouncedSearch) {
+          const lowerSearch = debouncedSearch.toLowerCase();
+          allScheduledBooks = allScheduledBooks.filter(book => 
+            book.title.toLowerCase().includes(lowerSearch) || 
+            book.author.toLowerCase().includes(lowerSearch)
+          );
+        }
+
         const startIdx = (page - 1) * pageSize;
         const endIdx = startIdx + pageSize;
         const paginatedBooks = allScheduledBooks.slice(startIdx, endIdx);
@@ -107,9 +142,9 @@ const BooksProvider = ({ children }) => {
         const readStatus = status === 'read' ? 'finished' : null;
 
         if (theme !== 'all') {
-            result = await getBooksPageFiltered(currentClub.id, theme, page, pageSize, 'createdAt', 'desc', userId, readStatus);
+            result = await getBooksPageFiltered(currentClub.id, theme, page, pageSize, 'createdAt', 'desc', userId, readStatus, debouncedSearch);
         } else {
-            result = await getBooksPage(currentClub.id, page, pageSize, 'createdAt', 'desc', userId, readStatus);
+            result = await getBooksPage(currentClub.id, page, pageSize, 'createdAt', 'desc', userId, readStatus, debouncedSearch);
         }
       }
 
@@ -123,7 +158,7 @@ const BooksProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentClub, user, pagination, filters]);
+  }, [currentClub, user, pagination, filters, debouncedSearch]);
 
   const refreshBooks = useCallback(() => {
     fetchBooks();
@@ -230,11 +265,13 @@ const BooksProvider = ({ children }) => {
         totalPages,
         pagination,
         filters,
+        search,
 
         // Setters
         setPage,
         setPageSize,
         setFilters,
+        setSearch,
 
         // Actions
         createBook,

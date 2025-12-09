@@ -34,11 +34,12 @@ export const deleteBook = async (clubId, bookId) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
   await apiCall(`/v1/books/${bookId}?${params}`, {
     method: 'DELETE',
+    body: JSON.stringify({ clubId }) // Sometimes DELETE might need body or query, usually query is enough
   });
 };
 
 // Books pagination and filtering
-export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null) => {
+export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '') => {
   const params = new URLSearchParams({
     clubId: clubId.toString(),
     page: pageNumber.toString(),
@@ -52,10 +53,13 @@ export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderB
   if (readStatus) {
     params.append('readStatus', readStatus);
   }
+  if (search) {
+    params.append('search', search);
+  }
   return apiCall(`/v1/books?${params}`);
 };
 
-export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null) => {
+export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '') => {
   const params = new URLSearchParams({
     clubId: clubId.toString(),
     theme,
@@ -69,6 +73,9 @@ export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSi
   }
   if (readStatus) {
     params.append('readStatus', readStatus);
+  }
+  if (search) {
+    params.append('search', search);
   }
   return apiCall(`/v1/books/filtered?${params}`);
 };
@@ -114,4 +121,3 @@ export const getTopReaders = async (clubId, limit = 10) => {
   });
   return apiCall(`/v1/books/top-readers?${params}`);
 };
-

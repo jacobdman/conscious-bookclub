@@ -19,9 +19,11 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  TextField,
+  InputAdornment
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Search as SearchIcon } from '@mui/icons-material';
 import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -41,9 +43,11 @@ const BookList = () => {
     totalPages,
     pagination,
     filters,
+    search,
     setPage,
     setPageSize,
     setFilters,
+    setSearch,
     updateBookProgress,
     refreshBooks
   } = useBooksContext();
@@ -96,6 +100,10 @@ const BookList = () => {
 
   const handlePageSizeChange = (event) => {
     setPageSize(parseInt(event.target.value, 10));
+  };
+  
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value);
   };
 
   const handleProgressUpdate = async (book) => {
@@ -234,6 +242,22 @@ const BookList = () => {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+          <TextField
+            label="Search Books"
+            variant="outlined"
+            size="medium"
+            value={search}
+            onChange={handleSearchChange}
+            sx={{ minWidth: 200, flexGrow: 1, maxWidth: 400 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+
           <FormControl sx={{ minWidth: 150 }}>
             <InputLabel>Theme Filter</InputLabel>
             <Select

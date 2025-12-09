@@ -9,11 +9,13 @@ const BooksContext = React.createContext({
   totalPages: 0,
   pagination: { page: 1, pageSize: 10 },
   filters: { theme: 'all', status: 'all' },
+  search: '',
 
   // Setters
   setPage: () => {},
   setPageSize: () => {},
   setFilters: () => {},
+  setSearch: () => {},
   
   // Actions
   createBook: async () => {},
