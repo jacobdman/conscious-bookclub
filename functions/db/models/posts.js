@@ -48,6 +48,16 @@ module.exports = function(sequelize, DataTypes) {
           allowNull: false,
           defaultValue: [],
         },
+        relatedRecordType: {
+          type: DataTypes.STRING(100),
+          field: "related_record_type",
+          allowNull: true,
+        },
+        relatedRecordId: {
+          type: DataTypes.INTEGER,
+          field: "related_record_id",
+          allowNull: true,
+        },
       },
       {
         tableName: "posts",

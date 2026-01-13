@@ -1,5 +1,5 @@
 const db = require("../../../../db/models/index");
-const {emitToClub} = require("../posts/posts.ctrl");
+const {emitToClub, postIncludes, buildPostResponse} = require("../posts/posts.ctrl");
 
 // GET /v1/progress/:userId/:bookId - Get user's progress for a book
 const getUserBookProgress = async (req, res, next) => {
@@ -61,41 +61,23 @@ const updateUserBookProgress = async (req, res, next) => {
           const user = await db.User.findByPk(userId);
           const clubIdInt = book.clubId;
           const userDisplayName = user?.displayName || user?.email || "A reader";
-          const bookTitle = book.title || "a book";
-          const authorSegment = book.author ? ` by ${book.author}` : "";
-          const activityText = `${userDisplayName} finished "${bookTitle}"${authorSegment}.`;
 
           const newPost = await db.Post.create({
-            authorId: null,
-            authorName: "Activity",
-            text: activityText,
+            authorId: userId,
+            authorName: userDisplayName,
+            text: "{book_completion_post}",
             clubId: clubIdInt,
             parentPostId: null,
             isSpoiler: false,
             isActivity: true,
+            relatedRecordType: "book",
+            relatedRecordId: book.id,
           });
 
-          const postWithAssociations = await db.Post.findByPk(newPost.id, {
-            include: [
-              {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-              {
-                model: db.PostReaction,
-                as: "reactions",
-                include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
-              },
-              {
-                model: db.Post,
-                as: "parentPost",
-                attributes: ["id", "text", "authorName", "isSpoiler"],
-                required: false,
-                include: [
-                  {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-                ],
-              },
-            ],
-          });
+          const postWithAssociations = await db.Post.findByPk(newPost.id, {include: postIncludes});
+          const serializedPost = await buildPostResponse(postWithAssociations);
 
-          await emitToClub(clubIdInt, "post:created", {id: newPost.id, ...postWithAssociations.toJSON()});
+          await emitToClub(clubIdInt, "post:created", serializedPost);
         }
       } catch (err) {
         console.error("Failed to create activity post for finished book:", err);

@@ -155,6 +155,20 @@ const FeedPreview = () => {
             const prevAuthorId = prevPost?.authorId || prevPost?.author?.uid;
             const isFirstInGroup = index === 0 || prevAuthorId !== currentAuthorId;
             const authorName = post.authorName || post.author?.displayName || 'Unknown';
+            const isMeetingActivity = post.text?.includes('{meeting_post}') && post.relatedRecord?.type === 'meeting';
+            const isBookCompletionActivity = post.text?.includes('{book_completion_post}') && post.relatedRecord?.type === 'book';
+
+            let previewText = post.text;
+            if (isMeetingActivity) {
+              const meeting = post.relatedRecord?.record || {};
+              const title = meeting.title || 'Book Club Meeting';
+              previewText = `Meeting: ${title}`;
+            } else if (isBookCompletionActivity) {
+              const book = post.relatedRecord?.record || {};
+              const actorName = post.authorName || 'A reader';
+              const bookTitle = book.title || 'a book';
+              previewText = `${actorName} finished ${bookTitle}`;
+            }
 
             return (
               <Box
@@ -291,7 +305,7 @@ const FeedPreview = () => {
                     </Box>
                   ) : (
                     <Typography variant="body2" sx={{ mb: 0.5, wordBreak: 'break-word' }}>
-                      {post.text}
+                      {previewText}
                     </Typography>
                   )}
 

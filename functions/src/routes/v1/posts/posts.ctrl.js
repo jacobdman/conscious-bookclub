@@ -143,6 +143,68 @@ const emitToClub = async (clubId, event, data) => {
   }
 };
 
+// Shared includes for fetching posts with associations
+const postIncludes = [
+  {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
+  {
+    model: db.PostReaction,
+    as: "reactions",
+    include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
+  },
+  {
+    model: db.Post,
+    as: "parentPost",
+    attributes: ["id", "text", "authorName", "isSpoiler"],
+    required: false,
+    include: [
+      {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
+    ],
+  },
+];
+
+// Helper to load related record data for polymorphic posts
+const loadRelatedRecord = async (type, id) => {
+  if (!type || !id) return null;
+
+  try {
+    if (type === "meeting") {
+      const meeting = await db.Meeting.findByPk(id, {
+        include: [{model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage"]}],
+      });
+      return meeting ? {id: meeting.id, ...meeting.toJSON()} : null;
+    }
+
+    if (type === "book") {
+      const book = await db.Book.findByPk(id, {
+        attributes: ["id", "title", "author", "coverImage", "clubId"],
+      });
+      return book ? {id: book.id, ...book.toJSON()} : null;
+    }
+  } catch (error) {
+    console.error("Failed to load related record", {type, id, error: error.message});
+  }
+
+  return null;
+};
+
+// Helper to build response payload with related record data
+const buildPostResponse = async (postInstance) => {
+  if (!postInstance) return null;
+  const json = postInstance.toJSON();
+
+  let relatedRecord = null;
+  if (json.relatedRecordType && json.relatedRecordId) {
+    const record = await loadRelatedRecord(json.relatedRecordType, json.relatedRecordId);
+    relatedRecord = {
+      type: json.relatedRecordType,
+      id: json.relatedRecordId,
+      record,
+    };
+  }
+
+  return {id: postInstance.id, ...json, relatedRecord};
+};
+
 // Helper to check which users are currently in a club's socket room
 // Returns a Set of userIds that are actively viewing the feed
 // If socket service is unavailable, returns empty Set (fail-safe - send notifications)
@@ -226,31 +288,19 @@ const getPosts = async (req, res, next) => {
       where: whereClause,
       order: [["created_at", "DESC"]],
       limit: limitNum + 1, // Fetch one extra to check if there are more
-      include: [
-        {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-        {
-          model: db.PostReaction,
-          as: "reactions",
-          include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
-        },
-        {
-          model: db.Post,
-          as: "parentPost",
-          attributes: ["id", "text", "authorName", "isSpoiler"],
-          required: false,
-          include: [
-            {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-          ],
-        },
-      ],
+      include: postIncludes,
     });
 
     // Check if there are more posts
     const hasMore = posts.length > limitNum;
     const postsToReturn = hasMore ? posts.slice(0, limitNum) : posts;
 
+    const serializedPosts = await Promise.all(
+        postsToReturn.map((post) => buildPostResponse(post)),
+    );
+
     res.json({
-      posts: postsToReturn.map((post) => ({id: post.id, ...post.toJSON()})),
+      posts: serializedPosts,
       hasMore,
       // Return the oldest post's ID for next pagination
       nextBeforeId: hasMore ? postsToReturn[postsToReturn.length - 1].id : null,
@@ -275,30 +325,15 @@ const getPost = async (req, res, next) => {
         id: parseInt(postId),
         clubId: parseInt(clubId),
       },
-      include: [
-        {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-        {
-          model: db.PostReaction,
-          as: "reactions",
-          include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
-        },
-        {
-          model: db.Post,
-          as: "parentPost",
-          attributes: ["id", "text", "authorName", "isSpoiler"],
-          required: false,
-          include: [
-            {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-          ],
-        },
-      ],
+      include: postIncludes,
     });
     if (!post) {
       const error = new Error("Post not found");
       error.status = 404;
       throw error;
     }
-    res.json({id: post.id, ...post.toJSON()});
+    const serializedPost = await buildPostResponse(post);
+    res.json(serializedPost);
   } catch (e) {
     next(e);
   }
@@ -326,28 +361,11 @@ const createPost = async (req, res, next) => {
     });
 
     // Fetch with associations for Socket.io event
-    const postWithAssociations = await db.Post.findByPk(post.id, {
-      include: [
-        {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-        {
-          model: db.PostReaction,
-          as: "reactions",
-          include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
-        },
-        {
-          model: db.Post,
-          as: "parentPost",
-          attributes: ["id", "text", "authorName", "isSpoiler"],
-          required: false,
-          include: [
-            {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
-          ],
-        },
-      ],
-    });
+    const postWithAssociations = await db.Post.findByPk(post.id, {include: postIncludes});
+    const serializedPost = await buildPostResponse(postWithAssociations);
 
     // Emit Socket.io event via Cloud Run service
-    await emitToClub(clubIdInt, "post:created", {id: post.id, ...postWithAssociations.toJSON()});
+    await emitToClub(clubIdInt, "post:created", serializedPost);
 
     // Send feed notifications based on user preferences
     // This is non-blocking - don't fail the request if notifications fail
@@ -486,7 +504,7 @@ const createPost = async (req, res, next) => {
       }
     }
 
-    res.status(201).json({id: post.id, ...postWithAssociations.toJSON()});
+    res.status(201).json(serializedPost);
   } catch (e) {
     next(e);
   }
@@ -664,5 +682,7 @@ module.exports = {
   removeReaction,
   getReactions,
   emitToClub,
+  postIncludes,
+  buildPostResponse,
 };
 

@@ -1,4 +1,31 @@
 const db = require("../../../../db/models/index");
+const {emitToClub, postIncludes, buildPostResponse} = require("../posts/posts.ctrl");
+
+const createMeetingActivityPost = async ({meeting, clubId, userId}) => {
+  try {
+    const user = userId ? await db.User.findByPk(userId) : null;
+    const actorName = user?.displayName || user?.email || "Organizer";
+
+    const activityPost = await db.Post.create({
+      authorId: null,
+      authorName: actorName,
+      text: "{meeting_post}",
+      clubId,
+      parentPostId: null,
+      isSpoiler: false,
+      isActivity: true,
+      relatedRecordType: "meeting",
+      relatedRecordId: meeting.id,
+    });
+
+    const postWithAssociations = await db.Post.findByPk(activityPost.id, {include: postIncludes});
+    const serializedPost = await buildPostResponse(postWithAssociations);
+
+    await emitToClub(clubId, "post:created", serializedPost);
+  } catch (error) {
+    console.error("Failed to create meeting activity post", error);
+  }
+};
 
 // Helper function to verify user can manage meetings (owner, admin, calendar-admin)
 const verifyMeetingAccess = async (clubId, userId) => {
@@ -149,7 +176,13 @@ const createMeeting = async (req, res, next) => {
     }
 
     const meetingWithBook = await db.Meeting.findByPk(meeting.id, {
-      include: [{model: db.Book, as: "book", attributes: ["id", "title", "author"]}],
+      include: [{model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage"]}],
+    });
+
+    await createMeetingActivityPost({
+      meeting: meetingWithBook,
+      clubId: parseInt(clubId),
+      userId,
     });
 
     res.status(201).json({id: meeting.id, ...meetingWithBook.toJSON()});
@@ -234,7 +267,13 @@ const updateMeeting = async (req, res, next) => {
     }
 
     const meetingWithBook = await db.Meeting.findByPk(meeting.id, {
-      include: [{model: db.Book, as: "book", attributes: ["id", "title", "author"]}],
+      include: [{model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage"]}],
+    });
+
+    await createMeetingActivityPost({
+      meeting: meetingWithBook,
+      clubId: parseInt(clubId),
+      userId,
     });
 
     res.json({id: meeting.id, ...meetingWithBook.toJSON()});

@@ -20,7 +20,7 @@ import EmojiInput from 'components/EmojiInput';
 import useFeedContext from 'contexts/Feed';
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
-import { formatSemanticDateTime } from 'utils/dateHelpers';
+import { formatSemanticDateTime, formatLocalTime, parseLocalDate } from 'utils/dateHelpers';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
   const { createReply, registerPostRef, addReaction } = useFeedContext();
@@ -157,6 +157,130 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
 
   const postImages = Array.isArray(post.images) ? post.images.filter(Boolean) : [];
   const showImages = postImages.length > 0 && (!post.isSpoiler || isRevealed);
+
+  const relatedRecord = post.relatedRecord || null;
+  const isMeetingActivity = post.text?.includes('{meeting_post}') && relatedRecord?.type === 'meeting';
+  const isBookCompletionActivity = post.text?.includes('{book_completion_post}') && relatedRecord?.type === 'book';
+
+  const buildMeetingDateTime = (meeting) => {
+    const dateValue = meeting?.date;
+    const startTime = meeting?.startTime;
+    const duration = meeting?.duration;
+
+    let dateLabel = '';
+    const parsedDate = dateValue ? parseLocalDate(dateValue) : null;
+    if (parsedDate) {
+      const yearOptions = parsedDate.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' };
+      dateLabel = parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...yearOptions });
+    }
+
+    const timeLabel = startTime ? formatLocalTime(`${dateValue}T${startTime}`) : '';
+    const durationLabel = duration ? `${duration} min` : '';
+
+    return [dateLabel, timeLabel, durationLabel].filter(Boolean).join(' • ');
+  };
+
+  const renderMeetingActivity = () => {
+    const meetingData = relatedRecord?.record || {};
+
+    const meetingTitle = meetingData.title || 'Book Club Meeting';
+    const location = meetingData.location;
+    const details = meetingData.notes;
+    const meetingBook = meetingData.book;
+    const dateTimeLabel = buildMeetingDateTime(meetingData);
+    const actionLabel = 'Meeting';
+
+    return (
+      <Box
+        sx={{
+          backgroundColor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          p: 1.5,
+          mb: 0.5,
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>
+          {actionLabel}
+        </Typography>
+        <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.25 }}>
+          {meetingTitle}
+        </Typography>
+        {dateTimeLabel && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.25 }}>
+            📅 {dateTimeLabel}
+          </Typography>
+        )}
+        {location && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.25 }}>
+            📍 {location}
+          </Typography>
+        )}
+        {meetingBook && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.25 }}>
+            📚 {meetingBook.title}
+            {meetingBook.author ? ` by ${meetingBook.author}` : ''}
+          </Typography>
+        )}
+        {details && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
+            {details}
+          </Typography>
+        )}
+      </Box>
+    );
+  };
+
+  const renderBookCompletionActivity = () => {
+    const bookData = relatedRecord?.record || {};
+    const actorName = post.authorName || 'A reader';
+
+    const title = bookData.title || 'a book';
+    const author = bookData.author;
+    const coverImage = bookData.coverImage;
+
+    return (
+      <Box
+        sx={{
+          backgroundColor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          p: 1.5,
+          mb: 0.5,
+          display: 'flex',
+          gap: 1.25,
+        }}
+      >
+        {coverImage && (
+          <Box
+            component="img"
+            src={coverImage}
+            alt={title}
+            sx={{
+              width: 56,
+              height: 80,
+              objectFit: 'cover',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              flexShrink: 0,
+            }}
+          />
+        )}
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>
+            {actorName} finished a book
+          </Typography>
+          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+            {title}
+            {author ? ` by ${author}` : ''}
+          </Typography>
+        </Box>
+      </Box>
+    );
+  };
 
   const renderFullEmojiPicker = () => {
     const emojis = EMOJI_CATEGORIES[activeCategory] || [];
@@ -314,7 +438,11 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         )}
 
         {/* Message Text */}
-        {post.isSpoiler && !isRevealed ? (
+        {isMeetingActivity ? (
+          renderMeetingActivity()
+        ) : isBookCompletionActivity ? (
+          renderBookCompletionActivity()
+        ) : post.isSpoiler && !isRevealed ? (
           <Box
             onClick={() => {
               setIsFadingOut(true);
