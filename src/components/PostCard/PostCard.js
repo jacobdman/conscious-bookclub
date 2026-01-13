@@ -8,14 +8,21 @@ import {
   Tooltip,
   FormControlLabel,
   Checkbox,
+  SwipeableDrawer,
+  Divider,
+  Button,
+  Stack,
+  Grid,
 } from '@mui/material';
 import { Reply as ReplyIcon } from '@mui/icons-material';
 import ReplyQuote from 'components/ReplyQuote';
 import EmojiInput from 'components/EmojiInput';
 import useFeedContext from 'contexts/Feed';
+import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
+import { triggerHaptic } from 'utils/haptics';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
-  const { createReply, registerPostRef } = useFeedContext();
+  const { createReply, registerPostRef, addReaction } = useFeedContext();
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isReplySpoiler, setIsReplySpoiler] = useState(false);
@@ -24,7 +31,13 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const [showReactions, setShowReactions] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [fullPickerOpen, setFullPickerOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState(Object.keys(EMOJI_CATEGORIES)[0]);
   const postRef = useRef(null);
+  const longPressTimerRef = useRef(null);
+  const longPressHandledRef = useRef(false);
+  const pressMovedRef = useRef(false);
 
   useEffect(() => {
     if (postRef.current) {
@@ -60,12 +73,135 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     }
   };
 
+  useEffect(() => () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+  }, []);
+
   const authorName = post.authorName || post.author?.displayName || 'Unknown';
   const showAvatar = isFirstInGroup;
+  const quickEmojis =
+    (post.reactions || [])
+      .map(r => r.emoji)
+      .filter((emoji, index, arr) => arr.indexOf(emoji) === index)
+      .slice(0, 6) || [];
+  const quickEmojiChoices = quickEmojis.length > 0 ? quickEmojis : ['👍', '❤️', '😂', '🎉', '👏', '🔥'];
+
+  const openActions = () => {
+    triggerHaptic('medium');
+    setActionsOpen(true);
+  };
+
+  const closeActions = () => {
+    setFullPickerOpen(false);
+    setActionsOpen(false);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handlePointerDown = (e) => {
+    if (e.pointerType !== 'touch') return;
+    if (e.target.closest('[data-emoji-reaction]')) return;
+    pressMovedRef.current = false;
+    longPressHandledRef.current = false;
+    cancelLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      longPressHandledRef.current = true;
+      openActions();
+    }, 600);
+  };
+
+  const handlePointerMove = (e) => {
+    if (e.pointerType !== 'touch') return;
+    if (!longPressTimerRef.current) return;
+    // Cancel if user starts scrolling/dragging
+    if (Math.abs(e.movementX) > 6 || Math.abs(e.movementY) > 6) {
+      pressMovedRef.current = true;
+      cancelLongPress();
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    if (e.pointerType !== 'touch') return;
+    cancelLongPress();
+    setTimeout(() => {
+      longPressHandledRef.current = false;
+    }, 50);
+  };
+
+  const handlePointerCancel = () => {
+    cancelLongPress();
+    longPressHandledRef.current = false;
+  };
+
+  const handlePostClick = (e) => {
+    if (longPressHandledRef.current) {
+      return;
+    }
+    // On mobile/touch devices, toggle reactions on tap
+    // Only toggle if clicking on the message itself, not on reactions
+    if ('ontouchstart' in window && !e.target.closest('[data-emoji-reaction]')) {
+      setShowReactions(prev => !prev);
+    }
+  };
+
+  const handleQuickEmoji = async (emoji) => {
+    try {
+      await addReaction(post.id, emoji);
+      triggerHaptic('light');
+      closeActions();
+    } catch (err) {
+      console.error('Error adding reaction from sheet:', err);
+    }
+  };
+
+  const renderFullEmojiPicker = () => {
+    const emojis = EMOJI_CATEGORIES[activeCategory] || [];
+    return (
+      <Box sx={{ p: 2 }}>
+        <Stack direction="row" spacing={1} sx={{ mb: 1 }} flexWrap="wrap">
+          {Object.keys(EMOJI_CATEGORIES).map((category) => (
+            <Button
+              key={category}
+              size="small"
+              variant={category === activeCategory ? 'contained' : 'text'}
+              onClick={() => setActiveCategory(category)}
+              sx={{ textTransform: 'none' }}
+            >
+              {category}
+            </Button>
+          ))}
+        </Stack>
+        <Grid container spacing={1}>
+          {emojis.map((emoji) => (
+            <Grid item xs={2} key={emoji}>
+              <Button
+                fullWidth
+                onClick={() => handleQuickEmoji(emoji)}
+                sx={{ minWidth: 'auto', fontSize: '1.25rem', py: 1 }}
+              >
+                {emoji}
+              </Button>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
+    );
+  };
 
   return (
     <Box
       ref={postRef}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onPointerMove={handlePointerMove}
       onMouseEnter={() => {
         setHovered(true);
         setShowReactions(true);
@@ -75,13 +211,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         // Always hide reactions on mouse leave (desktop behavior)
         setShowReactions(false);
       }}
-      onClick={(e) => {
-        // On mobile/touch devices, toggle reactions on tap
-        // Only toggle if clicking on the message itself, not on reactions
-        if ('ontouchstart' in window && !e.target.closest('[data-emoji-reaction]')) {
-          setShowReactions(prev => !prev);
-        }
-      }}
+      onClick={handlePostClick}
       sx={{
         display: 'flex',
         gap: 1.5,
@@ -91,6 +221,10 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           backgroundColor: 'action.hover',
         },
         transition: 'background-color 0.2s',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+        touchAction: 'manipulation',
       }}
     >
       {/* Avatar - only show for first message in group */}
@@ -218,6 +352,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         <Box 
           sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}
           onClick={(e) => e.stopPropagation()}
+          data-emoji-reaction
         >
           <EmojiInput 
             postId={post.id} 
@@ -264,6 +399,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
                 '& .MuiOutlinedInput-root': {
                   backgroundColor: 'background.default',
                   borderRadius: 2,
+                  userSelect: 'text',
                 },
               }}
             />
@@ -316,6 +452,61 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           </Box>
         )}
       </Box>
+      <SwipeableDrawer
+        anchor="bottom"
+        open={actionsOpen}
+        onClose={closeActions}
+        onOpen={() => {}}
+        PaperProps={{
+          sx: { borderTopLeftRadius: 12, borderTopRightRadius: 12, pb: 2 },
+        }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Stack direction="row" justifyContent="center" sx={{ mb: 1 }}>
+            <Box sx={{ width: 40, height: 4, backgroundColor: 'divider', borderRadius: 2 }} />
+          </Stack>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+            Quick reactions
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
+            {quickEmojiChoices.map((emoji) => (
+              <Button
+                key={emoji}
+                variant="outlined"
+                onClick={() => handleQuickEmoji(emoji)}
+                sx={{ minWidth: 48, minHeight: 40, fontSize: '1.2rem' }}
+              >
+                {emoji}
+              </Button>
+            ))}
+          </Stack>
+          <Button
+            fullWidth
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              triggerHaptic('light');
+              setFullPickerOpen(true);
+            }}
+            sx={{ textTransform: 'none', mb: 1 }}
+          >
+            Choose from full list
+          </Button>
+          <Divider sx={{ my: 1 }} />
+          <Button
+            fullWidth
+            startIcon={<ReplyIcon />}
+            onClick={() => {
+              setShowReplyForm(true);
+              closeActions();
+            }}
+            sx={{ textTransform: 'none' }}
+          >
+            Reply to {authorName}
+          </Button>
+        </Box>
+        {fullPickerOpen && renderFullEmojiPicker()}
+      </SwipeableDrawer>
     </Box>
   );
 };
