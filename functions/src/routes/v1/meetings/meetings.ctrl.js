@@ -134,6 +134,7 @@ const createMeeting = async (req, res, next) => {
       startTime: meetingData.startTime || null,
       duration: meetingData.duration || 120, // Default to 2 hours if not provided
       location: meetingData.location || null,
+      title: meetingData.title || null,
       bookId: meetingData.bookId || null,
       notes: meetingData.notes || null,
       clubId: parseInt(clubId),
@@ -211,6 +212,9 @@ const updateMeeting = async (req, res, next) => {
     }
     if (updates.location !== undefined) {
       meeting.location = updates.location;
+    }
+    if (updates.title !== undefined) {
+      meeting.title = updates.title || null;
     }
     if (updates.bookId !== undefined) {
       meeting.bookId = updates.bookId;
@@ -336,9 +340,9 @@ const getMeetingsICal = async (req, res, next) => {
       // Generate unique ID for the event
       const uid = `meeting-${meeting.id}@consciousbookclub.com`;
 
-      // Build title
-      let title = "Book Club Meeting";
-      if (meeting.book) {
+      // Build title: prefer custom meeting title, otherwise derive from book
+      let title = meeting.title || "Book Club Meeting";
+      if (!meeting.title && meeting.book) {
         title = `${meeting.book.title} - Book Club Meeting`;
         if (meeting.book.author) {
           title += ` (${meeting.book.author})`;

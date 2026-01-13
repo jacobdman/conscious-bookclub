@@ -19,13 +19,19 @@ const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
   const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
 
   const upcomingEvents = useMemo(() => {
+    const getMeetingTitle = (meeting) => {
+      if (meeting.title) return meeting.title;
+      if (meeting.book) {
+        return `${meeting.book.title}${meeting.book.author ? ` - ${meeting.book.author}` : ''}`;
+      }
+      return 'Book Club Meeting';
+    };
+
     return meetings.map((meeting) => {
       const meetingDate = parseLocalDate(meeting.date);
       return {
         id: meeting.id,
-        title: meeting.book
-          ? `${meeting.book.title}${meeting.book.author ? ` - ${meeting.book.author}` : ''}`
-          : 'Book Club Meeting',
+        title: getMeetingTitle(meeting),
         start: meetingDate.toISOString(),
         location: meeting.location || '',
         description: meeting.notes || '',

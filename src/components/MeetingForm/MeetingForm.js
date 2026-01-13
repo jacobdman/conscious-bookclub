@@ -25,6 +25,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [formData, setFormData] = useState({
+    title: '',
     date: null,
     startTime: '',
     duration: 120, // Default to 2 hours (120 minutes)
@@ -85,6 +86,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
 
       if (editingMeeting) {
         setFormData({
+          title: editingMeeting.title || '',
           date: editingMeeting.date ? new Date(editingMeeting.date) : null,
           startTime: editingMeeting.startTime || '',
           duration: editingMeeting.duration || 120,
@@ -106,6 +108,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
         }
       } else {
         setFormData({
+          title: '',
           date: null,
           startTime: '',
           duration: 120, // Default to 2 hours
@@ -152,6 +155,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
       setError(null);
 
       const meetingData = {
+        title: formData.title ? formData.title.trim() : null,
         date: formatLocalDate(formData.date), // Format as YYYY-MM-DD using local time
         startTime: formData.startTime || null,
         duration: formData.duration || 120,
@@ -191,6 +195,14 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
                 {error}
               </Alert>
             )}
+
+            <TextField
+              label="Title (Optional)"
+              value={formData.title}
+              onChange={(e) => handleInputChange('title', e.target.value)}
+              fullWidth
+              placeholder="e.g., Game Night, Planning Session"
+            />
 
             <DatePicker
               label="Meeting Date"

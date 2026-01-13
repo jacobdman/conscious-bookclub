@@ -19,6 +19,10 @@ module.exports = function(sequelize, DataTypes) {
         location: {
           type: DataTypes.STRING(255),
         },
+        title: {
+          type: DataTypes.STRING(255),
+          allowNull: true,
+        },
         bookId: {
           type: DataTypes.INTEGER,
           field: "book_id",

@@ -77,6 +77,18 @@ const CalendarComponent = () => {
         
         // Transform meetings for react-big-calendar
         const transformedEvents = meetings.map(meeting => {
+          const getMeetingTitle = () => {
+            if (meeting.title) return meeting.title;
+            if (meeting.book) {
+              let derivedTitle = meeting.book.title;
+              if (meeting.book.author) {
+                derivedTitle += ` - ${meeting.book.author}`;
+              }
+              return derivedTitle;
+            }
+            return 'Book Club Meeting';
+          };
+
           const meetingDate = parseLocalDate(meeting.date);
           
           // If startTime is provided, combine date and time
@@ -101,18 +113,9 @@ const CalendarComponent = () => {
             endDateTime.setHours(23, 59, 59, 999);
           }
           
-          // Build title from book title or default
-          let title = 'Book Club Meeting';
-          if (meeting.book) {
-            title = meeting.book.title;
-            if (meeting.book.author) {
-              title += ` - ${meeting.book.author}`;
-            }
-          }
-          
           return {
             id: meeting.id,
-            title: title,
+            title: getMeetingTitle(),
             start: startDateTime,
             end: endDateTime,
             resource: {

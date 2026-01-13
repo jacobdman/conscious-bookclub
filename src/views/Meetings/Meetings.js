@@ -86,6 +86,14 @@ const Meetings = () => {
 
   const canAccessMeetings = ['owner', 'admin', 'calendar-admin'].includes(currentClub.role);
 
+  const getMeetingTitle = (meeting) => {
+    if (meeting.title) return meeting.title;
+    if (meeting.book) {
+      return `${meeting.book.title}${meeting.book.author ? ` - ${meeting.book.author}` : ''}`;
+    }
+    return 'Book Club Meeting';
+  };
+
   if (!canAccessMeetings) {
     return (
       <Layout>
@@ -139,6 +147,7 @@ const Meetings = () => {
                     <TableHead>
                       <TableRow>
                         <TableCell>Date</TableCell>
+                        <TableCell>Title</TableCell>
                         <TableCell>Book</TableCell>
                         <TableCell>Location</TableCell>
                         <TableCell align="right">Actions</TableCell>
@@ -149,6 +158,11 @@ const Meetings = () => {
                         <TableRow key={meeting.id}>
                           <TableCell>
                             {format(parseLocalDate(meeting.date), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {getMeetingTitle(meeting)}
+                            </Typography>
                           </TableCell>
                           <TableCell>
                             {meeting.book ? (
@@ -200,6 +214,7 @@ const Meetings = () => {
                     <TableHead>
                       <TableRow>
                         <TableCell>Date</TableCell>
+                        <TableCell>Title</TableCell>
                         <TableCell>Book</TableCell>
                         <TableCell>Location</TableCell>
                         <TableCell align="right">Actions</TableCell>
@@ -210,6 +225,11 @@ const Meetings = () => {
                         <TableRow key={meeting.id}>
                           <TableCell>
                             {format(parseLocalDate(meeting.date), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {getMeetingTitle(meeting)}
+                            </Typography>
                           </TableCell>
                           <TableCell>
                             {meeting.book ? (
