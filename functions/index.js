@@ -105,3 +105,5 @@ exports.dailyGoalReminder =
   require("./src/functions/scheduled/dailyGoalReminder").dailyGoalReminder;
 exports.meetingReminder =
   require("./src/functions/scheduled/meetingReminder").meetingReminder;
+exports.rotateQuotesOfWeek =
+  require("./src/functions/scheduled/rotateQuotesOfWeek").rotateQuotesOfWeek;

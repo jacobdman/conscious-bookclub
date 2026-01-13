@@ -18,6 +18,7 @@ import NoClub from './views/NoClub';
 import Landing from './views/Landing';
 import Theory from './views/Theory';
 import Themes from './views/Themes';
+import Quotes from './views/Quotes';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
 import { CircularProgress, Box } from '@mui/material';
@@ -184,6 +185,16 @@ function AppContent() {
                 <ClubProvider>
                   <ProtectedRoute>
                     <Meetings />
+                  </ProtectedRoute>
+                </ClubProvider>
+              }
+            />
+            <Route
+              path="/quotes"
+              element={
+                <ClubProvider>
+                  <ProtectedRoute>
+                    <Quotes />
                   </ProtectedRoute>
                 </ClubProvider>
               }

@@ -13,6 +13,7 @@ import FeedPreview from 'components/FeedPreview';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
 import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
+import QuoteOfWeek from 'components/QuoteOfWeek';
 import { parseLocalDate } from 'utils/dateHelpers';
 import { useNavigate } from 'react-router-dom';
 import { ArrowForward } from '@mui/icons-material';
@@ -136,6 +137,8 @@ const Dashboard = () => {
                         View Full Goals Report
                     </Button>
                 </Paper>
+
+          <QuoteOfWeek />
           
           <CurrentBooksSection books={currentBooks} />
 

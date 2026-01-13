@@ -11,6 +11,7 @@ const notifications = require("./notifications");
 const support = require("./support");
 const feed = require("./feed");
 const reports = require("./reports");
+const quotes = require("./quotes");
 
 const router = express.Router(); // eslint-disable-line new-cap
 
@@ -26,6 +27,7 @@ router.use("/notifications", notifications);
 router.use("/support", support);
 router.use("/feed", feed);
 router.use("/reports", reports);
+router.use("/quotes", quotes);
 
 module.exports = router;
 
