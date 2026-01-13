@@ -780,6 +780,31 @@ const createMilestone = async (req, res, next) => {
   }
 };
 
+// DELETE /v1/goals/:goalId/milestones/:milestoneId - Delete milestone
+const deleteMilestone = async (req, res, next) => {
+  try {
+    const {goalId, milestoneId} = req.params;
+
+    const milestone = await db.Milestone.findOne({
+      where: {
+        id: parseInt(milestoneId),
+        goalId: parseInt(goalId),
+      },
+    });
+
+    if (!milestone) {
+      const error = new Error("Milestone not found");
+      error.status = 404;
+      throw error;
+    }
+
+    await milestone.destroy();
+    res.sendStatus(204);
+  } catch (e) {
+    next(e);
+  }
+};
+
 // PUT /v1/goals/:userId/:goalId/milestones/:milestoneId - Update milestone
 const updateMilestone = async (req, res, next) => {
   try {
@@ -834,6 +859,7 @@ module.exports = {
   deleteGoalEntry,
   getGoalProgress,
   createMilestone,
+  deleteMilestone,
   updateMilestone,
 };
 

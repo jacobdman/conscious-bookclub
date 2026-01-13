@@ -17,8 +17,13 @@ import {
   Paper,
   CircularProgress,
   Checkbox,
+  TextField,
+  DialogActions,
 } from '@mui/material';
 import { Close, Add, Edit, Delete, DragIndicator } from '@mui/icons-material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { useAuth } from 'AuthContext';
 import useGoalsContext from 'contexts/Goals';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
@@ -37,6 +42,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     updateEntry,
     deleteEntry,
     fetchGoalEntries,
+    createMilestone,
+    deleteMilestone,
     updateMilestone,
     bulkUpdateMilestones,
   } = useGoalsContext();
@@ -45,6 +52,15 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const [draggedOverMilestoneId, setDraggedOverMilestoneId] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [updatingMilestones, setUpdatingMilestones] = useState({});
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+  const [addingMilestone, setAddingMilestone] = useState(false);
+  const [deletingMilestones, setDeletingMilestones] = useState({});
+  const [milestoneDateDialog, setMilestoneDateDialog] = useState({
+    open: false,
+    milestoneId: null,
+    value: null,
+    saving: false,
+  });
   const observerTarget = useRef(null);
   const INITIAL_LIMIT = 10;
   const LOAD_MORE_LIMIT = 10;
@@ -142,6 +158,78 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         saving: false, 
         error: err.message || 'Failed to save entry'
       }));
+    }
+  };
+
+  const handleAddMilestone = async () => {
+    if (!user || !goal) return;
+    const title = newMilestoneTitle.trim();
+    if (!title) return;
+
+    try {
+      setAddingMilestone(true);
+      const nextOrder = (goal.milestones || []).length;
+      await createMilestone(goal.id, {
+        title,
+        order: nextOrder,
+        done: false,
+      });
+      setNewMilestoneTitle('');
+    } catch (err) {
+      console.error('Failed to add milestone:', err);
+    } finally {
+      setAddingMilestone(false);
+    }
+  };
+
+  const handleDeleteMilestone = async (milestoneId) => {
+    if (!user || !goal || !milestoneId) return;
+
+    const normalizedId = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+
+    try {
+      setDeletingMilestones(prev => ({ ...prev, [normalizedId]: true }));
+      await deleteMilestone(goal.id, normalizedId);
+    } catch (err) {
+      console.error('Failed to delete milestone:', err);
+    } finally {
+      setDeletingMilestones(prev => {
+        const next = { ...prev };
+        delete next[normalizedId];
+        return next;
+      });
+    }
+  };
+
+  const handleOpenMilestoneDate = (milestone) => {
+    if (!milestone) return;
+    const currentDate = milestone.doneAt ? new Date(milestone.doneAt) : new Date();
+    setMilestoneDateDialog({
+      open: true,
+      milestoneId: milestone.id,
+      value: currentDate,
+      saving: false,
+    });
+  };
+
+  const handleSaveMilestoneDate = async () => {
+    if (!user || !goal || !milestoneDateDialog.milestoneId || !milestoneDateDialog.value) return;
+
+    try {
+      setMilestoneDateDialog(prev => ({ ...prev, saving: true }));
+      await updateMilestone(goal.id, milestoneDateDialog.milestoneId, {
+        done: true,
+        doneAt: milestoneDateDialog.value.toISOString(),
+      });
+      setMilestoneDateDialog({
+        open: false,
+        milestoneId: null,
+        value: null,
+        saving: false,
+      });
+    } catch (err) {
+      console.error('Failed to update milestone date:', err);
+      setMilestoneDateDialog(prev => ({ ...prev, saving: false }));
     }
   };
 
@@ -415,10 +503,53 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                                 {formatDate(milestone.doneAt)}
                               </Typography>
                             )}
+                            {milestone.done && (
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpenMilestoneDate(milestone)}
+                                color="primary"
+                              >
+                                <Edit fontSize="small" />
+                              </IconButton>
+                            )}
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteMilestone(milestone.id)}
+                              color="error"
+                              disabled={deletingMilestones[milestone.id]}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                            {deletingMilestones[milestone.id] && (
+                              <CircularProgress size={16} />
+                            )}
                           </Box>
                         );
                       })
                   )}
+                  <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                    <TextField
+                      label="New milestone"
+                      size="small"
+                      value={newMilestoneTitle}
+                      onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddMilestone();
+                        }
+                      }}
+                      fullWidth
+                      disabled={addingMilestone}
+                    />
+                    <Button
+                      variant="contained"
+                      startIcon={<Add />}
+                      onClick={handleAddMilestone}
+                      disabled={!newMilestoneTitle.trim() || addingMilestone}
+                    >
+                      {addingMilestone ? 'Adding...' : 'Add'}
+                    </Button>
+                  </Box>
                 </Box>
               )}
 
@@ -532,6 +663,40 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         saving={entryDialog.saving}
         error={entryDialog.error}
       />
+
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <Dialog
+          open={milestoneDateDialog.open}
+          onClose={() => setMilestoneDateDialog({ open: false, milestoneId: null, value: null, saving: false })}
+        >
+          <DialogTitle>Edit Completion Date</DialogTitle>
+          <DialogContent sx={{ pt: 1 }}>
+            <DateTimePicker
+              label="Completion date/time"
+              value={milestoneDateDialog.value}
+              onChange={(newValue) => setMilestoneDateDialog(prev => ({ ...prev, value: newValue }))}
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  margin: 'normal',
+                },
+              }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setMilestoneDateDialog({ open: false, milestoneId: null, value: null, saving: false })}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveMilestoneDate}
+              variant="contained"
+              disabled={!milestoneDateDialog.value || milestoneDateDialog.saving}
+            >
+              {milestoneDateDialog.saving ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </LocalizationProvider>
     </>
   );
 };

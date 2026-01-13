@@ -133,6 +133,13 @@ export const createMilestone = async (userId, goalId, milestoneData) => {
   });
 };
 
+export const deleteMilestone = async (userId, goalId, milestoneId) => {
+  const params = new URLSearchParams({ userId });
+  return apiCall(`/v1/goals/${goalId}/milestones/${milestoneId}?${params}`, {
+    method: 'DELETE',
+  });
+};
+
 export const updateMilestone = async (userId, goalId, milestoneId, updates) => {
   const params = new URLSearchParams({ userId });
   return apiCall(`/v1/goals/${goalId}/milestones/${milestoneId}?${params}`, {

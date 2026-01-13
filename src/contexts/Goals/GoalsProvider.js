@@ -10,6 +10,8 @@ import {
   updateGoalEntry,
   deleteGoalEntry,
   getGoalEntries,
+  createMilestone,
+  deleteMilestone,
   updateMilestone,
 } from 'services/goals/goals.service';
 import { normalizeGoalType } from 'utils/goalHelpers';
@@ -419,6 +421,95 @@ const GoalsProvider = ({ children }) => {
   }, [user, currentClub]);
 
   // ******************MILESTONE OPERATIONS**********************
+  // Create a new milestone
+  const handleCreateMilestone = useCallback(async (goalId, milestoneData) => {
+    if (!user || !currentClub || !goalId) return;
+
+    try {
+      const result = await createMilestone(user.uid, goalId, milestoneData);
+
+      let createdMilestone = result;
+      // Some APIs might wrap the response
+      if (result && result.id === undefined && result.milestone) {
+        createdMilestone = result.milestone;
+      }
+
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const existingMilestones = goal.milestones || [];
+          const combinedMilestones = [...existingMilestones, createdMilestone];
+          const sortedMilestones = [...combinedMilestones].sort((a, b) => {
+            const orderA = a.order !== undefined ? a.order : (a.id || 0);
+            const orderB = b.order !== undefined ? b.order : (b.id || 0);
+            return orderA - orderB;
+          }).map((milestone, index) => ({
+            ...milestone,
+            order: index,
+          }));
+
+          const completedCount = sortedMilestones.filter(m => m.done).length;
+          const progress = {
+            completed: sortedMilestones.length > 0 && completedCount === sortedMilestones.length,
+            actual: completedCount,
+            target: sortedMilestones.length,
+          };
+
+          return {
+            ...goal,
+            milestones: sortedMilestones,
+            progress,
+          };
+        }
+        return goal;
+      }));
+
+      return createdMilestone;
+    } catch (err) {
+      console.error('Error creating milestone:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
+  // Delete a milestone
+  const handleDeleteMilestone = useCallback(async (goalId, milestoneId) => {
+    if (!user || !currentClub || !goalId || !milestoneId) return;
+
+    try {
+      await deleteMilestone(user.uid, goalId, milestoneId);
+
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          const targetId = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+          const remainingMilestones = (goal.milestones || []).filter(m => {
+            const mId = m.id || m.ID;
+            const normalizedId = typeof mId === 'string' ? parseInt(mId, 10) : mId;
+            return normalizedId !== targetId;
+          }).map((milestone, index) => ({
+            ...milestone,
+            order: index,
+          }));
+
+          const completedCount = remainingMilestones.filter(m => m.done).length;
+          const progress = {
+            completed: remainingMilestones.length > 0 && completedCount === remainingMilestones.length,
+            actual: completedCount,
+            target: remainingMilestones.length,
+          };
+
+          return {
+            ...goal,
+            milestones: remainingMilestones,
+            progress,
+          };
+        }
+        return goal;
+      }));
+    } catch (err) {
+      console.error('Error deleting milestone:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
   // Update a single milestone
   const handleUpdateMilestone = useCallback(async (goalId, milestoneId, updates) => {
     if (!user || !currentClub || !goalId || !milestoneId) return;
@@ -522,6 +613,8 @@ const GoalsProvider = ({ children }) => {
         updateEntry: handleUpdateEntry,
         deleteEntry: handleDeleteEntry,
         fetchGoalEntries: handleFetchGoalEntries,
+        createMilestone: handleCreateMilestone,
+        deleteMilestone: handleDeleteMilestone,
         updateMilestone: handleUpdateMilestone,
         bulkUpdateMilestones: handleBulkUpdateMilestones,
       }}

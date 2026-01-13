@@ -14,6 +14,7 @@ const {
   deleteGoalEntry,
   getGoalProgress,
   createMilestone,
+  deleteMilestone,
   updateMilestone,
 } = require("./goals.ctrl");
 const {getPersonalGoalsReport} = require("./goalsReport.ctrl");
@@ -36,7 +37,8 @@ router
     .delete("/:goalId/entries/:entryId", deleteGoalEntry)
     .get("/:goalId/progress", getGoalProgress)
     .post("/:goalId/milestones", createMilestone)
-    .put("/:goalId/milestones/:milestoneId", updateMilestone);
+    .put("/:goalId/milestones/:milestoneId", updateMilestone)
+    .delete("/:goalId/milestones/:milestoneId", deleteMilestone);
 
 module.exports = router;
 
