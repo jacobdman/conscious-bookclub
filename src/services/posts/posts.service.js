@@ -7,6 +7,10 @@ export const getPosts = async (clubId, options = {}) => {
   if (options.limit) {
     params.append('limit', options.limit.toString());
   }
+
+  if (options.includeActivity !== undefined) {
+    params.append('includeActivity', options.includeActivity ? 'true' : 'false');
+  }
   
   if (options.beforeId) {
     params.append('beforeId', options.beforeId.toString());

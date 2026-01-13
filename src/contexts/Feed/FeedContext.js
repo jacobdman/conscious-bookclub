@@ -8,6 +8,7 @@ export default React.createContext({
   unreadCount: 0,
   lastReadTimestamp: null,
   hasMore: false,
+  showActivity: true,
   fetchPosts: async () => {},
   loadMorePosts: async () => {},
   createPost: async () => {},
@@ -16,5 +17,6 @@ export default React.createContext({
   removeReaction: async () => {},
   markAsRead: async () => {},
   scrollToPost: () => {},
+  setShowActivity: () => {},
 });
 

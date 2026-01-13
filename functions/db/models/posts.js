@@ -37,6 +37,12 @@ module.exports = function(sequelize, DataTypes) {
           allowNull: false,
           defaultValue: false,
         },
+        isActivity: {
+          type: DataTypes.BOOLEAN,
+          field: "is_activity",
+          allowNull: false,
+          defaultValue: false,
+        },
       },
       {
         tableName: "posts",

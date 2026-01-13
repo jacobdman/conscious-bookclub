@@ -1,4 +1,5 @@
 const db = require("../../../../db/models/index");
+const {emitToClub} = require("../posts/posts.ctrl");
 
 // GET /v1/progress/:userId/:bookId - Get user's progress for a book
 const getUserBookProgress = async (req, res, next) => {
@@ -37,6 +38,10 @@ const updateUserBookProgress = async (req, res, next) => {
       throw error;
     }
 
+    const existingProgress = await db.BookProgress.findOne({
+      where: {userId, bookId: bookIdInt},
+    });
+
     const progressData = req.body;
     const [progress] = await db.BookProgress.upsert({
       userId,
@@ -44,6 +49,59 @@ const updateUserBookProgress = async (req, res, next) => {
       ...progressData,
       updatedAt: new Date(),
     });
+
+    const transitionedToFinished =
+      progressData?.status === "finished" &&
+      existingProgress?.status !== "finished";
+
+    if (transitionedToFinished) {
+      try {
+        const book = await db.Book.findOne({where: {id: bookIdInt}});
+        if (book) {
+          const user = await db.User.findByPk(userId);
+          const clubIdInt = book.clubId;
+          const userDisplayName = user?.displayName || user?.email || "A reader";
+          const bookTitle = book.title || "a book";
+          const authorSegment = book.author ? ` by ${book.author}` : "";
+          const activityText = `${userDisplayName} finished "${bookTitle}"${authorSegment}.`;
+
+          const newPost = await db.Post.create({
+            authorId: null,
+            authorName: "Activity",
+            text: activityText,
+            clubId: clubIdInt,
+            parentPostId: null,
+            isSpoiler: false,
+            isActivity: true,
+          });
+
+          const postWithAssociations = await db.Post.findByPk(newPost.id, {
+            include: [
+              {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
+              {
+                model: db.PostReaction,
+                as: "reactions",
+                include: [{model: db.User, as: "user", attributes: ["uid", "displayName", "photoUrl"]}],
+              },
+              {
+                model: db.Post,
+                as: "parentPost",
+                attributes: ["id", "text", "authorName", "isSpoiler"],
+                required: false,
+                include: [
+                  {model: db.User, as: "author", attributes: ["uid", "displayName", "photoUrl"]},
+                ],
+              },
+            ],
+          });
+
+          await emitToClub(clubIdInt, "post:created", {id: newPost.id, ...postWithAssociations.toJSON()});
+        }
+      } catch (err) {
+        console.error("Failed to create activity post for finished book:", err);
+      }
+    }
+
     res.json({id: progress.id, ...progress.toJSON()});
   } catch (e) {
     next(e);

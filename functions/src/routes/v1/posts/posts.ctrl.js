@@ -184,7 +184,7 @@ const checkUsersInRoom = async (clubId, userIds) => {
 // GET /v1/posts - Get posts with pagination
 const getPosts = async (req, res, next) => {
   try {
-    const {clubId, limit, beforeId} = req.query;
+    const {clubId, limit, beforeId, includeActivity} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
@@ -195,6 +195,12 @@ const getPosts = async (req, res, next) => {
     const limitNum = limit ? Math.min(parseInt(limit, 10), 100) : 25;
 
     const whereClause = {clubId: parseInt(clubId)};
+
+    // Filter out activity posts when requested (default: include)
+    const shouldIncludeActivity = includeActivity !== "false";
+    if (!shouldIncludeActivity) {
+      whereClause.isActivity = false;
+    }
 
     // If beforeId is provided, only get posts older than that post
     if (beforeId) {
@@ -304,6 +310,7 @@ const createPost = async (req, res, next) => {
       ...postData,
       clubId: clubIdInt,
       isSpoiler: postData.isSpoiler || false,
+      isActivity: postData.isActivity || false,
     });
 
     // Fetch with associations for Socket.io event
@@ -644,5 +651,6 @@ module.exports = {
   addReaction,
   removeReaction,
   getReactions,
+  emitToClub,
 };
 

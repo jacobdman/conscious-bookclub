@@ -19,8 +19,10 @@ const FeedProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [oldestPostId, setOldestPostId] = useState(null);
+  const [showActivity, setShowActivity] = useState(true);
   const postRefs = useRef({});
   const lastReadTimestampRef = useRef(null);
+  const showActivityRef = useRef(true);
 
   // ******************LOAD FUNCTIONS**********************
   const fetchPosts = useCallback(async () => {
@@ -32,7 +34,7 @@ const FeedProvider = ({ children }) => {
       
       // Fetch initial 25 posts and read status in parallel
       const [postsResponse, readStatusData] = await Promise.all([
-        getPosts(currentClub.id, { limit: 25 }),
+        getPosts(currentClub.id, { limit: 25, includeActivity: showActivity }),
         getReadStatus(currentClub.id, user.uid).catch(() => ({ lastReadAt: null })),
       ]);
       
@@ -77,7 +79,7 @@ const FeedProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentClub, user]);
+  }, [currentClub, user, showActivity]);
 
   // Load more posts (older posts) when scrolling to top
   const loadMorePosts = useCallback(async () => {
@@ -90,6 +92,7 @@ const FeedProvider = ({ children }) => {
       const postsResponse = await getPosts(currentClub.id, {
         limit: 25,
         beforeId: oldestPostId,
+        includeActivity: showActivity,
       });
       
       const newPosts = postsResponse.posts || [];
@@ -106,13 +109,20 @@ const FeedProvider = ({ children }) => {
     } finally {
       setLoadingMore(false);
     }
-  }, [currentClub, user, hasMore, loadingMore, oldestPostId]);
+  }, [currentClub, user, hasMore, loadingMore, oldestPostId, showActivity]);
 
   // ******************EFFECTS/REACTIONS**********************
   // Keep ref in sync with lastReadTimestamp state
   useEffect(() => {
     lastReadTimestampRef.current = lastReadTimestamp;
   }, [lastReadTimestamp]);
+
+  useEffect(() => {
+    showActivityRef.current = showActivity;
+    if (!showActivity) {
+      setPosts(prev => prev.filter(post => !post.isActivity));
+    }
+  }, [showActivity]);
 
   // Socket.io connection and room management
   const socketRef = useRef(null);
@@ -143,6 +153,11 @@ const FeedProvider = ({ children }) => {
             authorId: postData.authorId,
             created_at: postData.created_at,
           });
+
+          if (!showActivityRef.current && postData.isActivity) {
+            console.log(`[FeedProvider] Skipping activity post ${postId} due to filter`);
+            return;
+          }
           
           // Check if we've already processed this post ID (prevent duplicate processing)
           if (processedPostIdsRef.current.has(postId)) {
@@ -598,6 +613,7 @@ const FeedProvider = ({ children }) => {
         unreadCount,
         lastReadTimestamp,
         hasMore,
+        showActivity,
         fetchPosts,
         loadMorePosts,
         createPost,
@@ -607,6 +623,7 @@ const FeedProvider = ({ children }) => {
         markAsRead,
         scrollToPost,
         registerPostRef,
+        setShowActivity,
       }}
     >
       {children}

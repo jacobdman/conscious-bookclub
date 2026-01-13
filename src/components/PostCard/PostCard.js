@@ -72,7 +72,8 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   }, []);
 
   const authorName = post.authorName || post.author?.displayName || 'Unknown';
-  const showAvatar = isFirstInGroup;
+  const isActivity = !!post.isActivity;
+  const showAvatar = isFirstInGroup && !isActivity;
   const { displayString: timestampLabel } = formatSemanticDateTime(post.created_at);
   const quickEmojis =
     (post.reactions || [])
@@ -210,8 +211,12 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         gap: 1.5,
         px: 2,
         py: 0.75,
+        backgroundColor: isActivity ? 'action.selected' : 'transparent',
+        borderRadius: 2,
+        border: isActivity ? '1px solid' : 'none',
+        borderColor: isActivity ? 'divider' : 'transparent',
         '&:hover': {
-          backgroundColor: 'action.hover',
+          backgroundColor: isActivity ? 'action.selected' : 'action.hover',
         },
         transition: 'background-color 0.2s',
         userSelect: 'none',
@@ -236,7 +241,40 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
       {/* Message Content */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         {/* Header with name and timestamp - only show for first in group */}
-        {showAvatar && (
+        {isActivity ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+            <Box
+              sx={{
+                backgroundColor: 'primary.main',
+                px: 1,
+                py: 0.25,
+                borderRadius: 1,
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  color: 'primary.contrastText',
+                  fontSize: '0.6875rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}
+              >
+                Activity
+              </Typography>
+            </Box>
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
+                fontSize: '0.75rem',
+              }}
+            >
+              {timestampLabel}
+            </Typography>
+          </Box>
+        ) : showAvatar && (
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
             <Typography
               variant="subtitle2"
@@ -334,6 +372,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
               fontSize: '0.9375rem',
               lineHeight: 1.4,
               color: 'text.primary',
+              fontWeight: isActivity ? 600 : 400,
               mb: 0.5,
             }}
           >
