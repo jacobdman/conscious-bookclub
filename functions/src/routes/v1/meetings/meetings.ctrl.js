@@ -15,7 +15,7 @@ const verifyMeetingAccess = async (clubId, userId) => {
 // GET /v1/meetings - Get all meetings
 const getMeetings = async (req, res, next) => {
   try {
-    const {clubId, userId, startDate, endDate} = req.query;
+    const {clubId, userId, startDate, endDate, limit} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
@@ -65,11 +65,20 @@ const getMeetings = async (req, res, next) => {
       }];
     }
 
-    const meetings = await db.Meeting.findAll({
+    const queryOptions = {
       where: whereClause,
       order: [["date", "ASC"]],
       include: [bookInclude],
-    });
+    };
+
+    if (limit) {
+      const parsedLimit = parseInt(limit, 10);
+      if (!Number.isNaN(parsedLimit) && parsedLimit > 0) {
+        queryOptions.limit = parsedLimit;
+      }
+    }
+
+    const meetings = await db.Meeting.findAll(queryOptions);
 
     // Transform the response to nest progress in book.progress
     const transformedMeetings = meetings.map((meeting) => {

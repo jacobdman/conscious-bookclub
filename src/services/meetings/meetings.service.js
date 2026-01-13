@@ -5,7 +5,8 @@ export const getMeetings = async (
   clubId,
   userId = null,
   startDate = null,
-  endDate = null
+  endDate = null,
+  limit = null
 ) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
   if (userId) {
@@ -16,6 +17,9 @@ export const getMeetings = async (
   }
   if (endDate) {
     params.append('endDate', endDate);
+  }
+  if (limit) {
+    params.append('limit', limit.toString());
   }
   const meetings = await apiCall(`/v1/meetings?${params}`);
   return meetings;

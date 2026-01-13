@@ -23,6 +23,9 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [currentBooks, setCurrentBooks] = useState([]);
+  const [nextMeetings, setNextMeetings] = useState([]);
+  const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [meetingsError, setMeetingsError] = useState(null);
   const navigate = useNavigate();
   const dashboardConfig = useMemo(
       () => sanitizeDashboardConfig(currentClub?.dashboardConfig),
@@ -91,12 +94,37 @@ const Dashboard = () => {
     }
   }, [user, currentClub]);
 
+  const fetchNextMeetings = useCallback(async () => {
+    try {
+      if (!user || !currentClub) {
+        return;
+      }
+
+      setMeetingsLoading(true);
+      setMeetingsError(null);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const startDate = today.toISOString().split('T')[0];
+
+      const meetings = await getMeetings(currentClub.id, user.uid, startDate, null, 3);
+      setNextMeetings(meetings);
+    } catch (err) {
+      setMeetingsError(err?.message || 'Failed to load meetings');
+      console.error('Error fetching next meetings:', err);
+      setNextMeetings([]);
+    } finally {
+      setMeetingsLoading(false);
+    }
+  }, [user, currentClub]);
+
 
   useEffect(() => {
     if (user) {
       fetchBooks();
+      fetchNextMeetings();
     }
-  }, [user, fetchBooks]);
+  }, [user, fetchBooks, fetchNextMeetings]);
 
   // Ensure page starts at top when Dashboard loads
   useEffect(() => {
@@ -132,7 +160,14 @@ const Dashboard = () => {
                       <HabitConsistencyLeaderboardWithData key={sectionId} />
                     ) : null;
                   case 'nextMeeting':
-                    return <NextMeetingCard key={sectionId} />;
+                    return (
+                      <NextMeetingCard
+                        key={sectionId}
+                        meetings={nextMeetings}
+                        loading={meetingsLoading}
+                        error={meetingsError}
+                      />
+                    );
                   case 'quote':
                     return <QuoteOfWeek key={sectionId} />;
                   case 'quickGoals':
