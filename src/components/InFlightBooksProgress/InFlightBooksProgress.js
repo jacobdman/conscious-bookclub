@@ -26,6 +26,21 @@ const InFlightBooksProgress = () => {
   const [hasMoreUsers, setHasMoreUsers] = useState({}); // Track if more users available per book
   const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
 
+  const parseMeetingDate = useCallback((dateValue) => {
+    if (!dateValue) return null;
+
+    // Handle date-only strings as local dates to avoid UTC shifting a day backward
+    if (typeof dateValue === 'string') {
+      const dateOnlyMatch = /^(\d{4}-\d{2}-\d{2})$/.exec(dateValue);
+      if (dateOnlyMatch) {
+        return parseLocalDate(dateOnlyMatch[1]);
+      }
+    }
+
+    const parsed = new Date(dateValue);
+    return isNaN(parsed) ? null : parsed;
+  }, []);
+
   useEffect(() => {
     const fetchBooksProgress = async () => {
       if (!currentClub) {
@@ -68,7 +83,6 @@ const InFlightBooksProgress = () => {
     fetchBooksProgress();
   }, [currentClub]);
 
-  // Load meetings to get discussion dates
   useEffect(() => {
     const loadMeetings = async () => {
       if (!currentClub) return;
@@ -79,9 +93,10 @@ const InFlightBooksProgress = () => {
         const datesMap = {};
         meetings.forEach(meeting => {
           if (meeting.bookId) {
-            const meetingDate = parseLocalDate(meeting.date);
-            if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
-              datesMap[meeting.bookId] = meeting.date;
+            const meetingDate = parseMeetingDate(meeting.date);
+            if (!meetingDate) return;
+            if (!datesMap[meeting.bookId] || meetingDate < datesMap[meeting.bookId]) {
+              datesMap[meeting.bookId] = meetingDate;
             }
           }
         });
@@ -92,13 +107,14 @@ const InFlightBooksProgress = () => {
     };
 
     loadMeetings();
-  }, [currentClub]);
+  }, [currentClub, parseMeetingDate]);
 
   const formatDiscussionDate = (date) => {
     if (!date) return 'No date set';
-    
-    const discussionDate = new Date(date);
-    
+
+    const discussionDate = parseMeetingDate(date);
+    if (!discussionDate) return 'No date set';
+
     return discussionDate.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
@@ -189,17 +205,13 @@ const InFlightBooksProgress = () => {
       </Typography>
       
       {booksData.map((book) => {
-        // Show 3-5 users initially, then show all loaded users
-        const initialUsersCount = Math.min(5, book.users.length);
+        // Always show all loaded users; container scrolls when longer than ~5.5 rows
+        const displayedUsers = book.users || [];
         const currentPage = userPages[book.id] || 1;
-        // Show initial 5, then all users from subsequent pages
-        const displayedUsers = currentPage === 1 
-          ? book.users.slice(0, initialUsersCount)
-          : book.users;
-        // Show load more if: we're on page 1, have more than 5 users loaded, or stats indicate more users exist
+        // Show load more if backend indicates more users remain beyond what is loaded
         const showLoadMore = hasMoreUsers[book.id] && (
-          (currentPage === 1 && book.users.length > initialUsersCount) ||
-          (book.stats && book.stats.readerCount > book.users.length)
+          (book.stats && book.stats.readerCount > displayedUsers.length) ||
+          displayedUsers.length >= currentPage * 10
         );
 
         // Use average book progress percentage (avgPercent) for the ring
@@ -270,8 +282,7 @@ const InFlightBooksProgress = () => {
                       </Typography>
                     </Box>
                   )}
-                  
-                  <Box>
+                  <Box sx={{ maxHeight: 280, overflowY: 'auto', pr: 1 }}>
                     {displayedUsers.length === 0 ? (
                       <Typography variant="body2" color="text.secondary">
                         No progress data available
