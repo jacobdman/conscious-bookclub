@@ -435,7 +435,9 @@ const updateMemberRole = async (req, res, next) => {
     }
 
     if (!role || !["member", "calendar-admin", "admin", "owner"].includes(role)) {
-      const error = new Error("Invalid role. Must be 'member', 'calendar-admin', 'admin', or 'owner'");
+      const error = new Error(
+          "Invalid role. Must be 'member', 'calendar-admin', 'admin', or 'owner'",
+      );
       error.status = 400;
       throw error;
     }

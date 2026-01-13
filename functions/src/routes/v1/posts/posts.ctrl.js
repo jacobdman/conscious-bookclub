@@ -169,7 +169,11 @@ const loadRelatedRecord = async (type, id) => {
   try {
     if (type === "meeting") {
       const meeting = await db.Meeting.findByPk(id, {
-        include: [{model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage"]}],
+        include: [{
+          model: db.Book,
+          as: "book",
+          attributes: ["id", "title", "author", "coverImage"],
+        }],
       });
       return meeting ? {id: meeting.id, ...meeting.toJSON()} : null;
     }

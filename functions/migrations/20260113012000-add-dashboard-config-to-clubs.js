@@ -14,6 +14,10 @@ module.exports = {
       {id: "feed", enabled: true},
     ];
 
+    const defaultDashboardConfigLiteral = Sequelize.literal(
+        `'${JSON.stringify(DEFAULT_DASHBOARD_CONFIG)}'::jsonb`,
+    );
+
     try {
       const table = await queryInterface.describeTable("clubs");
       const columnExists = !!table.dashboard_config;
@@ -25,7 +29,7 @@ module.exports = {
             {
               type: Sequelize.JSONB,
               allowNull: false,
-              defaultValue: Sequelize.literal(`'${JSON.stringify(DEFAULT_DASHBOARD_CONFIG)}'::jsonb`),
+              defaultValue: defaultDashboardConfigLiteral,
             },
             {transaction},
         );
