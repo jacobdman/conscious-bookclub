@@ -225,7 +225,18 @@ const FeedSection = () => {
               const prevPost = reversedPosts[index - 1];
               const currentAuthorId = post.authorId || post.author?.uid;
               const prevAuthorId = prevPost?.authorId || prevPost?.author?.uid;
-              const isFirstInGroup = index === 0 || prevAuthorId !== currentAuthorId;
+              const currentTimestamp = post?.created_at || post?.createdAt;
+              const prevTimestamp = prevPost?.created_at || prevPost?.createdAt;
+              const isDayBreak = (() => {
+                if (!prevTimestamp || !currentTimestamp) return false;
+                const currentDate = new Date(currentTimestamp);
+                const previousDate = new Date(prevTimestamp);
+                if (Number.isNaN(currentDate.getTime()) || Number.isNaN(previousDate.getTime())) return false;
+                const diffMs = Math.abs(currentDate.getTime() - previousDate.getTime());
+                const oneDayMs = 24 * 60 * 60 * 1000;
+                return diffMs > oneDayMs;
+              })();
+              const isFirstInGroup = index === 0 || prevAuthorId !== currentAuthorId || isDayBreak;
               return (
                 <PostCard key={post.id} post={post} isFirstInGroup={isFirstInGroup} />
               );

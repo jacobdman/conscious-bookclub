@@ -20,6 +20,7 @@ import EmojiInput from 'components/EmojiInput';
 import useFeedContext from 'contexts/Feed';
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
+import { formatSemanticDateTime } from 'utils/dateHelpers';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
   const { createReply, registerPostRef, addReaction } = useFeedContext();
@@ -64,15 +65,6 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     }
   };
 
-  const formatTime = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    } catch (err) {
-      return '';
-    }
-  };
-
   useEffect(() => () => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -81,6 +73,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
 
   const authorName = post.authorName || post.author?.displayName || 'Unknown';
   const showAvatar = isFirstInGroup;
+  const { displayString: timestampLabel } = formatSemanticDateTime(post.created_at);
   const quickEmojis =
     (post.reactions || [])
       .map(r => r.emoji)
@@ -262,7 +255,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
                 fontSize: '0.75rem',
               }}
             >
-              {formatTime(post.created_at)}
+              {timestampLabel}
             </Typography>
           </Box>
         )}
