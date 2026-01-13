@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -21,6 +21,7 @@ import {
   DialogActions,
   useMediaQuery,
   useTheme,
+  LinearProgress,
 } from '@mui/material';
 import { CalendarToday, List as ListIcon, LocationOn, AccessTime } from '@mui/icons-material';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
@@ -41,91 +42,144 @@ const CalendarComponent = () => {
   const { currentClub } = useClubContext();
   
   const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // initial full-page load only
+  const [isFetching, setIsFetching] = useState(false); // background fetches (no page blink)
   const [error, setError] = useState(null);
   const [view, setView] = useState('list'); // 'month' or 'list'
+  const [listFilter, setListFilter] = useState('upcoming'); // 'upcoming' or 'past'
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [loadedYears, setLoadedYears] = useState(() => {
+    const year = new Date().getFullYear();
+    return [year];
+  });
 
-  const fetchEvents = async () => {
-    if (!currentClub) {
-      setError('No club selected');
-      setLoading(false);
-      return;
-    }
+  const fetchEvents = useCallback(
+    async (targetYear, { append = false, showLoader = false } = {}) => {
+      if (!currentClub) {
+        setError('No club selected');
+        setLoading(false);
+        return;
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
-      const meetings = await getMeetings(currentClub.id);
-      
-      // Transform meetings for react-big-calendar
-      const transformedEvents = meetings.map(meeting => {
-        const meetingDate = parseLocalDate(meeting.date);
-        
-        // If startTime is provided, combine date and time
-        let startDateTime = meetingDate;
-        let endDateTime = new Date(meetingDate);
-        let allDay = true;
-        
-        if (meeting.startTime) {
-          // Parse time string (HH:MM:SS or HH:MM)
-          const [hours, minutes] = meeting.startTime.split(':').map(Number);
-          startDateTime = new Date(meetingDate);
-          startDateTime.setHours(hours, minutes || 0, 0, 0);
-          
-          // End time is 2 hours after start (default meeting duration)
-          endDateTime = new Date(startDateTime);
-          endDateTime.setHours(endDateTime.getHours() + 2);
-          
-          allDay = false;
+      try {
+        if (showLoader) {
+          setLoading(true);
         } else {
-          // For all-day events, use same date for start and end (not next day)
-          endDateTime = new Date(meetingDate);
-          endDateTime.setHours(23, 59, 59, 999);
+          setIsFetching(true);
         }
-        
-        // Build title from book title or default
-        let title = 'Book Club Meeting';
-        if (meeting.book) {
-          title = meeting.book.title;
-          if (meeting.book.author) {
-            title += ` - ${meeting.book.author}`;
-          }
-        }
-        
-        return {
-          id: meeting.id,
-          title: title,
-          start: startDateTime,
-          end: endDateTime,
-          resource: {
-            description: meeting.notes || '',
-            location: meeting.location || '',
-            allDay: allDay,
-            meeting: meeting
-          }
-        };
-      });
-      
-      setEvents(transformedEvents);
-    } catch (err) {
-      console.error('Error fetching meetings:', err);
-      setError(err.message || 'Failed to fetch meetings');
-    } finally {
-      setLoading(false);
-    }
-  };
+        setError(null);
 
+        const startDate = `${targetYear}-01-01`;
+        const endDate = `${targetYear}-12-31`;
+        const meetings = await getMeetings(currentClub.id, null, startDate, endDate);
+        
+        // Transform meetings for react-big-calendar
+        const transformedEvents = meetings.map(meeting => {
+          const meetingDate = parseLocalDate(meeting.date);
+          
+          // If startTime is provided, combine date and time
+          let startDateTime = meetingDate;
+          let endDateTime = new Date(meetingDate);
+          let allDay = true;
+          
+          if (meeting.startTime) {
+            // Parse time string (HH:MM:SS or HH:MM)
+            const [hours, minutes] = meeting.startTime.split(':').map(Number);
+            startDateTime = new Date(meetingDate);
+            startDateTime.setHours(hours, minutes || 0, 0, 0);
+            
+            // End time is 2 hours after start (default meeting duration)
+            endDateTime = new Date(startDateTime);
+            endDateTime.setHours(endDateTime.getHours() + 2);
+            
+            allDay = false;
+          } else {
+            // For all-day events, use same date for start and end (not next day)
+            endDateTime = new Date(meetingDate);
+            endDateTime.setHours(23, 59, 59, 999);
+          }
+          
+          // Build title from book title or default
+          let title = 'Book Club Meeting';
+          if (meeting.book) {
+            title = meeting.book.title;
+            if (meeting.book.author) {
+              title += ` - ${meeting.book.author}`;
+            }
+          }
+          
+          return {
+            id: meeting.id,
+            title: title,
+            start: startDateTime,
+            end: endDateTime,
+            resource: {
+              description: meeting.notes || '',
+              location: meeting.location || '',
+              allDay: allDay,
+              meeting: meeting
+            }
+          };
+        });
+        
+        setEvents(prevEvents => {
+          if (append) {
+            const existingIds = new Set(prevEvents.map(e => e.id));
+            const merged = [
+              ...prevEvents,
+              ...transformedEvents.filter(e => !existingIds.has(e.id)),
+            ];
+            return merged.sort((a, b) => a.start - b.start);
+          }
+          return transformedEvents.sort((a, b) => a.start - b.start);
+        });
+
+        setLoadedYears(prevYears => {
+          if (prevYears.includes(targetYear)) return prevYears;
+          return [...prevYears, targetYear];
+        });
+      } catch (err) {
+        console.error('Error fetching meetings:', err);
+        setError(err.message || 'Failed to fetch meetings');
+      } finally {
+        if (showLoader) {
+          setLoading(false);
+        } else {
+          setIsFetching(false);
+        }
+      }
+    },
+    [currentClub]
+  );
+
+  // Reset events when club changes and load current year with full-page spinner once
   useEffect(() => {
-    fetchEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentClub]);
+    const targetYear = new Date().getFullYear();
+    setEvents([]);
+    setLoadedYears([targetYear]);
+    setCurrentDate(new Date());
+    fetchEvents(targetYear, { showLoader: true });
+  }, [currentClub, fetchEvents]);
+
+  // When navigating to a year that hasn't been loaded, fetch and append without blanking the page
+  useEffect(() => {
+    const targetYear = currentDate.getFullYear();
+    if (!loadedYears.includes(targetYear)) {
+      fetchEvents(targetYear, { append: true });
+    }
+  }, [currentDate, loadedYears, fetchEvents]);
 
   const handleViewChange = (event, newView) => {
     if (newView !== null) {
       setView(newView);
+    }
+  };
+
+  const handleListFilterChange = (event, newFilter) => {
+    if (newFilter !== null) {
+      setListFilter(newFilter);
     }
   };
 
@@ -159,7 +213,21 @@ const CalendarComponent = () => {
     return events
       .filter(event => event.start >= now)
       .sort((a, b) => a.start - b.start)
-      .slice(0, 10); // Show next 10 events
+      ;
+  };
+
+  const getPastEvents = () => {
+    const now = new Date();
+    return events
+      .filter(event => event.start < now)
+      .sort((a, b) => b.start - a.start);
+  };
+
+  const handleLoadMorePast = () => {
+    if (loadedYears.length === 0) return;
+    const earliestYear = Math.min(...loadedYears);
+    const previousYear = earliestYear - 1;
+    fetchEvents(previousYear, { append: true });
   };
 
   const eventStyleGetter = (event) => {
@@ -236,6 +304,12 @@ const CalendarComponent = () => {
           </ToggleButtonGroup>
         </Box>
 
+        {isFetching && (
+          <Box sx={{ width: '100%', mb: 2 }}>
+            <LinearProgress />
+          </Box>
+        )}
+
         {view === 'month' ? (
           <Paper sx={{ p: 2, height: isMobile ? '600px' : '600px' }}>
             <Calendar
@@ -256,71 +330,100 @@ const CalendarComponent = () => {
           </Paper>
         ) : (
           <Box>
-            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-              Upcoming Events ({getUpcomingEvents().length})
-            </Typography>
-            {getUpcomingEvents().length === 0 ? (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+                {listFilter === 'upcoming' 
+                  ? `Upcoming Events (${getUpcomingEvents().length})`
+                  : `Past Events (${getPastEvents().length})`}
+              </Typography>
+              <ToggleButtonGroup
+                value={listFilter}
+                exclusive
+                onChange={handleListFilterChange}
+                aria-label="list filter"
+                size="small"
+              >
+                <ToggleButton value="upcoming" aria-label="upcoming events">
+                  Upcoming
+                </ToggleButton>
+                <ToggleButton value="past" aria-label="past events">
+                  Past
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+            {(listFilter === 'upcoming' ? getUpcomingEvents() : getPastEvents()).length === 0 ? (
               <Card>
                 <CardContent sx={{ textAlign: 'center', py: 4 }}>
                   <Typography variant="h6" color="text.secondary">
-                    No upcoming events
+                    {listFilter === 'upcoming' ? 'No upcoming events' : 'No past events'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Check back later for new events!
+                    {listFilter === 'upcoming'
+                      ? 'Check back later for new events!'
+                      : 'Past events will appear here once meetings have occurred.'}
                   </Typography>
                 </CardContent>
               </Card>
             ) : (
-              <List>
-                {getUpcomingEvents().map((event) => (
-                  <ListItem 
-                    key={event.id} 
-                    divider
-                    button
-                    onClick={() => handleEventClick(event)}
-                    sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}
-                  >
-                    <ListItemIcon>
-                      <AccessTime color="primary" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          <Typography variant="subtitle1" fontWeight="medium">
-                            {event.title}
-                          </Typography>
-                          <Chip 
-                            label={formatEventTime(event)} 
-                            size="small" 
-                            color="primary" 
-                            variant="outlined"
-                          />
-                        </Box>
-                      }
-                      secondary={
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">
-                            {formatEventDate(event)}
-                          </Typography>
-                          {event.resource.location && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                              <LocationOn sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                              <Typography variant="caption" color="text.secondary">
-                                {event.resource.location}
-                              </Typography>
-                            </Box>
-                          )}
-                          {event.resource.description && (
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                              {event.resource.description.replace(/\n/g, '<br />').replace(/<[^>]*>?/g, '')}
+              <Box>
+                <List>
+                  {(listFilter === 'upcoming' ? getUpcomingEvents() : getPastEvents()).map((event) => (
+                    <ListItem 
+                      key={event.id} 
+                      divider
+                      button
+                      onClick={() => handleEventClick(event)}
+                      sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}
+                    >
+                      <ListItemIcon>
+                        <AccessTime color="primary" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="subtitle1" fontWeight="medium">
+                              {event.title}
                             </Typography>
-                          )}
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
+                            <Chip 
+                              label={formatEventTime(event)} 
+                              size="small" 
+                              color="primary" 
+                              variant="outlined"
+                            />
+                          </Box>
+                        }
+                        secondary={
+                          <Box>
+                            <Typography variant="body2" color="text.secondary">
+                              {formatEventDate(event)}
+                            </Typography>
+                            {event.resource.location && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                                <LocationOn sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
+                                <Typography variant="caption" color="text.secondary">
+                                  {event.resource.location}
+                                </Typography>
+                              </Box>
+                            )}
+                            {event.resource.description && (
+                              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                                {event.resource.description.replace(/\n/g, '<br />').replace(/<[^>]*>?/g, '')}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+                {listFilter === 'past' && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Button variant="outlined" onClick={handleLoadMorePast} disabled={isFetching}>
+                      Load previous year
+                    </Button>
+                  </Box>
+                )}
+              </Box>
             )}
           </Box>
         )}

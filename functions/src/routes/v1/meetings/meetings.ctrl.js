@@ -11,7 +11,7 @@ const verifyOwnership = async (clubId, userId) => {
 // GET /v1/meetings - Get all meetings
 const getMeetings = async (req, res, next) => {
   try {
-    const {clubId, userId, startDate} = req.query;
+    const {clubId, userId, startDate, endDate} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
@@ -21,10 +21,18 @@ const getMeetings = async (req, res, next) => {
     // Build where clause
     const whereClause = {clubId: parseInt(clubId)};
 
-    // Filter by startDate if provided (default to today)
-    if (startDate) {
+    // Filter by date range if provided (defaults to upcoming only)
+    if (startDate && endDate) {
+      whereClause.date = {
+        [db.Op.between]: [startDate, endDate],
+      };
+    } else if (startDate) {
       whereClause.date = {
         [db.Op.gte]: startDate,
+      };
+    } else if (endDate) {
+      whereClause.date = {
+        [db.Op.lte]: endDate,
       };
     } else {
       // Default to today if no startDate provided

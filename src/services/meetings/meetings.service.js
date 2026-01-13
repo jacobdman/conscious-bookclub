@@ -1,13 +1,21 @@
 import { apiCall } from '../apiHelpers';
 
 // Meetings functions
-export const getMeetings = async (clubId, userId = null, startDate = null) => {
+export const getMeetings = async (
+  clubId,
+  userId = null,
+  startDate = null,
+  endDate = null
+) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
   if (userId) {
     params.append('userId', userId);
   }
   if (startDate) {
     params.append('startDate', startDate);
+  }
+  if (endDate) {
+    params.append('endDate', endDate);
   }
   const meetings = await apiCall(`/v1/meetings?${params}`);
   return meetings;
