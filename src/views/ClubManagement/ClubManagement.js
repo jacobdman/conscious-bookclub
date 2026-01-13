@@ -20,8 +20,21 @@ import {
   Alert,
   CircularProgress,
   Stack,
+  Checkbox,
 } from '@mui/material';
-import { Delete, Edit, Add, Save, Cancel, ContentCopy, Refresh, Check } from '@mui/icons-material';
+import {
+  Delete,
+  Edit,
+  Add,
+  Save,
+  Cancel,
+  ContentCopy,
+  Refresh,
+  Check,
+  ArrowUpward,
+  ArrowDownward,
+  Restore,
+} from '@mui/icons-material';
 import Layout from 'components/Layout';
 import useClubContext from 'contexts/Club';
 import { useAuth } from 'AuthContext';
@@ -34,6 +47,11 @@ import {
   rotateInviteCode,
 } from 'services/clubs/clubs.service';
 import { useNavigate } from 'react-router-dom';
+import {
+  DASHBOARD_SECTIONS,
+  getDefaultDashboardConfig,
+  sanitizeDashboardConfig,
+} from 'utils/dashboardConfig';
 
 const ClubManagement = () => {
   const { user } = useAuth();
@@ -50,6 +68,8 @@ const ClubManagement = () => {
   const [rotateDialog, setRotateDialog] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [dashboardConfig, setDashboardConfig] = useState(getDefaultDashboardConfig());
+  const [savingDashboard, setSavingDashboard] = useState(false);
 
   const loadMembers = useCallback(async () => {
     if (!currentClub || !user) return;
@@ -70,6 +90,7 @@ const ClubManagement = () => {
   useEffect(() => {
     if (currentClub) {
       setClubName(currentClub.name);
+      setDashboardConfig(sanitizeDashboardConfig(currentClub.dashboardConfig));
       loadMembers();
     }
   }, [currentClub, loadMembers]);
@@ -180,6 +201,54 @@ const ClubManagement = () => {
       setError('Failed to rotate invite code');
       console.error('Error rotating invite code:', err);
       setRotateDialog(false);
+    }
+  };
+
+  const handleToggleSection = (sectionId) => {
+    setDashboardConfig((prev) => {
+      const sanitized = sanitizeDashboardConfig(prev);
+      return sanitized.map((item) =>
+        item.id === sectionId ? {...item, enabled: !item.enabled} : item
+      );
+    });
+  };
+
+  const handleMoveSection = (sectionId, direction) => {
+    setDashboardConfig((prev) => {
+      const sanitized = sanitizeDashboardConfig(prev);
+      const currentIndex = sanitized.findIndex((item) => item.id === sectionId);
+      if (currentIndex === -1) return sanitized;
+
+      const targetIndex = currentIndex + direction;
+      if (targetIndex < 0 || targetIndex >= sanitized.length) {
+        return sanitized;
+      }
+
+      const newConfig = [...sanitized];
+      [newConfig[currentIndex], newConfig[targetIndex]] = [newConfig[targetIndex], newConfig[currentIndex]];
+      return newConfig;
+    });
+  };
+
+  const handleResetDashboard = () => {
+    setDashboardConfig(getDefaultDashboardConfig());
+  };
+
+  const handleSaveDashboard = async () => {
+    if (!currentClub || !user) return;
+
+    try {
+      setSavingDashboard(true);
+      setError(null);
+      const sanitized = sanitizeDashboardConfig(dashboardConfig);
+      await updateClub(currentClub.id, user.uid, {dashboardConfig: sanitized});
+      await refreshClubs();
+      setDashboardConfig(sanitized);
+    } catch (err) {
+      setError('Failed to update dashboard settings');
+      console.error('Error updating dashboard settings:', err);
+    } finally {
+      setSavingDashboard(false);
     }
   };
 
@@ -325,6 +394,83 @@ const ClubManagement = () => {
               </Button>
             </Box>
           </Stack>
+        </Paper>
+
+        {/* Dashboard Section */}
+        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Dashboard</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Re-order or disable dashboard sections. Disabled sections remain in the list but will not show on the dashboard.
+          </Typography>
+          <List sx={{ py: 0 }}>
+            {dashboardConfig.map((section, index) => {
+              const sectionMeta = DASHBOARD_SECTIONS.find(({ id }) => id === section.id);
+              if (!sectionMeta) return null;
+              const enabled = section.enabled !== false;
+
+              return (
+                <ListItem
+                  key={section.id}
+                  sx={{
+                    px: { xs: 0, md: 2 },
+                    py: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <Checkbox
+                    edge="start"
+                    checked={enabled}
+                    onChange={() => handleToggleSection(section.id)}
+                    inputProps={{ 'aria-label': `Toggle ${sectionMeta.label}` }}
+                  />
+                  <ListItemText
+                    primary={sectionMeta.label}
+                    primaryTypographyProps={{ fontSize: { xs: '0.95rem', md: '1rem' } }}
+                    secondary={sectionMeta.description}
+                  />
+                  <ListItemSecondaryAction sx={{ right: { xs: 0, md: 8 } }}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleMoveSection(section.id, -1)}
+                      disabled={index === 0}
+                      aria-label={`Move ${sectionMeta.label} up`}
+                    >
+                      <ArrowUpward fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleMoveSection(section.id, 1)}
+                      disabled={index === dashboardConfig.length - 1}
+                      aria-label={`Move ${sectionMeta.label} down`}
+                    >
+                      <ArrowDownward fontSize="small" />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              );
+            })}
+          </List>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 1 }}>
+            <Button
+              variant="text"
+              startIcon={<Restore />}
+              onClick={handleResetDashboard}
+              size="small"
+            >
+              Reset to Default
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Save />}
+              onClick={handleSaveDashboard}
+              disabled={savingDashboard}
+              size="small"
+            >
+              {savingDashboard ? 'Saving...' : 'Save Dashboard'}
+            </Button>
+          </Box>
         </Paper>
 
         {/* Members Section */}

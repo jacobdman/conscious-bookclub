@@ -1,5 +1,75 @@
 const db = require("../../../../db/models/index");
 
+const DASHBOARD_SECTIONS = [
+  "habitLeaderboard",
+  "nextMeeting",
+  "quote",
+  "quickGoals",
+  "upcomingBooks",
+  "feed",
+];
+
+const DEFAULT_DASHBOARD_CONFIG = DASHBOARD_SECTIONS.map((id) => ({id, enabled: true}));
+
+const coerceArrayConfig = (config) => {
+  // New shape already an array of objects
+  if (Array.isArray(config)) {
+    return config;
+  }
+
+  // Backward compatibility for old {order, sections} shape
+  if (config && (Array.isArray(config.order) || config.sections)) {
+    const order = Array.isArray(config.order) ? config.order : [];
+    const sections = config.sections || {};
+
+    const mapped = order
+        .filter((id) => DASHBOARD_SECTIONS.includes(id))
+        .map((id) => ({
+          id,
+          enabled: typeof sections[id]?.enabled === "boolean" ? sections[id].enabled : true,
+        }));
+
+    DASHBOARD_SECTIONS.forEach((id) => {
+      if (!mapped.find((item) => item.id === id)) {
+        mapped.push({
+          id,
+          enabled: typeof sections[id]?.enabled === "boolean" ? sections[id].enabled : true,
+        });
+      }
+    });
+
+    return mapped;
+  }
+
+  return [];
+};
+
+const sanitizeDashboardConfig = (config = []) => {
+  const arrayConfig = coerceArrayConfig(config);
+  const seen = new Set();
+  const sanitized = [];
+
+  arrayConfig.forEach((item) => {
+    if (!item || !item.id || !DASHBOARD_SECTIONS.includes(item.id)) return;
+    if (seen.has(item.id)) return;
+
+    sanitized.push({
+      id: item.id,
+      enabled: typeof item.enabled === "boolean" ? item.enabled : true,
+    });
+    seen.add(item.id);
+  });
+
+  // Append any missing defaults
+  DEFAULT_DASHBOARD_CONFIG.forEach((section) => {
+    if (!seen.has(section.id)) {
+      sanitized.push({...section});
+    }
+  });
+
+  return sanitized;
+};
+
 // Helper function to verify user is member of club
 const verifyMembership = async (clubId, userId) => {
   const membership = await db.ClubMember.findOne({
@@ -76,6 +146,7 @@ const getUserClubs = async (req, res, next) => {
         id: membership.club.id,
         name: membership.club.name,
         config: membership.club.config || {},
+        dashboardConfig: sanitizeDashboardConfig(membership.club.dashboardConfig),
         role: membership.role,
         createdAt: membership.club.createdAt,
       };
@@ -125,6 +196,7 @@ const getClub = async (req, res, next) => {
       id: club.id,
       name: club.name,
       config: club.config || {},
+      dashboardConfig: sanitizeDashboardConfig(club.dashboardConfig),
       role: membership.role,
       createdAt: club.createdAt,
     };
@@ -224,6 +296,9 @@ const updateClub = async (req, res, next) => {
     }
     if (updates.config !== undefined) {
       club.config = updates.config;
+    }
+    if (updates.dashboardConfig !== undefined) {
+      club.dashboardConfig = sanitizeDashboardConfig(updates.dashboardConfig);
     }
 
     await club.save();

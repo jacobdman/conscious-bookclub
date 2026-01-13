@@ -16,6 +16,11 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.JSONB,
           defaultValue: {},
         },
+        dashboardConfig: {
+          type: DataTypes.JSONB,
+          field: "dashboard_config",
+          defaultValue: [],
+        },
         inviteCode: {
           type: DataTypes.STRING(10),
           field: "invite_code",

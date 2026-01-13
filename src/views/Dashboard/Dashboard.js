@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Button, Grid, Paper } from '@mui/material';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Box, Typography, Button, Paper } from '@mui/material';
 import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -15,6 +15,7 @@ import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
 import QuoteOfWeek from 'components/QuoteOfWeek';
 import { parseLocalDate } from 'utils/dateHelpers';
+import { sanitizeDashboardConfig, isSectionEnabled } from 'utils/dashboardConfig';
 import { useNavigate } from 'react-router-dom';
 import { ArrowForward } from '@mui/icons-material';
 
@@ -23,6 +24,10 @@ const Dashboard = () => {
   const { currentClub } = useClubContext();
   const [currentBooks, setCurrentBooks] = useState([]);
   const navigate = useNavigate();
+  const dashboardConfig = useMemo(
+      () => sanitizeDashboardConfig(currentClub?.dashboardConfig),
+      [currentClub],
+  );
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -117,46 +122,77 @@ const Dashboard = () => {
               {currentClub.name}
             </Typography>
           )}
-          {currentClub && (
-            <HabitConsistencyLeaderboardWithData />
-          )}
-          <NextMeetingCard />
-          
-          <QuickGoalCompletion />
-
-          <Paper 
-                    sx={{ p: 1, textAlign: 'center', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    elevation={1}
-                >
-                    <Button 
-                        fullWidth 
-                        endIcon={<ArrowForward />} 
-                        onClick={() => navigate('/club/goals')}
-                        sx={{ textTransform: 'none', lineHeight: 1.2 }}
-                    >
-                        View Full Goals Report
-                    </Button>
-                </Paper>
-
-          <QuoteOfWeek />
-          
-          <CurrentBooksSection books={currentBooks} />
-
-                <Paper 
-                    sx={{ p: 1, textAlign: 'center', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    elevation={1}
-                >
-                    <Button 
-                        fullWidth 
-                        endIcon={<ArrowForward />} 
-                        onClick={() => navigate('/club/books')}
-                        sx={{ textTransform: 'none', lineHeight: 1.2 }}
-                    >
-                        View Full Book Report
-                    </Button>
-                </Paper>
-
-          <FeedPreview />
+          {dashboardConfig
+              .filter((section) => isSectionEnabled(dashboardConfig, section.id))
+              .map((section) => {
+                const sectionId = section.id;
+                switch (sectionId) {
+                  case 'habitLeaderboard':
+                    return currentClub ? (
+                      <HabitConsistencyLeaderboardWithData key={sectionId} />
+                    ) : null;
+                  case 'nextMeeting':
+                    return <NextMeetingCard key={sectionId} />;
+                  case 'quote':
+                    return <QuoteOfWeek key={sectionId} />;
+                  case 'quickGoals':
+                    return (
+                      <React.Fragment key={sectionId}>
+                        <QuickGoalCompletion />
+                        <Paper
+                          sx={{
+                            p: 1,
+                            textAlign: 'center',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          elevation={1}
+                        >
+                          <Button
+                            fullWidth
+                            endIcon={<ArrowForward />}
+                            onClick={() => navigate('/club/goals')}
+                            sx={{ textTransform: 'none', lineHeight: 1.2 }}
+                          >
+                            View Full Goals Report
+                          </Button>
+                        </Paper>
+                      </React.Fragment>
+                    );
+                  case 'upcomingBooks':
+                    return (
+                      <React.Fragment key={sectionId}>
+                        <CurrentBooksSection books={currentBooks} />
+                        <Paper
+                          sx={{
+                            p: 1,
+                            textAlign: 'center',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          elevation={1}
+                        >
+                          <Button
+                            fullWidth
+                            endIcon={<ArrowForward />}
+                            onClick={() => navigate('/club/books')}
+                            sx={{ textTransform: 'none', lineHeight: 1.2 }}
+                          >
+                            View Full Book Report
+                          </Button>
+                        </Paper>
+                      </React.Fragment>
+                    );
+                  case 'feed':
+                    return <FeedPreview key={sectionId} />;
+                  default:
+                    return null;
+                }
+              })}
         </Box>
       </Layout>
       </FeedProvider>
