@@ -116,6 +116,10 @@ const ClubManagement = () => {
 
   const handleUpdateRole = async (memberUserId, newRole) => {
     if (!currentClub || !user) return;
+    if (currentClub.role !== 'owner') {
+      setError('Only owners can change member roles.');
+      return;
+    }
 
     try {
       await updateMemberRole(currentClub.id, user.uid, memberUserId, newRole);
@@ -179,6 +183,9 @@ const ClubManagement = () => {
     }
   };
 
+  const isOwner = currentClub?.role === 'owner';
+  const canManageClub = ['owner', 'admin'].includes(currentClub?.role);
+
   if (!currentClub) {
     return (
       <Layout>
@@ -189,11 +196,11 @@ const ClubManagement = () => {
     );
   }
 
-  if (currentClub.role !== 'owner') {
+  if (!canManageClub) {
     return (
       <Layout>
         <Box sx={{ p: 3 }}>
-          <Alert severity="error">You must be a club owner to access this page.</Alert>
+          <Alert severity="error">You do not have permission to access this page.</Alert>
         </Box>
       </Layout>
     );
@@ -353,8 +360,11 @@ const ClubManagement = () => {
                       <Select
                         value={member.role}
                         onChange={(e) => handleUpdateRole(member.userId, e.target.value)}
+                        disabled={!isOwner}
                       >
                         <MenuItem value="member">Member</MenuItem>
+                        <MenuItem value="calendar-admin">Calendar Admin</MenuItem>
+                        <MenuItem value="admin">Admin</MenuItem>
                         <MenuItem value="owner">Owner</MenuItem>
                       </Select>
                     </FormControl>
@@ -376,17 +386,19 @@ const ClubManagement = () => {
         </Paper>
 
         {/* Delete Club Section */}
-        <Paper sx={{ p: { xs: 2, md: 3 } }}>
-          <Typography variant="h6" sx={{ mb: 1.5, color: 'error.main', fontSize: { xs: '1rem', md: '1.25rem' } }}>Danger Zone</Typography>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => setDeleteDialog(true)}
-            size="small"
-          >
-            Delete Club
-          </Button>
-        </Paper>
+        {isOwner && (
+          <Paper sx={{ p: { xs: 2, md: 3 } }}>
+            <Typography variant="h6" sx={{ mb: 1.5, color: 'error.main', fontSize: { xs: '1rem', md: '1.25rem' } }}>Danger Zone</Typography>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => setDeleteDialog(true)}
+              size="small"
+            >
+              Delete Club
+            </Button>
+          </Paper>
+        )}
 
         {/* Add Member Dialog */}
         <Dialog open={addMemberDialog} onClose={() => setAddMemberDialog(false)}>

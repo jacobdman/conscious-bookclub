@@ -1,9 +1,13 @@
 const db = require("../../../../db/models/index");
 
-// Helper function to verify user is owner of club
-const verifyOwnership = async (clubId, userId) => {
+// Helper function to verify user can manage meetings (owner, admin, calendar-admin)
+const verifyMeetingAccess = async (clubId, userId) => {
   const membership = await db.ClubMember.findOne({
-    where: {clubId, userId, role: "owner"},
+    where: {
+      clubId,
+      userId,
+      role: {[db.Op.in]: ["owner", "admin", "calendar-admin"]},
+    },
   });
   return membership;
 };
@@ -108,10 +112,10 @@ const createMeeting = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
-    const ownership = await verifyOwnership(parseInt(clubId), userId);
-    if (!ownership) {
-      const error = new Error("Only club owners can create meetings");
+    // Verify meeting access
+    const meetingAccess = await verifyMeetingAccess(parseInt(clubId), userId);
+    if (!meetingAccess) {
+      const error = new Error("Only club owners, admins, or calendar admins can create meetings");
       error.status = 403;
       throw error;
     }
@@ -164,10 +168,10 @@ const updateMeeting = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
-    const ownership = await verifyOwnership(parseInt(clubId), userId);
-    if (!ownership) {
-      const error = new Error("Only club owners can update meetings");
+    // Verify meeting access
+    const meetingAccess = await verifyMeetingAccess(parseInt(clubId), userId);
+    if (!meetingAccess) {
+      const error = new Error("Only club owners, admins, or calendar admins can update meetings");
       error.status = 403;
       throw error;
     }

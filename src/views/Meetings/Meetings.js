@@ -84,11 +84,13 @@ const Meetings = () => {
     );
   }
 
-  if (currentClub.role !== 'owner') {
+  const canAccessMeetings = ['owner', 'admin', 'calendar-admin'].includes(currentClub.role);
+
+  if (!canAccessMeetings) {
     return (
       <Layout>
         <Box sx={{ p: 3 }}>
-          <Alert severity="error">You must be a club owner to access this page.</Alert>
+          <Alert severity="error">You do not have permission to access meetings.</Alert>
         </Box>
       </Layout>
     );

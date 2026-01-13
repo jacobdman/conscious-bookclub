@@ -16,6 +16,14 @@ const verifyOwnership = async (clubId, userId) => {
   return membership;
 };
 
+// Helper function to verify user can manage club (owner or admin)
+const verifyManageAccess = async (clubId, userId) => {
+  const membership = await db.ClubMember.findOne({
+    where: {clubId, userId, role: {[db.Op.in]: ["owner", "admin"]}},
+  });
+  return membership;
+};
+
 // Helper function to generate a unique 10-character alphanumeric invite code
 const generateInviteCode = async () => {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -72,8 +80,8 @@ const getUserClubs = async (req, res, next) => {
         createdAt: membership.club.createdAt,
       };
 
-      // Only include invite code for owners
-      if (membership.role === "owner") {
+      // Only include invite code for owners/admins
+      if (["owner", "admin"].includes(membership.role)) {
         clubData.inviteCode = membership.club.inviteCode;
       }
 
@@ -121,8 +129,8 @@ const getClub = async (req, res, next) => {
       createdAt: club.createdAt,
     };
 
-    // Only include invite code for owners
-    if (membership.role === "owner") {
+    // Only include invite code for owners/admins
+    if (["owner", "admin"].includes(membership.role)) {
       response.inviteCode = club.inviteCode;
     }
 
@@ -195,10 +203,10 @@ const updateClub = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
-    const ownership = await verifyOwnership(parseInt(clubId), userId);
-    if (!ownership) {
-      const error = new Error("Only club owners can update club settings");
+    // Verify manage access
+    const manageAccess = await verifyManageAccess(parseInt(clubId), userId);
+    if (!manageAccess) {
+      const error = new Error("Only club owners or admins can update club settings");
       error.status = 403;
       throw error;
     }
@@ -245,10 +253,10 @@ const addClubMember = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
-    const ownership = await verifyOwnership(parseInt(clubId), userId);
-    if (!ownership) {
-      const error = new Error("Only club owners can add members");
+    // Verify manage access
+    const manageAccess = await verifyManageAccess(parseInt(clubId), userId);
+    if (!manageAccess) {
+      const error = new Error("Only club owners or admins can add members");
       error.status = 403;
       throw error;
     }
@@ -301,10 +309,10 @@ const removeClubMember = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
-    const ownership = await verifyOwnership(parseInt(clubId), userId);
-    if (!ownership) {
-      const error = new Error("Only club owners can remove members");
+    // Verify manage access
+    const manageAccess = await verifyManageAccess(parseInt(clubId), userId);
+    if (!manageAccess) {
+      const error = new Error("Only club owners or admins can remove members");
       error.status = 403;
       throw error;
     }
@@ -351,13 +359,13 @@ const updateMemberRole = async (req, res, next) => {
       throw error;
     }
 
-    if (!role || !["member", "owner"].includes(role)) {
-      const error = new Error("Invalid role. Must be 'member' or 'owner'");
+    if (!role || !["member", "calendar-admin", "admin", "owner"].includes(role)) {
+      const error = new Error("Invalid role. Must be 'member', 'calendar-admin', 'admin', or 'owner'");
       error.status = 400;
       throw error;
     }
 
-    // Verify ownership
+    // Verify ownership (role changes remain owner-only)
     const ownership = await verifyOwnership(parseInt(clubId), userId);
     if (!ownership) {
       const error = new Error("Only club owners can update member roles");
@@ -496,10 +504,10 @@ const rotateInviteCode = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
-    const ownership = await verifyOwnership(parseInt(clubId), userId);
-    if (!ownership) {
-      const error = new Error("Only club owners can rotate invite codes");
+    // Verify manage access
+    const manageAccess = await verifyManageAccess(parseInt(clubId), userId);
+    if (!manageAccess) {
+      const error = new Error("Only club owners or admins can rotate invite codes");
       error.status = 403;
       throw error;
     }
@@ -538,7 +546,7 @@ const deleteClub = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
+    // Verify ownership (delete remains owner-only)
     const ownership = await verifyOwnership(parseInt(clubId), userId);
     if (!ownership) {
       const error = new Error("Only club owners can delete clubs");
@@ -580,10 +588,10 @@ const linkPendingRequest = async (req, res, next) => {
       throw error;
     }
 
-    // Verify ownership
-    const ownership = await verifyOwnership(parseInt(clubId), userId);
-    if (!ownership) {
-      const error = new Error("Only club owners can link pending requests");
+    // Verify manage access
+    const manageAccess = await verifyManageAccess(parseInt(clubId), userId);
+    if (!manageAccess) {
+      const error = new Error("Only club owners or admins can link pending requests");
       error.status = 403;
       throw error;
     }

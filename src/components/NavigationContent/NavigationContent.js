@@ -37,10 +37,16 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
   }, []);
 
   // Organize menu items into logical groups
-  const clubManagementItems = currentClub?.role === 'owner' ? [
-    { name: 'Manage Club', path: '/club/manage' },
-    { name: 'Meetings', path: '/meetings' },
-  ] : [];
+  const canManageClub = ['owner', 'admin'].includes(currentClub?.role);
+  const canManageMeetings = ['owner', 'admin', 'calendar-admin'].includes(currentClub?.role);
+
+  const clubManagementItems = [];
+  if (canManageClub) {
+    clubManagementItems.push({ name: 'Manage Club', path: '/club/manage' });
+  }
+  if (canManageMeetings) {
+    clubManagementItems.push({ name: 'Meetings', path: '/meetings' });
+  }
 
   const mainNavigationItems = [
     { name: 'Dashboard', path: '/' },
