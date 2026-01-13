@@ -63,6 +63,43 @@ export const deleteProfilePicture = async (imageUrl) => {
 };
 
 /**
+ * Upload multiple post images to Firebase Storage
+ * @param {number|string} clubId - Club ID for namespacing paths
+ * @param {string} userId - Authenticated user ID
+ * @param {File[]} files - Array of image files
+ * @param {object} options - Optional overrides (maxCount, maxSizeMb)
+ * @returns {Promise<string[]>} Download URLs for uploaded images
+ */
+export const uploadPostImages = async (clubId, userId, files, options = {}) => {
+  const maxCount = options.maxCount || 5;
+  const maxSizeMb = options.maxSizeMb || 5;
+  const maxSizeBytes = maxSizeMb * 1024 * 1024;
+
+  if (!Array.isArray(files) || files.length === 0) return [];
+  if (!clubId || !userId) throw new Error('Missing club or user for uploads');
+
+  const limitedFiles = files.slice(0, maxCount);
+  const uploadTasks = limitedFiles.map(async (file, index) => {
+    if (!file.type?.startsWith('image/')) {
+      throw new Error('All files must be images');
+    }
+    if (file.size > maxSizeBytes) {
+      throw new Error(`Images must be under ${maxSizeMb}MB`);
+    }
+
+    const fileNameSafe = file.name?.replace(/\s+/g, '_') || `image_${index}`;
+    const storageRef = ref(
+      storage,
+      `posts/${clubId}/${userId}/${Date.now()}_${index}_${fileNameSafe}`,
+    );
+    const snapshot = await uploadBytes(storageRef, file);
+    return getDownloadURL(snapshot.ref);
+  });
+
+  return Promise.all(uploadTasks);
+};
+
+/**
  * Get download URL for any file in Firebase Storage
  * @param {string} filePath - Path to the file (e.g., "landing_images/dashboard.png")
  * @returns {Promise<string>} The download URL of the file

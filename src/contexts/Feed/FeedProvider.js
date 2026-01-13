@@ -355,6 +355,7 @@ const FeedProvider = ({ children }) => {
       isSpoiler: postData.isSpoiler || false,
       isOptimistic: true,
       tempId: tempId, // Store tempId for matching later
+      images: postData.images || [],
     };
 
     // Add optimistic post to state immediately
@@ -413,6 +414,7 @@ const FeedProvider = ({ children }) => {
       isSpoiler: replyData.isSpoiler || false,
       isOptimistic: true,
       tempId: tempId,
+      images: replyData.images || [],
     };
 
     // Add optimistic reply to state immediately

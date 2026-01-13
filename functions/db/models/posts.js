@@ -43,6 +43,11 @@ module.exports = function(sequelize, DataTypes) {
           allowNull: false,
           defaultValue: false,
         },
+        images: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: [],
+        },
       },
       {
         tableName: "posts",

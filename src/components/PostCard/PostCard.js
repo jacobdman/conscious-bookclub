@@ -155,6 +155,9 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     }
   };
 
+  const postImages = Array.isArray(post.images) ? post.images.filter(Boolean) : [];
+  const showImages = postImages.length > 0 && (!post.isSpoiler || isRevealed);
+
   const renderFullEmojiPicker = () => {
     const emojis = EMOJI_CATEGORIES[activeCategory] || [];
     return (
@@ -378,6 +381,38 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           >
             {post.text}
           </Typography>
+        )}
+
+        {showImages && (
+          <Box sx={{ mt: 0.75 }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 1,
+                gridTemplateColumns: postImages.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+              }}
+            >
+              {postImages.map((url, index) => (
+                <Box
+                  key={`${url}-${index}`}
+                  component="img"
+                  src={url}
+                  alt={`Post image ${index + 1}`}
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    maxHeight: postImages.length === 1 ? 340 : 200,
+                    aspectRatio: postImages.length === 1 ? '4 / 3' : '1 / 1',
+                    objectFit: 'cover',
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    backgroundColor: 'background.default',
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
         )}
 
         {/* Reactions - always show existing reactions, only show + button on hover/tap */}

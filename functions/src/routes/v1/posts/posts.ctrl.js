@@ -10,6 +10,16 @@ if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
 }
 
+const sanitizeImages = (images) => {
+  if (!images) return [];
+  if (!Array.isArray(images)) return [];
+  const maxImages = 5;
+  return images
+      .map((url) => (typeof url === "string" ? url.trim() : ""))
+      .filter((url) => url.length > 0)
+      .slice(0, maxImages);
+};
+
 // Helper function to send push notification
 const sendPushNotification = async (subscription, title, body, data = {}) => {
   try {
@@ -305,12 +315,14 @@ const createPost = async (req, res, next) => {
     }
     const postData = req.body;
     const clubIdInt = parseInt(clubId);
+    const images = sanitizeImages(postData.images);
 
     const post = await db.Post.create({
       ...postData,
       clubId: clubIdInt,
       isSpoiler: postData.isSpoiler || false,
       isActivity: postData.isActivity || false,
+      images,
     });
 
     // Fetch with associations for Socket.io event

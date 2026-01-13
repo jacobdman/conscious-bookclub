@@ -10,21 +10,39 @@ import {
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
-import { Send, KeyboardArrowDown } from '@mui/icons-material';
+import { Send, KeyboardArrowDown, Image as ImageIcon, Close } from '@mui/icons-material';
+import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
 import useFeedContext from 'contexts/Feed';
 import PostCard from 'components/PostCard';
+import { uploadPostImages } from 'services/storage';
 
 const FeedSection = () => {
+  const { user } = useAuth();
+  const { currentClub } = useClubContext();
   const { posts, loading, loadingMore, error, createPost, hasMore, loadMorePosts } = useFeedContext();
   const [newPostText, setNewPostText] = useState('');
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]); // { file, preview }
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const justLoadedMoreRef = useRef(false); // Track if we just loaded older posts
   const previousFirstPostIdRef = useRef(null); // Track first post ID to detect new posts
+  const MAX_IMAGES = 5;
+  const MAX_IMAGE_SIZE_MB = 5;
+  const hasContent = newPostText.trim().length > 0 || selectedFiles.length > 0;
+
+  useEffect(() => {
+    return () => {
+      selectedFiles.forEach(({ preview }) => URL.revokeObjectURL(preview));
+    };
+  }, [selectedFiles]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -141,24 +159,95 @@ const FeedSection = () => {
     };
   }, [posts]); // Re-check when posts change
 
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const remainingSlots = MAX_IMAGES - selectedFiles.length;
+    if (remainingSlots <= 0) {
+      setUploadError(`You can attach up to ${MAX_IMAGES} images`);
+      return;
+    }
+
+    const validFiles = files
+      .filter((file) => file.type?.startsWith('image/'))
+      .slice(0, remainingSlots);
+
+    const oversized = validFiles.find((file) => file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024);
+    if (oversized) {
+      setUploadError(`Images must be under ${MAX_IMAGE_SIZE_MB}MB`);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    const filesWithPreview = validFiles.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+
+    setSelectedFiles((prev) => [...prev, ...filesWithPreview]);
+    setUploadError(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveFile = (index) => {
+    setSelectedFiles((prev) => {
+      const fileToRemove = prev[index];
+      if (fileToRemove?.preview) {
+        URL.revokeObjectURL(fileToRemove.preview);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   const handleCreatePost = async () => {
-    if (!newPostText.trim() || isSubmitting) return;
+    if ((!newPostText.trim() && selectedFiles.length === 0) || isSubmitting) return;
+    if (!user || !currentClub) {
+      setUploadError('You must be signed in to post');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
-      await createPost({ text: newPostText.trim(), isSpoiler });
+      setUploadError(null);
+      let imageUrls = [];
+
+      if (selectedFiles.length > 0) {
+        setUploadingImages(true);
+        imageUrls = await uploadPostImages(
+          currentClub?.id,
+          user?.uid,
+          selectedFiles.map(({ file }) => file),
+          { maxCount: MAX_IMAGES, maxSizeMb: MAX_IMAGE_SIZE_MB },
+        );
+      }
+
+      await createPost({ text: newPostText.trim(), isSpoiler, images: imageUrls });
       setNewPostText('');
       setIsSpoiler(false);
+      selectedFiles.forEach(({ preview }) => URL.revokeObjectURL(preview));
+      setSelectedFiles([]);
       inputRef.current?.focus();
     } catch (err) {
       console.error('Error creating post:', err);
+      setUploadError(err.message || 'Failed to create post');
     } finally {
       setIsSubmitting(false);
+      setUploadingImages(false);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && hasContent) {
       e.preventDefault();
       handleCreatePost();
     }
@@ -281,8 +370,27 @@ const FeedSection = () => {
           zIndex: 10,
         }}
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={handleFileChange}
+        />
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+            <IconButton
+              color="primary"
+              onClick={handleFileButtonClick}
+              disabled={isSubmitting}
+              sx={{
+                backgroundColor: 'action.hover',
+                '&:hover': { backgroundColor: 'action.selected' },
+              }}
+            >
+              <ImageIcon />
+            </IconButton>
             <TextField
               inputRef={inputRef}
               fullWidth
@@ -303,8 +411,8 @@ const FeedSection = () => {
             />
             <IconButton
               color="primary"
-              onClick={handleCreatePost}
-              disabled={!newPostText.trim() || isSubmitting}
+            onClick={handleCreatePost}
+            disabled={!hasContent || isSubmitting}
               sx={{
                 backgroundColor: 'primary.main',
                 color: 'primary.contrastText',
@@ -319,6 +427,61 @@ const FeedSection = () => {
               {isSubmitting ? <CircularProgress size={20} /> : <Send />}
             </IconButton>
           </Box>
+          {selectedFiles.length > 0 && (
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+              {selectedFiles.map(({ preview, file }, index) => (
+                <Box
+                  key={preview}
+                  sx={{
+                    position: 'relative',
+                    width: 88,
+                    height: 88,
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    backgroundColor: 'background.default',
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={preview}
+                    alt={file.name}
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => handleRemoveFile(index)}
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      color: '#fff',
+                      '&:hover': { backgroundColor: 'rgba(0,0,0,0.7)' },
+                    }}
+                  >
+                    <Close fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+          )}
+          {uploadError && (
+            <Typography variant="caption" color="error" sx={{ ml: 0.5 }}>
+              {uploadError}
+            </Typography>
+          )}
+          {uploadingImages && (
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+              Uploading images...
+            </Typography>
+          )}
           <FormControlLabel
             control={
               <Checkbox
