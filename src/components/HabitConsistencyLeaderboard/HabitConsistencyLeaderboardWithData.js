@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -24,22 +24,19 @@ const HabitConsistencyLeaderboardWithData = ({
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Date range state - default to current quarter
-  const [startDate] = useState(() => {
-    if (propStartDate) return propStartDate;
+
+  // Date range state - default to current quarter (UTC anchored)
+  const { startDate, endDate } = useMemo(() => {
     const now = new Date();
-    const quarter = Math.floor(now.getMonth() / 3);
-    return new Date(now.getFullYear(), quarter * 3, 1);
-  });
-  const [endDate] = useState(() => {
-    if (propEndDate) return propEndDate;
-    const now = new Date();
-    const quarter = Math.floor(now.getMonth() / 3);
-    const lastDay = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
-    lastDay.setHours(23, 59, 59, 999);
-    return lastDay;
-  });
+    const quarter = Math.floor(now.getUTCMonth() / 3);
+    const defaultStart = new Date(Date.UTC(now.getUTCFullYear(), quarter * 3, 1, 0, 0, 0, 0));
+    const defaultEnd = new Date(Date.UTC(now.getUTCFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999));
+
+    return {
+      startDate: propStartDate || defaultStart,
+      endDate: propEndDate || defaultEnd,
+    };
+  }, [propStartDate, propEndDate]);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {

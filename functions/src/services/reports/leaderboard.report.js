@@ -5,6 +5,7 @@ const {
   getPreviousPeriodBoundaries,
   calculateHabitWeight,
 } = require("../../../utils/goalHelpers");
+const {Op} = db;
 
 /**
  * Calculates club leaderboard with habit consistency scores and streaks
@@ -62,7 +63,7 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
   }
 
   const now = new Date();
-  const effectiveEndDate = endDate || now;
+  const effectiveEndDate = endDate && endDate < now ? endDate : now;
 
   // Default to last 8 weeks if no date range provided
   const defaultStartDate = (() => {
@@ -93,7 +94,7 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
   const milestoneMetrics = {byMember: []};
 
   // Process each member
-  for (const member of members) {
+  await Promise.all(members.map(async (member) => {
     const memberUserId = member.userId;
 
     // SQL Query 2: Get ALL goals for this member in this club (not just habits)
@@ -131,12 +132,34 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
         consistencyScore: 0,
         streak: 0,
       });
-      continue;
+      return;
     }
+
+    // Prefetch habit entries once per goal for the full effective range
+    const habitEntries = await Promise.all(
+        habitGoals.map(async (goal) => {
+          const entries = await db.GoalEntry.findAll({
+            where: {
+              goalId: goal.id,
+              userId: memberUserId,
+              occurredAt: {
+                [Op.gte]: effectiveStartDate,
+                [Op.lt]: effectiveEndDate,
+              },
+            },
+            order: [["occurred_at", "ASC"]],
+          });
+
+          return {
+            goal,
+            entries: entries.map((entry) => ({id: entry.id, ...entry.toJSON()})),
+          };
+        }),
+    );
 
     // Calculate consistency rate for each habit
     const habitsWithConsistency = await Promise.all(
-        habitGoals.map(async (goal) => {
+        habitEntries.map(async ({goal, entries}) => {
           if (!goal.cadence) {
             return {
               goal,
@@ -146,36 +169,39 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
           }
 
           const periods = [];
-          let currentBoundaries = getPeriodBoundaries(goal.cadence);
+          let currentBoundaries = getPeriodBoundaries(goal.cadence, effectiveEndDate);
 
-          // Start from current period and go back until we're before startDate
-          // CRITICAL: Exclude the current/incomplete period
-          // Only include periods where end <= now (fully completed periods)
+          // If the current period is incomplete, move back one period
+          // so we only score completed periods
+          if (currentBoundaries.end > effectiveEndDate || currentBoundaries.end > now) {
+            currentBoundaries = getPreviousPeriodBoundaries(
+                goal.cadence,
+                currentBoundaries.start,
+            );
+          }
+
           let periodIndex = 0;
           while (currentBoundaries.start >= (effectiveStartDate || new Date(0))) {
           // Only include periods that:
           // 1. Overlap with the date range
-          // 2. Are fully complete (end <= now) - EXCLUDE in-progress periods
+          // 2. Are fully complete (end <= effectiveEndDate && end <= now)
             if (
               currentBoundaries.end > (effectiveStartDate || new Date(0)) &&
             currentBoundaries.start <= effectiveEndDate &&
-            currentBoundaries.end <= now // EXCLUDE incomplete periods
+            currentBoundaries.end <= effectiveEndDate &&
+            currentBoundaries.end <= now
             ) {
-            // SQL Query 3: Get entries for this period
-            // SELECT * FROM goal_entry
-            // WHERE goal_id = ? AND user_id = ?
-            // AND occurred_at >= ? AND occurred_at < ?
-              const entries = await getGoalEntries(
-                  memberUserId,
-                  goal.id,
-                  currentBoundaries.start,
-                  currentBoundaries.end,
-              );
+              const periodStart = currentBoundaries.start;
+              const periodEnd = currentBoundaries.end;
+              const periodEntries = entries.filter((entry) => {
+                const occurredAt = new Date(entry.occurredAt || entry.occurred_at);
+                return occurredAt >= periodStart && occurredAt < periodEnd;
+              });
 
               // Check if period is completed
               const completed = goal.measure === "count" ?
-              entries.length >= goal.targetCount :
-              entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
+              periodEntries.length >= goal.targetCount :
+              periodEntries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
                 parseFloat(goal.targetQuantity);
 
               periods.push({
@@ -331,18 +357,40 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
       completed: completedMilestones,
       total: totalMilestones,
     });
-  }
+  }));
 
   // Sort leaderboard by consistency score (descending)
-  leaderboard.sort((a, b) => b.consistencyScore - a.consistencyScore);
+  leaderboard.sort((a, b) => {
+    if (b.consistencyScore !== a.consistencyScore) {
+      return b.consistencyScore - a.consistencyScore;
+    }
+    const nameA = (a.user.displayName || "").toLowerCase();
+    const nameB = (b.user.displayName || "").toLowerCase();
+    if (nameA === nameB) {
+      return (a.user.uid || a.userId || "").localeCompare(b.user.uid || b.userId || "");
+    }
+    return nameA.localeCompare(nameB);
+  });
   leaderboard.forEach((entry, index) => {
     entry.rank = index + 1;
   });
 
   // Create streak leaderboard (sorted by longest streak)
-  const streakLeaderboard = [...leaderboard].sort((a, b) => b.streak - a.streak);
+  const streakLeaderboard = leaderboard
+      .map((entry) => ({...entry})) // avoid mutating primary leaderboard ranks
+      .sort((a, b) => {
+        if (b.streak !== a.streak) {
+          return b.streak - a.streak;
+        }
+        const nameA = (a.user.displayName || "").toLowerCase();
+        const nameB = (b.user.displayName || "").toLowerCase();
+        if (nameA === nameB) {
+          return (a.user.uid || a.userId || "").localeCompare(b.user.uid || b.userId || "");
+        }
+        return nameA.localeCompare(nameB);
+      });
   streakLeaderboard.forEach((entry, index) => {
-    entry.rank = index + 1;
+    entry.streakRank = index + 1;
   });
 
   // Calculate top performers (uses existing metrics)

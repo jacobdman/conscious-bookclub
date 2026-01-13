@@ -22,6 +22,12 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
     );
   }
 
+  const sortedLeaderboard = [...leaderboard].sort((a, b) => {
+    const rankA = a.rank ?? Number.POSITIVE_INFINITY;
+    const rankB = b.rank ?? Number.POSITIVE_INFINITY;
+    return rankA - rankB;
+  });
+
   const itemWidth = 100; // minWidth of each item
 
   return (
@@ -42,7 +48,8 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
           },
         }}
       >
-      {leaderboard.map((entry) => {
+      {sortedLeaderboard.map((entry, index) => {
+        const rank = entry.rank ?? index + 1;
         return (
           <Box
             key={entry.userId}
@@ -56,7 +63,7 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
             }}
           >
             <Badge
-              badgeContent={getRankLabel(entry.rank)}
+              badgeContent={getRankLabel(rank)}
               color="primary"
               anchorOrigin={{
                 vertical: 'bottom',
