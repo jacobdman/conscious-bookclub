@@ -27,6 +27,17 @@ module.exports = function(sequelize, DataTypes) {
           allowNull: true,
           unique: true,
         },
+        themesEnabled: {
+          type: DataTypes.BOOLEAN,
+          field: "themes_enabled",
+          allowNull: false,
+          defaultValue: true,
+        },
+        themes: {
+          type: DataTypes.JSONB,
+          allowNull: false,
+          defaultValue: ["Classy", "Creative", "Curious"],
+        },
       },
       {
         tableName: "clubs",

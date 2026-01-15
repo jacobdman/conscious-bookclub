@@ -78,6 +78,10 @@ const BookList = () => {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const searchInputRef = useRef(null);
+  const themesEnabled = currentClub?.themesEnabled !== false;
+  const themeOptions = Array.isArray(currentClub?.themes) && currentClub?.themes.length > 0
+    ? currentClub.themes
+    : ['Classy', 'Creative', 'Curious'];
 
   // Load meetings to get discussion dates (keeping this logic for now as it aggregates meetings)
   useEffect(() => {
@@ -104,6 +108,12 @@ const BookList = () => {
 
     loadMeetings();
   }, [currentClub]);
+
+  useEffect(() => {
+    if (!themesEnabled && filters.theme !== 'all') {
+      setFilters({ theme: 'all' });
+    }
+  }, [themesEnabled, filters.theme, setFilters]);
 
   // Handlers
   const handlePageChange = (event, page) => {
@@ -432,21 +442,25 @@ const BookList = () => {
                 }}
             >
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <FormControl sx={{ minWidth: 200 }} size="small">
-                        <InputLabel>Theme Filter</InputLabel>
-                        <Select
-                            value={filters.theme}
-                            onChange={handleThemeChange}
-                            label="Theme Filter"
-                            sx={{ borderRadius: 2 }}
-                        >
-                            <MenuItem value="all">All Themes</MenuItem>
-                            <MenuItem value="Creative">Creative</MenuItem>
-                            <MenuItem value="Curious">Curious</MenuItem>
-                            <MenuItem value="Classy">Classy</MenuItem>
-                            <MenuItem value="no-theme">No Theme</MenuItem>
-                        </Select>
-                    </FormControl>
+                    {themesEnabled && (
+                        <FormControl sx={{ minWidth: 200 }} size="small">
+                            <InputLabel>Theme Filter</InputLabel>
+                            <Select
+                                value={filters.theme}
+                                onChange={handleThemeChange}
+                                label="Theme Filter"
+                                sx={{ borderRadius: 2 }}
+                            >
+                                <MenuItem value="all">All Themes</MenuItem>
+                                {themeOptions.map((themeOption) => (
+                                  <MenuItem key={themeOption} value={themeOption}>
+                                    {themeOption}
+                                  </MenuItem>
+                                ))}
+                                <MenuItem value="no-theme">No Theme</MenuItem>
+                            </Select>
+                        </FormControl>
+                    )}
                 
                     <FormControl sx={{ minWidth: 250 }} size="small">
                         <InputLabel>Book Filter</InputLabel>

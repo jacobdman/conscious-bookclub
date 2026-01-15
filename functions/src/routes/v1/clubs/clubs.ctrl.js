@@ -10,6 +10,7 @@ const DASHBOARD_SECTIONS = [
 ];
 
 const DEFAULT_DASHBOARD_CONFIG = DASHBOARD_SECTIONS.map((id) => ({id, enabled: true}));
+const DEFAULT_THEMES = ["Classy", "Creative", "Curious"];
 
 const coerceArrayConfig = (config) => {
   // New shape already an array of objects
@@ -68,6 +69,20 @@ const sanitizeDashboardConfig = (config = []) => {
   });
 
   return sanitized;
+};
+
+const normalizeThemes = (themes) => {
+  if (!themes) return [];
+  const rawThemes = Array.isArray(themes) ? themes : [themes];
+  const cleaned = rawThemes
+      .map((theme) => (typeof theme === "string" ? theme.trim() : ""))
+      .filter((theme) => theme.length > 0);
+  return Array.from(new Set(cleaned));
+};
+
+const resolveThemes = (themes) => {
+  const normalized = normalizeThemes(themes);
+  return normalized.length > 0 ? normalized : DEFAULT_THEMES;
 };
 
 // Helper function to verify user is member of club
@@ -147,6 +162,8 @@ const getUserClubs = async (req, res, next) => {
         name: membership.club.name,
         config: membership.club.config || {},
         dashboardConfig: sanitizeDashboardConfig(membership.club.dashboardConfig),
+        themesEnabled: membership.club.themesEnabled !== false,
+        themes: resolveThemes(membership.club.themes),
         role: membership.role,
         createdAt: membership.club.createdAt,
       };
@@ -197,6 +214,8 @@ const getClub = async (req, res, next) => {
       name: club.name,
       config: club.config || {},
       dashboardConfig: sanitizeDashboardConfig(club.dashboardConfig),
+      themesEnabled: club.themesEnabled !== false,
+      themes: resolveThemes(club.themes),
       role: membership.role,
       createdAt: club.createdAt,
     };
@@ -300,8 +319,46 @@ const updateClub = async (req, res, next) => {
     if (updates.dashboardConfig !== undefined) {
       club.dashboardConfig = sanitizeDashboardConfig(updates.dashboardConfig);
     }
+    if (updates.themesEnabled !== undefined) {
+      club.themesEnabled = updates.themesEnabled === true;
+    }
+    if (updates.themes !== undefined) {
+      const sanitizedThemes = normalizeThemes(updates.themes);
+      club.themes = sanitizedThemes;
+    }
+
+    const nextThemesEnabled = club.themesEnabled !== false;
+    const nextThemes = normalizeThemes(club.themes);
+    if (nextThemesEnabled && nextThemes.length === 0) {
+      const error = new Error("At least one theme is required when themes are enabled");
+      error.status = 400;
+      throw error;
+    }
+
+    const previousThemes = normalizeThemes(club._previousDataValues?.themes);
+    const removedThemes = previousThemes.filter((theme) => !nextThemes.includes(theme));
 
     await club.save();
+
+    if (removedThemes.length > 0) {
+      const themeConditions = removedThemes.map((theme) => ({
+        theme: {[db.Op.contains]: [theme]},
+      }));
+      const books = await db.Book.findAll({
+        where: {
+          clubId: parseInt(clubId),
+          [db.Op.or]: themeConditions,
+        },
+      });
+
+      await Promise.all(
+          books.map((book) => {
+            const bookThemes = normalizeThemes(book.theme);
+            const updatedThemes = bookThemes.filter((theme) => !removedThemes.includes(theme));
+            return book.update({theme: updatedThemes});
+          }),
+      );
+    }
 
     res.json({id: club.id, ...club.toJSON()});
   } catch (e) {

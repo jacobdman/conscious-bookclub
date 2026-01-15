@@ -48,12 +48,11 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       let cleanTheme = [];
       if (Array.isArray(editingBook.theme)) {
         cleanTheme = editingBook.theme
-          .map(t => typeof t === 'string' ? t.replace(/^["']|["']$/g, '') : t) // Remove surrounding quotes
-          .filter(t => t && t.trim() !== '') // Remove empty entries
-          .filter(t => ['Creative', 'Curious', 'Classy'].includes(t)); // Only allow valid themes
+          .map(t => typeof t === 'string' ? t.replace(/^["']|["']$/g, '').trim() : '')
+          .filter(t => t && t.trim() !== '');
       } else if (editingBook.theme) {
-        const cleaned = editingBook.theme.replace(/^["']|["']$/g, '');
-        if (['Creative', 'Curious', 'Classy'].includes(cleaned)) {
+        const cleaned = editingBook.theme.replace(/^["']|["']$/g, '').trim();
+        if (cleaned) {
           cleanTheme = [cleaned];
         }
       }
@@ -102,7 +101,10 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
   const [autocompleteLoading, setAutocompleteLoading] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
 
-  const themeOptions = ['Creative', 'Curious', 'Classy'];
+  const themeOptions = Array.isArray(currentClub?.themes) && currentClub?.themes.length > 0
+    ? currentClub.themes
+    : ['Classy', 'Creative', 'Curious'];
+  const themesEnabled = currentClub?.themesEnabled !== false;
   
   const genres = [
     'Personal Development',
@@ -131,9 +133,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     }
   };
 
-  const handleThemeChange = (event) => {
-    const value = event.target.value;
-    setFormData(prev => ({ ...prev, theme: typeof value === 'string' ? value.split(',') : value }));
+  const handleThemeChange = (event, value) => {
+    setFormData(prev => ({ ...prev, theme: value }));
     
     // Clear error when user starts selecting
     if (errors.theme) {
@@ -217,7 +218,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       newErrors.author = 'Author is required';
     }
     
-    if (!formData.theme || formData.theme.length === 0) {
+    if (themesEnabled && (!formData.theme || formData.theme.length === 0)) {
       newErrors.theme = 'At least one theme is required';
     }
     
@@ -419,27 +420,23 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
               disabled={loading}
             />
 
-            <FormControl fullWidth error={!!errors.theme} disabled={loading}>
-              <InputLabel>Theme *</InputLabel>
-              <Select
+            {themesEnabled && (
+              <Autocomplete
                 multiple
+                options={themeOptions}
                 value={formData.theme}
                 onChange={handleThemeChange}
-                label="Theme *"
-                renderValue={(selected) => selected.join(', ')}
-              >
-                {themeOptions.map((theme) => (
-                  <MenuItem key={theme} value={theme}>
-                    {theme}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.theme && (
-                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
-                  {errors.theme}
-                </Typography>
-              )}
-            </FormControl>
+                disabled={loading}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Theme *"
+                    error={!!errors.theme}
+                    helperText={errors.theme}
+                  />
+                )}
+              />
+            )}
 
             <FormControl fullWidth disabled={loading}>
               <InputLabel>Genre</InputLabel>

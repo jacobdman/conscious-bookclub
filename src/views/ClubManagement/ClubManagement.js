@@ -21,6 +21,11 @@ import {
   CircularProgress,
   Stack,
   Checkbox,
+  Autocomplete,
+  Chip,
+  FormControlLabel,
+  Switch,
+  Tooltip,
 } from '@mui/material';
 import {
   Delete,
@@ -34,6 +39,7 @@ import {
   ArrowUpward,
   ArrowDownward,
   Restore,
+  InfoOutlined,
 } from '@mui/icons-material';
 import Layout from 'components/Layout';
 import useClubContext from 'contexts/Club';
@@ -53,6 +59,8 @@ import {
   sanitizeDashboardConfig,
 } from 'utils/dashboardConfig';
 
+const DEFAULT_THEMES = ['Classy', 'Creative', 'Curious'];
+
 const ClubManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -70,6 +78,10 @@ const ClubManagement = () => {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [dashboardConfig, setDashboardConfig] = useState(getDefaultDashboardConfig());
   const [savingDashboard, setSavingDashboard] = useState(false);
+  const [themesEnabled, setThemesEnabled] = useState(true);
+  const [themes, setThemes] = useState(DEFAULT_THEMES);
+  const [savingThemes, setSavingThemes] = useState(false);
+  const [themesInfoOpen, setThemesInfoOpen] = useState(false);
 
   const loadMembers = useCallback(async () => {
     if (!currentClub || !user) return;
@@ -91,6 +103,12 @@ const ClubManagement = () => {
     if (currentClub) {
       setClubName(currentClub.name);
       setDashboardConfig(sanitizeDashboardConfig(currentClub.dashboardConfig));
+      setThemesEnabled(currentClub.themesEnabled ?? true);
+      if (Array.isArray(currentClub.themes) && currentClub.themes.length > 0) {
+        setThemes(currentClub.themes);
+      } else {
+        setThemes(DEFAULT_THEMES);
+      }
       loadMembers();
     }
   }, [currentClub, loadMembers]);
@@ -252,6 +270,39 @@ const ClubManagement = () => {
     }
   };
 
+  const normalizeThemes = (themeList) => {
+    const cleaned = (themeList || [])
+      .map((theme) => (typeof theme === 'string' ? theme.trim() : ''))
+      .filter((theme) => theme.length > 0);
+    return Array.from(new Set(cleaned));
+  };
+
+  const handleSaveThemes = async () => {
+    if (!currentClub || !user) return;
+
+    const sanitizedThemes = normalizeThemes(themes);
+    if (themesEnabled && sanitizedThemes.length === 0) {
+      setError('Add at least one theme or disable themes.');
+      return;
+    }
+
+    try {
+      setSavingThemes(true);
+      setError(null);
+      await updateClub(currentClub.id, user.uid, {
+        themesEnabled,
+        themes: sanitizedThemes,
+      });
+      await refreshClubs();
+      setThemes(sanitizedThemes.length > 0 ? sanitizedThemes : DEFAULT_THEMES);
+    } catch (err) {
+      setError('Failed to update theme settings');
+      console.error('Error updating themes:', err);
+    } finally {
+      setSavingThemes(false);
+    }
+  };
+
   const isOwner = currentClub?.role === 'owner';
   const canManageClub = ['owner', 'admin'].includes(currentClub?.role);
 
@@ -395,6 +446,96 @@ const ClubManagement = () => {
             </Box>
           </Stack>
         </Paper>
+
+        {/* Themes Section */}
+        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
+              Themes
+            </Typography>
+            <Tooltip
+              title="We recommend Classy, Creative, and Curious (self-development, fiction, psychology), but you can add as few or as many themes as you want."
+              placement="top"
+            >
+              <IconButton
+                size="small"
+                aria-label="themes info"
+                onClick={() => setThemesInfoOpen(true)}
+              >
+                <InfoOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enable themes to categorize books and filter the list by theme.
+          </Typography>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={themesEnabled}
+                onChange={(event) => setThemesEnabled(event.target.checked)}
+                disabled={savingThemes}
+              />
+            }
+            label="Enable themes"
+          />
+          {themesEnabled && (
+            <Autocomplete
+              multiple
+              freeSolo
+              clearOnEscape
+              options={[]}
+              value={themes}
+              onChange={(event, value) => setThemes(value)}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip
+                    variant="outlined"
+                    label={option}
+                    {...getTagProps({ index })}
+                    key={option}
+                  />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Themes"
+                  placeholder="Add a theme"
+                  size="small"
+                  sx={{ mt: 2 }}
+                />
+              )}
+            />
+          )}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 2 }}>
+            <Button
+              variant="contained"
+              startIcon={<Save />}
+              onClick={handleSaveThemes}
+              disabled={savingThemes}
+              size="small"
+            >
+              {savingThemes ? 'Saving...' : 'Save Themes'}
+            </Button>
+          </Box>
+        </Paper>
+
+        <Dialog open={themesInfoOpen} onClose={() => setThemesInfoOpen(false)}>
+          <DialogTitle sx={{ pb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>
+            Theme Recommendations
+          </DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            <Typography variant="body2">
+              We recommend Classy, Creative, and Curious (self-development, fiction, psychology), but you can add as few or as many themes as you want.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 2, pb: 2 }}>
+            <Button onClick={() => setThemesInfoOpen(false)} size="small">
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Dashboard Section */}
         <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
