@@ -1,7 +1,10 @@
 import { apiCall } from '../apiHelpers';
 
-export const getQuotes = async (userId, clubId) => {
+export const getQuotes = async (userId, clubId, sort) => {
   const params = new URLSearchParams({ userId, clubId: clubId.toString() });
+  if (sort) {
+    params.set('sort', sort);
+  }
   return apiCall(`/v1/quotes?${params}`);
 };
 
@@ -28,6 +31,20 @@ export const setFeaturedQuote = async (userId, clubId, quoteId) => {
 export const clearFeaturedQuote = async (userId, clubId) => {
   const params = new URLSearchParams({ userId, clubId: clubId.toString() });
   return apiCall(`/v1/quotes/featured?${params}`, {
+    method: 'DELETE',
+  });
+};
+
+export const likeQuote = async (userId, clubId, quoteId) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
+  return apiCall(`/v1/quotes/${quoteId}/like?${params}`, {
+    method: 'POST',
+  });
+};
+
+export const unlikeQuote = async (userId, clubId, quoteId) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
+  return apiCall(`/v1/quotes/${quoteId}/like?${params}`, {
     method: 'DELETE',
   });
 };

@@ -19,7 +19,7 @@ const verifyAdminAccess = async (clubId, userId) => {
   return membership;
 };
 
-const formatQuoteResponse = (quoteInstance) => {
+const formatQuoteResponse = (quoteInstance, {likesCount = 0, isLiked = false} = {}) => {
   const quoteJson = quoteInstance.toJSON();
   const book = quoteJson.book ? {
     id: quoteJson.book.id,
@@ -45,13 +45,46 @@ const formatQuoteResponse = (quoteInstance) => {
     createdBy: quoteJson.createdBy,
     createdAt: quoteJson.createdAt,
     creator,
+    likesCount,
+    isLiked,
   };
+};
+
+const buildLikesSummary = async (quoteIds, userId) => {
+  if (!quoteIds.length) {
+    return {likesByQuoteId: new Map(), likedQuoteIds: new Set()};
+  }
+
+  const likesCounts = await db.QuoteLike.findAll({
+    attributes: [
+      "quoteId",
+      [db.sequelize.fn("COUNT", db.sequelize.col("id")), "count"],
+    ],
+    where: {quoteId: quoteIds},
+    group: ["quote_id"],
+    raw: true,
+  });
+
+  const likesByQuoteId = new Map();
+  likesCounts.forEach((row) => {
+    likesByQuoteId.set(row.quoteId, parseInt(row.count, 10));
+  });
+
+  const likedRows = await db.QuoteLike.findAll({
+    attributes: ["quoteId"],
+    where: {quoteId: quoteIds, userId},
+    raw: true,
+  });
+
+  const likedQuoteIds = new Set(likedRows.map((row) => row.quoteId));
+
+  return {likesByQuoteId, likedQuoteIds};
 };
 
 // GET /v1/quotes?clubId=...&userId=...
 const getQuotes = async (req, res, next) => {
   try {
-    const {clubId, userId} = req.query;
+    const {clubId, userId, sort} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
@@ -87,7 +120,25 @@ const getQuotes = async (req, res, next) => {
       ],
     });
 
-    res.json(quotes.map(formatQuoteResponse));
+    const quoteIds = quotes.map((quote) => quote.id);
+    const {likesByQuoteId, likedQuoteIds} = await buildLikesSummary(quoteIds, userId);
+
+    const response = quotes.map((quote) => formatQuoteResponse(quote, {
+      likesCount: likesByQuoteId.get(quote.id) || 0,
+      isLiked: likedQuoteIds.has(quote.id),
+    }));
+
+    if (sort === "likes_desc") {
+      response.sort((a, b) => b.likesCount - a.likesCount ||
+        new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    if (sort === "likes_asc") {
+      response.sort((a, b) => a.likesCount - b.likesCount ||
+        new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    res.json(response);
   } catch (e) {
     next(e);
   }
@@ -164,7 +215,10 @@ const createQuote = async (req, res, next) => {
       ],
     });
 
-    res.status(201).json(formatQuoteResponse(quoteWithRelations));
+    res.status(201).json(formatQuoteResponse(quoteWithRelations, {
+      likesCount: 0,
+      isLiked: false,
+    }));
   } catch (e) {
     next(e);
   }
@@ -230,7 +284,15 @@ const getFeaturedQuote = async (req, res, next) => {
       return;
     }
 
-    res.json({quote: formatQuoteResponse(featuredQuote), selectedQuoteId});
+    const {likesByQuoteId, likedQuoteIds} = await buildLikesSummary([featuredQuote.id], userId);
+
+    res.json({
+      quote: formatQuoteResponse(featuredQuote, {
+        likesCount: likesByQuoteId.get(featuredQuote.id) || 0,
+        isLiked: likedQuoteIds.has(featuredQuote.id),
+      }),
+      selectedQuoteId,
+    });
   } catch (e) {
     next(e);
   }
@@ -287,7 +349,14 @@ const setFeaturedQuote = async (req, res, next) => {
     const config = {...(club.config || {}), quoteOfWeekId: numericQuoteId};
     await club.update({config});
 
-    res.status(200).json({quote: formatQuoteResponse(quote), selectedQuoteId: numericQuoteId});
+    const {likesByQuoteId, likedQuoteIds} = await buildLikesSummary([quote.id], userId);
+    res.status(200).json({
+      quote: formatQuoteResponse(quote, {
+        likesCount: likesByQuoteId.get(quote.id) || 0,
+        isLiked: likedQuoteIds.has(quote.id),
+      }),
+      selectedQuoteId: numericQuoteId,
+    });
   } catch (e) {
     next(e);
   }
@@ -335,10 +404,132 @@ const clearFeaturedQuote = async (req, res, next) => {
   }
 };
 
+// POST /v1/quotes/:quoteId/like?clubId=...&userId=...
+const addQuoteLike = async (req, res, next) => {
+  try {
+    const {clubId, userId} = req.query;
+    const {quoteId} = req.params;
+
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const numericClubId = parseInt(clubId);
+    const numericQuoteId = parseInt(quoteId);
+
+    const membership = await verifyMembership(numericClubId, userId);
+    if (!membership) {
+      const error = new Error("Club not found or user is not a member");
+      error.status = 404;
+      throw error;
+    }
+
+    const quote = await db.Quote.findOne({
+      where: {id: numericQuoteId, clubId: numericClubId},
+      attributes: ["id"],
+    });
+
+    if (!quote) {
+      const error = new Error("Quote not found in this club");
+      error.status = 404;
+      throw error;
+    }
+
+    const [like, created] = await db.QuoteLike.findOrCreate({
+      where: {quoteId: numericQuoteId, userId},
+      defaults: {quoteId: numericQuoteId, userId},
+    });
+
+    const likesCount = await db.QuoteLike.count({
+      where: {quoteId: numericQuoteId},
+    });
+
+    res.status(created ? 201 : 200).json({
+      quoteId: numericQuoteId,
+      liked: true,
+      likesCount,
+      likeId: like.id,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// DELETE /v1/quotes/:quoteId/like?clubId=...&userId=...
+const removeQuoteLike = async (req, res, next) => {
+  try {
+    const {clubId, userId} = req.query;
+    const {quoteId} = req.params;
+
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const numericClubId = parseInt(clubId);
+    const numericQuoteId = parseInt(quoteId);
+
+    const membership = await verifyMembership(numericClubId, userId);
+    if (!membership) {
+      const error = new Error("Club not found or user is not a member");
+      error.status = 404;
+      throw error;
+    }
+
+    const quote = await db.Quote.findOne({
+      where: {id: numericQuoteId, clubId: numericClubId},
+      attributes: ["id"],
+    });
+
+    if (!quote) {
+      const error = new Error("Quote not found in this club");
+      error.status = 404;
+      throw error;
+    }
+
+    const deleted = await db.QuoteLike.destroy({
+      where: {quoteId: numericQuoteId, userId},
+    });
+
+    if (!deleted) {
+      const error = new Error("Like not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const likesCount = await db.QuoteLike.count({
+      where: {quoteId: numericQuoteId},
+    });
+
+    res.status(200).json({
+      quoteId: numericQuoteId,
+      liked: false,
+      likesCount,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   getQuotes,
   createQuote,
   getFeaturedQuote,
   setFeaturedQuote,
   clearFeaturedQuote,
+  addQuoteLike,
+  removeQuoteLike,
 };

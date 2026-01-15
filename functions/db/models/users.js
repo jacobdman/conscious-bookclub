@@ -80,6 +80,10 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "user_id",
       as: "pushSubscriptions",
     });
+    User.hasMany(models.QuoteLike, {
+      foreignKey: "user_id",
+      as: "quoteLikes",
+    });
   };
 
   return User;

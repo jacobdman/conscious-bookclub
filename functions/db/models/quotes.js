@@ -61,6 +61,10 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "created_by",
       as: "creator",
     });
+    Quote.hasMany(models.QuoteLike, {
+      foreignKey: "quote_id",
+      as: "likes",
+    });
   };
 
   return Quote;

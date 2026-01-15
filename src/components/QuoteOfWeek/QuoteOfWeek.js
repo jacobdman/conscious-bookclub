@@ -1,11 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Box, Button, CircularProgress, Paper, Typography } from '@mui/material';
-import { ArrowForward } from '@mui/icons-material';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  IconButton,
+  Paper,
+  Stack,
+  Typography,
+} from '@mui/material';
+import { ArrowForward, Star, StarBorder } from '@mui/icons-material';
 // Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 // Services
-import { getFeaturedQuote } from 'services/quotes/quotes.service';
+import { getFeaturedQuote, likeQuote, unlikeQuote } from 'services/quotes/quotes.service';
 // Utils
 import { useNavigate } from 'react-router-dom';
 
@@ -16,6 +24,7 @@ const QuoteOfWeek = () => {
 
   const [quoteData, setQuoteData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [liking, setLiking] = useState(false);
   const [error, setError] = useState(null);
 
   const fallbackQuotes = [
@@ -56,6 +65,26 @@ const QuoteOfWeek = () => {
 
   const displayQuote = quoteData || fallbackQuote;
   const usingFallback = !quoteData;
+  const likesCount = quoteData?.likesCount ?? 0;
+
+  const handleToggleLike = async () => {
+    if (!user || !currentClub || !quoteData?.id) return;
+    setLiking(true);
+    try {
+      const response = quoteData.isLiked
+        ? await unlikeQuote(user.uid, currentClub.id, quoteData.id)
+        : await likeQuote(user.uid, currentClub.id, quoteData.id);
+      setQuoteData((prev) => ({
+        ...prev,
+        isLiked: response?.liked ?? !prev?.isLiked,
+        likesCount: response?.likesCount ?? prev?.likesCount ?? 0,
+      }));
+    } catch (err) {
+      console.error('Error updating quote star', err);
+    } finally {
+      setLiking(false);
+    }
+  };
 
   return (
     <Paper
@@ -125,6 +154,27 @@ const QuoteOfWeek = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {displayQuote.book.title}
             </Typography>
+          )}
+          {!usingFallback && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <IconButton
+                  size="small"
+                  onClick={handleToggleLike}
+                  disabled={liking}
+                  aria-label={quoteData?.isLiked ? 'Remove star' : 'Add star'}
+                >
+                  {quoteData?.isLiked ? (
+                    <Star fontSize="small" sx={{ color: 'warning.main' }} />
+                  ) : (
+                    <StarBorder fontSize="small" sx={{ color: 'text.secondary' }} />
+                  )}
+                </IconButton>
+                <Typography variant="caption" color="text.secondary">
+                  {likesCount}
+                </Typography>
+              </Stack>
+            </Box>
           )}
         </Box>
       ) : (
