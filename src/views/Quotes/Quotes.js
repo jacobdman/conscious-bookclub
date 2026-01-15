@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// UI
 import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
-  MenuItem,
   Paper,
   Stack,
   Table,
@@ -14,16 +15,14 @@ import {
   TableRow,
   TextField,
   Typography,
-  Chip,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 // Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 // Components
+import BookSearch from 'components/BookSearch';
 import Layout from 'components/Layout';
 // Services
-import { getBooks } from 'services/books/books.service';
 import {
   clearFeaturedQuote,
   createQuote,
@@ -43,8 +42,8 @@ const Quotes = () => {
   const { currentClub } = useClubContext();
 
   const [quotes, setQuotes] = useState([]);
-  const [books, setBooks] = useState([]);
   const [featuredQuoteId, setFeaturedQuoteId] = useState(null);
+  const [selectedBook, setSelectedBook] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,14 +60,12 @@ const Quotes = () => {
     setLoading(true);
     setError(null);
     try {
-      const [quotesResponse, booksResponse, featuredResponse] = await Promise.all([
+      const [quotesResponse, featuredResponse] = await Promise.all([
         getQuotes(user.uid, currentClub.id),
-        getBooks(currentClub.id),
         getFeaturedQuote(user.uid, currentClub.id),
       ]);
 
       setQuotes(quotesResponse || []);
-      setBooks(Array.isArray(booksResponse) ? booksResponse : []);
       setFeaturedQuoteId(featuredResponse?.selectedQuoteId || null);
     } catch (err) {
       setError('Failed to load quotes');
@@ -85,10 +82,6 @@ const Quotes = () => {
   const handleFormChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const clearBook = () => {
-    setForm((prev) => ({ ...prev, bookId: '' }));
   };
 
   const handleSubmit = async (event) => {
@@ -113,6 +106,7 @@ const Quotes = () => {
       const created = await createQuote(user.uid, currentClub.id, payload);
       setQuotes((prev) => [created, ...prev]);
       setForm(emptyForm);
+      setSelectedBook(null);
       setSuccess('Quote added');
     } catch (err) {
       setError('Failed to add quote');
@@ -185,32 +179,18 @@ const Quotes = () => {
                 label="Quote author (character)"
                 value={form.author}
                 onChange={handleFormChange}
+                helperText="Only add an author if it differs from the book author (e.g., a character) or no book is selected."
                 fullWidth
               />
-              <TextField
-                name="bookId"
-                label="Related book"
-                select
-                value={form.bookId}
-                onChange={handleFormChange}
-                fullWidth
-                InputProps={{
-                  endAdornment: form.bookId ? (
-                    <Button
-                      size="small"
-                      onClick={clearBook}
-                      startIcon={<CloseIcon fontSize="small" />}
-                      sx={{ textTransform: 'none', ml: 1 }}
-                    />
-                  ) : null,
+              <BookSearch
+                value={selectedBook}
+                onChange={(book) => {
+                  setSelectedBook(book);
+                  setForm((prev) => ({ ...prev, bookId: book ? book.id : '' }));
                 }}
-              >
-                {books.map((book) => (
-                  <MenuItem key={book.id} value={book.id}>
-                    {book.title}
-                  </MenuItem>
-                ))}
-              </TextField>
+                label="Related book"
+                placeholder="Search books in this club"
+              />
             </Stack>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button

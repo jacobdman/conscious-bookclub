@@ -1,27 +1,32 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import moment from 'moment-timezone';
+// UI
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Box,
-  FormControl,
   Alert,
-  CircularProgress,
   Autocomplete,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+// Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
+// Components
+import BookSearch from 'components/BookSearch';
+// Services
+import { getBook } from 'services/books/books.service';
 import { createMeeting, updateMeeting } from 'services/meetings/meetings.service';
-import { getBooksPage, getBook } from 'services/books/books.service';
+// Utils
 import { formatLocalDate, parseLocalDate } from 'utils/dateHelpers';
 import { getBrowserTimezone } from 'utils/meetingTime';
-import moment from 'moment-timezone';
 
 const MeetingForm = ({
   open,
@@ -45,62 +50,13 @@ const MeetingForm = ({
 
   const timezoneOptions = useMemo(() => moment.tz.names(), []);
 
-  // Autocomplete state
-  const [books, setBooks] = useState([]);
-  const [loadingBooks, setLoadingBooks] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [selectedBook, setSelectedBook] = useState(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  
-  const searchTimeoutRef = useRef(null);
-  const PAGE_SIZE = 20;
-
-  const fetchBooks = useCallback(async (pageNum, search) => {
-    if (!currentClub) return;
-    try {
-      setLoadingBooks(true);
-      const result = await getBooksPage(
-        currentClub.id,
-        pageNum,
-        PAGE_SIZE,
-        'created_at',
-        'desc',
-        null,
-        null,
-        search
-      );
-      
-      const newBooks = result.books || [];
-      
-      setBooks(prev => pageNum === 1 ? newBooks : [...prev, ...newBooks]);
-      setHasMore(newBooks.length === PAGE_SIZE);
-    } catch (err) {
-      console.error('Error loading books:', err);
-    } finally {
-      setLoadingBooks(false);
-    }
-  }, [currentClub]);
-
-  const getBookLabel = (book) => {
-    if (!book) return '';
-    return `${book.title}${book.author ? ` by ${book.author}` : ''}`;
-  };
 
   useEffect(() => {
     if (open && currentClub) {
-      // Reset state
-      setPage(1);
-      setHasMore(true);
-      setInputValue('');
-      setBooks([]);
-      
-      // Initial fetch
-      fetchBooks(1, '');
-
       if (editingMeeting) {
         setFormData({
           title: editingMeeting.title || '',
@@ -137,34 +93,17 @@ const MeetingForm = ({
         });
         if (initialBook) {
           setSelectedBook(initialBook);
-          setInputValue(getBookLabel(initialBook));
           setFormData((prev) => ({...prev, bookId: initialBook.id}));
-          setBooks((prev) => (
-            prev.some((book) => book.id === initialBook.id) ? prev : [initialBook, ...prev]
-          ));
         } else {
           setSelectedBook(null);
         }
       }
       setError(null);
     }
-  }, [open, editingMeeting, currentClub, fetchBooks, initialBook]);
+  }, [open, editingMeeting, currentClub, initialBook]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSearchChange = (event, newInputValue) => {
-    setInputValue(newInputValue);
-    
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      setPage(1);
-      fetchBooks(1, newInputValue);
-    }, 500);
   };
 
   const handleSave = async () => {
@@ -318,55 +257,13 @@ const MeetingForm = ({
               )}
             />
 
-            <Autocomplete
-              options={books}
-              getOptionLabel={(option) => {
-                if (!option) return '';
-                return `${option.title}${option.author ? ` by ${option.author}` : ''}`;
-              }}
+            <BookSearch
               value={selectedBook}
-              onChange={(event, newValue) => {
+              onChange={(newValue) => {
                 setSelectedBook(newValue);
                 handleInputChange('bookId', newValue ? newValue.id : '');
               }}
-              inputValue={inputValue}
-              onInputChange={handleSearchChange}
-              loading={loadingBooks}
-              ListboxProps={{
-                onScroll: (event) => {
-                  const listboxNode = event.currentTarget;
-                  if (
-                    listboxNode.scrollTop + listboxNode.clientHeight >= listboxNode.scrollHeight - 20 &&
-                    hasMore &&
-                    !loadingBooks
-                  ) {
-                    const nextPage = page + 1;
-                    setPage(nextPage);
-                    fetchBooks(nextPage, inputValue);
-                  }
-                }
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Book (Optional)"
-                  fullWidth
-                  InputProps={{
-                    ...params.InputProps,
-                    endAdornment: (
-                      <React.Fragment>
-                        {loadingBooks ? <CircularProgress color="inherit" size={20} /> : null}
-                        {params.InputProps.endAdornment}
-                      </React.Fragment>
-                    ),
-                  }}
-                />
-              )}
-              renderOption={(props, option) => (
-                <li {...props} key={option.id}>
-                  {option.title} {option.author ? `by ${option.author}` : ''}
-                </li>
-              )}
+              enabled={open}
             />
 
             <TextField
