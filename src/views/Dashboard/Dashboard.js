@@ -58,6 +58,7 @@ const Dashboard = () => {
             const bookData = {
               id: bookId,
               ...meeting.book,
+              chosenForBookclub: true, // If the book is in a meeting, it's chosen for bookclub
               progress: meeting.book.progress || null, // Progress is nested in book.progress
             };
             bookMap.set(bookId, {

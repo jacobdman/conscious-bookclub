@@ -263,7 +263,6 @@ const CurrentBooksSection = ({ books }) => {
                   }
                 </Typography>
               )}
-              
               {!book.chosenForBookclub && (
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
                   Not selected for book club reading yet.
