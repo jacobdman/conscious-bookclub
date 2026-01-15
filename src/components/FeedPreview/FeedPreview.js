@@ -13,6 +13,7 @@ import { ArrowForward } from '@mui/icons-material';
 import useFeedContext from 'contexts/Feed';
 import EmojiInput from 'components/EmojiInput';
 import ReplyQuote from 'components/ReplyQuote';
+import { formatMeetingDisplay } from 'utils/meetingTime';
 
 const FeedPreview = () => {
   const navigate = useNavigate();
@@ -162,7 +163,13 @@ const FeedPreview = () => {
             if (isMeetingActivity) {
               const meeting = post.relatedRecord?.record || {};
               const title = meeting.title || 'Book Club Meeting';
-              previewText = `Meeting: ${title}`;
+              const display = formatMeetingDisplay({
+                date: meeting.date,
+                startTime: meeting.startTime,
+                timezone: meeting.timezone,
+              });
+              const timePart = display.hostTime ? ` · ${display.hostTime}${display.hostLabel ? ` (${display.hostLabel})` : ''}` : '';
+              previewText = `Meeting: ${title}${timePart}`;
             } else if (isBookCompletionActivity) {
               const book = post.relatedRecord?.record || {};
               const actorName = post.authorName || 'A reader';

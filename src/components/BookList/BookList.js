@@ -40,6 +40,7 @@ import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
 import Layout from 'components/Layout';
 import AddBookForm from 'components/AddBookForm';
+import MeetingForm from 'components/MeetingForm';
 import { parseLocalDate } from 'utils/dateHelpers';
 
 const BookList = () => {
@@ -59,6 +60,7 @@ const BookList = () => {
     setFilters,
     setSearch,
     updateBookProgress,
+    updateBook,
     refreshBooks
   } = useBooksContext();
 
@@ -68,6 +70,9 @@ const BookList = () => {
   // Local UI state for button loading
   const [loadingProgress, setLoadingProgress] = useState({});
   const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
+  const [meetingFormOpen, setMeetingFormOpen] = useState(false);
+  const [meetingFormBook, setMeetingFormBook] = useState(null);
+  const [meetingFormPreviousChosen, setMeetingFormPreviousChosen] = useState(false);
 
   // UI Enhancement States
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -223,6 +228,38 @@ const BookList = () => {
 
   const handleBookDeleted = () => {
     handleCloseForm();
+  };
+
+  const canManageMeetings = ['owner', 'admin', 'calendar-admin'].includes(currentClub?.role);
+
+  const handleChooseForReading = async (book) => {
+    if (!canManageMeetings) return;
+
+    try {
+      setMeetingFormPreviousChosen(!!book.chosenForBookclub);
+      await updateBook(book.id, { chosenForBookclub: true });
+      setMeetingFormBook(book);
+      setMeetingFormOpen(true);
+    } catch (error) {
+      console.error('Error choosing book for reading:', error);
+    }
+  };
+
+  const handleMeetingFormClose = async (revertSelection = true) => {
+    if (revertSelection && meetingFormBook && !meetingFormPreviousChosen) {
+      try {
+        await updateBook(meetingFormBook.id, { chosenForBookclub: false });
+      } catch (error) {
+        console.error('Error reverting chosen book:', error);
+      }
+    }
+    setMeetingFormOpen(false);
+    setMeetingFormBook(null);
+    setMeetingFormPreviousChosen(false);
+  };
+
+  const handleMeetingSaved = () => {
+    handleMeetingFormClose(false);
   };
 
   const handleEditBook = (book) => {
@@ -538,33 +575,48 @@ const BookList = () => {
                   <TableCell>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 120 }}>
                       <Chip
-                        label={book.progress?.status === 'finished' ? 'Finished' : 
-                               book.progress?.status === 'reading' ? 'Reading' : 
-                               'Not Started'}
+                        label={!book.chosenForBookclub ?
+                          'Not selected for reading' :
+                          book.progress?.status === 'finished' ? 'Finished' :
+                          book.progress?.status === 'reading' ? 'Reading' :
+                          'Not Started'}
                         size="small"
-                        color={book.progress?.status === 'finished' ? 'success' : 
-                               book.progress?.status === 'reading' ? 'primary' : 
-                               'default'}
-                        variant={book.progress?.status ? "filled" : "outlined"}
+                        color={!book.chosenForBookclub ? 'default' :
+                          book.progress?.status === 'finished' ? 'success' :
+                          book.progress?.status === 'reading' ? 'primary' :
+                          'default'}
+                        variant={!book.chosenForBookclub ? "outlined" : (book.progress?.status ? "filled" : "outlined")}
                       />
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => handleProgressUpdate(book)}
-                        disabled={loadingProgress[book.id]}
-                        sx={{ 
-                            minWidth: 100, 
-                            borderRadius: 5,
-                            textTransform: 'none',
-                            fontSize: '0.75rem'
-                        }}
-                      >
-                        {loadingProgress[book.id] ? (
-                          <CircularProgress size={16} />
-                        ) : (
-                          getButtonText(book)
-                        )}
-                      </Button>
+                      {book.chosenForBookclub && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleProgressUpdate(book)}
+                          disabled={loadingProgress[book.id]}
+                          sx={{ 
+                              minWidth: 100, 
+                              borderRadius: 5,
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
+                          }}
+                        >
+                          {loadingProgress[book.id] ? (
+                            <CircularProgress size={16} />
+                          ) : (
+                            getButtonText(book)
+                          )}
+                        </Button>
+                      )}
+                      {!book.chosenForBookclub && canManageMeetings && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handleChooseForReading(book)}
+                          sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
+                        >
+                          Choose for reading
+                        </Button>
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -639,6 +691,12 @@ const BookList = () => {
         onBookAdded={handleBookAdded}
         onBookDeleted={handleBookDeleted}
         editingBook={editingBook}
+      />
+      <MeetingForm
+        open={meetingFormOpen}
+        onClose={handleMeetingFormClose}
+        onSave={handleMeetingSaved}
+        initialBook={meetingFormBook}
       />
     </Layout>
   );

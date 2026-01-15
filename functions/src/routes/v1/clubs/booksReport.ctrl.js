@@ -40,6 +40,7 @@ const getBooksReport = async (req, res, next) => {
     const pastBooks = await db.Book.findAll({
       where: {
         clubId: parseInt(clubId),
+        chosenForBookclub: true,
         discussionDate: {
           [db.Op.lt]: today,
           [db.Op.ne]: null,

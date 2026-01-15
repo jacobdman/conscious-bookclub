@@ -442,7 +442,7 @@ const getBooksProgress = async (req, res, next) => {
       }
 
       const book = await db.Book.findOne({
-        where: {id: bookIdInt, clubId: parseInt(clubId)},
+        where: {id: bookIdInt, clubId: parseInt(clubId), chosenForBookclub: true},
       });
       if (!book) {
         const error = new Error("Book not found");
@@ -555,6 +555,7 @@ const getBooksProgress = async (req, res, next) => {
     const books = await db.Book.findAll({
       where: {
         clubId: parseInt(clubId),
+        chosenForBookclub: true,
         discussionDate: {
           [db.Op.gte]: today,
         },
@@ -732,7 +733,7 @@ const getTopReaders = async (req, res, next) => {
           model: db.Book,
           as: "book",
           attributes: [], // Don't select any book attributes, just use for filtering
-          where: {clubId: parseInt(clubId)},
+          where: {clubId: parseInt(clubId), chosenForBookclub: true},
           required: true,
         },
       ],

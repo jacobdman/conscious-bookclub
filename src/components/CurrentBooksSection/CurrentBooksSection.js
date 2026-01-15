@@ -264,23 +264,32 @@ const CurrentBooksSection = ({ books }) => {
                 </Typography>
               )}
               
+              {!book.chosenForBookclub && (
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                  Not selected for book club reading yet.
+                </Typography>
+              )}
+
               {/* Progress Update Button */}
-              <Button 
-                variant="outlined" 
-                size="small"
-                onClick={() => handleProgressUpdate(book.id)}
-                disabled={loadingProgress[book.id]}
-                sx={{ mb: 1 }}
-              >
-                {loadingProgress[book.id] ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  getButtonText(book.id)
-                )}
-              </Button>
+              {book.chosenForBookclub && (
+                <Button 
+                  variant="outlined" 
+                  size="small"
+                  onClick={() => handleProgressUpdate(book.id)}
+                  disabled={loadingProgress[book.id]}
+                  sx={{ mb: 1 }}
+                >
+                  {loadingProgress[book.id] ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    getButtonText(book.id)
+                  )}
+                </Button>
+              )}
               
               {/* Percentage Input (shown when reading or finished) */}
-              {(bookProgress[book.id]?.status === 'reading' || bookProgress[book.id]?.status === 'finished') && (
+              {book.chosenForBookclub &&
+                (bookProgress[book.id]?.status === 'reading' || bookProgress[book.id]?.status === 'finished') && (
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   <TextField
                     size="small"

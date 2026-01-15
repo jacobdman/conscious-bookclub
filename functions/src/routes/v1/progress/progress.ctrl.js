@@ -38,6 +38,19 @@ const updateUserBookProgress = async (req, res, next) => {
       throw error;
     }
 
+    const book = await db.Book.findOne({where: {id: bookIdInt}});
+    if (!book) {
+      const error = new Error("Book not found");
+      error.status = 404;
+      throw error;
+    }
+
+    if (!book.chosenForBookclub) {
+      const error = new Error("Book is not selected for club reading");
+      error.status = 403;
+      throw error;
+    }
+
     const existingProgress = await db.BookProgress.findOne({
       where: {userId, bookId: bookIdInt},
     });
@@ -56,8 +69,17 @@ const updateUserBookProgress = async (req, res, next) => {
 
     if (transitionedToFinished) {
       try {
-        const book = await db.Book.findOne({where: {id: bookIdInt}});
-        if (book) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const pastMeeting = await db.Meeting.findOne({
+          where: {
+            bookId: bookIdInt,
+            date: {[db.Op.lt]: today},
+          },
+        });
+
+        if (!pastMeeting) {
           const user = await db.User.findByPk(userId);
           const clubIdInt = book.clubId;
           const userDisplayName = user?.displayName || user?.email || "A reader";

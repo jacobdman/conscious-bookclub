@@ -11,7 +11,8 @@ import {
   ListItemText,
   Chip,
   CircularProgress,
-  Divider
+  Divider,
+  Button
 } from '@mui/material';
 import { getTopReaders } from 'services/books/books.service';
 import { useAuth } from 'AuthContext';
@@ -23,6 +24,8 @@ const FinishedBooksLeaderboard = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [currentUserStats, setCurrentUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -34,17 +37,18 @@ const FinishedBooksLeaderboard = () => {
 
       try {
         setLoading(true);
-        
+
         // Get top 10 users
         const topUsers = await getTopReaders(currentClub.id, 10);
         setLeaderboard(topUsers);
-        
+        setShowAll(false);
+
         // Only show current user separately if they're NOT in the top 3
         if (user) {
           const top3 = topUsers.slice(0, 3);
           const currentUserInTop3 = top3.find(u => u.id === user.uid);
           const currentUserInTop10 = topUsers.find(u => u.id === user.uid);
-          
+
           // Only set currentUserStats if they're in top 10 but NOT in top 3
           if (currentUserInTop10 && !currentUserInTop3) {
             setCurrentUserStats(currentUserInTop10);
@@ -61,6 +65,32 @@ const FinishedBooksLeaderboard = () => {
 
     fetchLeaderboard();
   }, [user, currentClub]);
+
+  const handleShowAll = async () => {
+    if (!currentClub || loadingAll) return;
+
+    try {
+      setLoadingAll(true);
+      const allUsers = await getTopReaders(currentClub.id, 1000);
+      setLeaderboard(allUsers);
+      setShowAll(true);
+
+      if (user) {
+        const top3 = allUsers.slice(0, 3);
+        const currentUserInTop3 = top3.find(u => u.id === user.uid);
+        if (currentUserInTop3) {
+          setCurrentUserStats(null);
+        } else {
+          const currentUser = allUsers.find(u => u.id === user.uid);
+          setCurrentUserStats(currentUser || null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching full leaderboard:', error);
+    } finally {
+      setLoadingAll(false);
+    }
+  };
 
   const getRankIcon = (index) => {
     switch (index) {
@@ -96,7 +126,7 @@ const FinishedBooksLeaderboard = () => {
           </Typography>
         ) : (
           <List>
-            {leaderboard.slice(0, 3).map((userStats, index) => (
+            {(showAll ? leaderboard : leaderboard.slice(0, 3)).map((userStats, index) => (
               <React.Fragment key={userStats.id}>
                 <ListItem sx={{ px: 0 }}>
                   <ListItemAvatar>
@@ -137,12 +167,12 @@ const FinishedBooksLeaderboard = () => {
                     }
                   />
                 </ListItem>
-                {index < 2 && <Divider />}
+                {index < (showAll ? leaderboard.length - 1 : 2) && <Divider />}
               </React.Fragment>
             ))}
             
             {/* Show current user if not in top 3 */}
-            {currentUserStats && (
+            {!showAll && currentUserStats && (
               <>
                 <Divider sx={{ my: 1 }} />
                 <ListItem sx={{ px: 0 }}>
@@ -181,11 +211,21 @@ const FinishedBooksLeaderboard = () => {
           </List>
         )}
         
-        {leaderboard.length > 3 && !currentUserStats && (
+        {leaderboard.length > 3 && !currentUserStats && !showAll && (
           <Box mt={2}>
             <Typography variant="body2" color="text.secondary" textAlign="center">
               ... and {leaderboard.length - 3} more readers
             </Typography>
+            <Box mt={1} display="flex" justifyContent="center">
+              <Button
+                size="small"
+                variant="text"
+                onClick={handleShowAll}
+                disabled={loadingAll}
+              >
+                {loadingAll ? 'Loading...' : 'Show all'}
+              </Button>
+            </Box>
           </Box>
         )}
       </CardContent>

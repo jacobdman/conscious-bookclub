@@ -36,6 +36,12 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.DATEONLY,
           field: "discussion_date",
         },
+        chosenForBookclub: {
+          type: DataTypes.BOOLEAN,
+          field: "chosen_for_bookclub",
+          allowNull: false,
+          defaultValue: false,
+        },
         clubId: {
           type: DataTypes.INTEGER,
           field: "club_id",
