@@ -9,8 +9,7 @@ import {
 } from '@mui/material';
 import { LocationOn, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { useTheme, useMediaQuery } from '@mui/material';
-import moment from 'moment';
-import { parseLocalDate } from 'utils/dateHelpers';
+import { formatMeetingDisplay } from 'utils/meetingTime';
 
 const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
   const scrollRef = useRef(null);
@@ -28,14 +27,28 @@ const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
     };
 
     return meetings.map((meeting) => {
-      const meetingDate = parseLocalDate(meeting.date);
+      const display = formatMeetingDisplay({
+        date: meeting.date,
+        startTime: meeting.startTime,
+        timezone: meeting.timezone,
+      });
+
+      const showViewerTime =
+        display.viewerTime &&
+        (display.viewerDate !== display.hostDate || display.viewerTime !== display.hostTime);
+
       return {
         id: meeting.id,
         title: getMeetingTitle(meeting),
-        start: meetingDate.toISOString(),
         location: meeting.location || '',
         description: meeting.notes || '',
-        allDay: true,
+        hostDate: display.hostDate,
+        hostTime: display.hostTime,
+        hostLabel: display.hostLabel,
+        viewerDate: display.viewerDate,
+        viewerTime: display.viewerTime,
+        hasStartTime: !!meeting.startTime,
+        showViewerTime,
       };
     });
   }, [meetings]);
@@ -93,17 +106,6 @@ const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
       if (frame) cancelAnimationFrame(frame);
     };
   }, [upcomingEvents.length]);
-
-  const formatEventTime = (event) => {
-    if (event.allDay) {
-      return 'All Day';
-    }
-    return moment(event.start).format('h:mm A');
-  };
-
-  const formatEventDate = (event) => {
-    return moment(event.start).format('MMM D, YYYY');
-  };
 
   if (loading) {
     return (
@@ -184,17 +186,25 @@ const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
               <Typography variant="subtitle1" fontWeight="medium">
                 {event.title}
               </Typography>
-              <Chip
-                label={formatEventTime(event)}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
+              {event.hasStartTime && (
+                <Chip
+                  label={`${event.hostTime || ''} ${event.hostLabel ? `(${event.hostLabel})` : ''}`.trim()}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                />
+              )}
             </Box>
 
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {formatEventDate(event)}
+              {event.hostDate}
             </Typography>
+
+            {event.showViewerTime && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Your time: {event.viewerDate} · {event.viewerTime}
+              </Typography>
+            )}
 
             {event.location && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>

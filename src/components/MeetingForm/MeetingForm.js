@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -19,9 +19,17 @@ import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { createMeeting, updateMeeting } from 'services/meetings/meetings.service';
 import { getBooksPage, getBook } from 'services/books/books.service';
-import { formatLocalDate } from 'utils/dateHelpers';
+import { formatLocalDate, parseLocalDate } from 'utils/dateHelpers';
+import { getBrowserTimezone } from 'utils/meetingTime';
+import moment from 'moment-timezone';
 
-const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
+const MeetingForm = ({
+  open,
+  onClose,
+  onSave,
+  editingMeeting = null,
+  initialBook = null,
+}) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [formData, setFormData] = useState({
@@ -32,7 +40,10 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
     location: '',
     bookId: '',
     notes: '',
+    timezone: getBrowserTimezone(),
   });
+
+  const timezoneOptions = useMemo(() => moment.tz.names(), []);
 
   // Autocomplete state
   const [books, setBooks] = useState([]);
@@ -53,12 +64,13 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
     try {
       setLoadingBooks(true);
       const result = await getBooksPage(
-        currentClub.id, 
-        pageNum, 
-        PAGE_SIZE, 
-        'created_at', 
-        'desc', 
-        null, 
+        currentClub.id,
+        pageNum,
+        PAGE_SIZE,
+        'created_at',
+        'desc',
+        null,
+        null,
         search
       );
       
@@ -72,6 +84,11 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
       setLoadingBooks(false);
     }
   }, [currentClub]);
+
+  const getBookLabel = (book) => {
+    if (!book) return '';
+    return `${book.title}${book.author ? ` by ${book.author}` : ''}`;
+  };
 
   useEffect(() => {
     if (open && currentClub) {
@@ -87,12 +104,13 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
       if (editingMeeting) {
         setFormData({
           title: editingMeeting.title || '',
-          date: editingMeeting.date ? new Date(editingMeeting.date) : null,
+          date: editingMeeting.date ? parseLocalDate(editingMeeting.date) : null,
           startTime: editingMeeting.startTime || '',
           duration: editingMeeting.duration || 120,
           location: editingMeeting.location || '',
           bookId: editingMeeting.bookId || '',
           notes: editingMeeting.notes || '',
+          timezone: editingMeeting.timezone || getBrowserTimezone(),
         });
         
         // Handle selected book
@@ -115,12 +133,22 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
           location: '',
           bookId: '',
           notes: '',
+          timezone: getBrowserTimezone(),
         });
-        setSelectedBook(null);
+        if (initialBook) {
+          setSelectedBook(initialBook);
+          setInputValue(getBookLabel(initialBook));
+          setFormData((prev) => ({...prev, bookId: initialBook.id}));
+          setBooks((prev) => (
+            prev.some((book) => book.id === initialBook.id) ? prev : [initialBook, ...prev]
+          ));
+        } else {
+          setSelectedBook(null);
+        }
       }
       setError(null);
     }
-  }, [open, editingMeeting, currentClub, fetchBooks]);
+  }, [open, editingMeeting, currentClub, fetchBooks, initialBook]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -162,6 +190,7 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
         location: formData.location || null,
         bookId: formData.bookId || null,
         notes: formData.notes || null,
+        timezone: formData.timezone || getBrowserTimezone(),
       };
 
       if (editingMeeting) {
@@ -271,6 +300,22 @@ const MeetingForm = ({ open, onClose, onSave, editingMeeting = null }) => {
               value={formData.location}
               onChange={(e) => handleInputChange('location', e.target.value)}
               fullWidth
+            />
+
+            <Autocomplete
+              options={timezoneOptions}
+              value={formData.timezone || ''}
+              onChange={(event, newValue) => {
+                handleInputChange('timezone', newValue || getBrowserTimezone());
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Timezone"
+                  placeholder="Select timezone"
+                  fullWidth
+                />
+              )}
             />
 
             <Autocomplete

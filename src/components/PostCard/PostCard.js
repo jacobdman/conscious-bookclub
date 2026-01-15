@@ -20,7 +20,8 @@ import EmojiInput from 'components/EmojiInput';
 import useFeedContext from 'contexts/Feed';
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
-import { formatSemanticDateTime, formatLocalTime, parseLocalDate } from 'utils/dateHelpers';
+import { formatSemanticDateTime, formatLocalTime } from 'utils/dateHelpers';
+import { formatMeetingDisplay } from 'utils/meetingTime';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
   const { createReply, registerPostRef, addReaction } = useFeedContext();
@@ -162,24 +163,6 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const isMeetingActivity = post.text?.includes('{meeting_post}') && relatedRecord?.type === 'meeting';
   const isBookCompletionActivity = post.text?.includes('{book_completion_post}') && relatedRecord?.type === 'book';
 
-  const buildMeetingDateTime = (meeting) => {
-    const dateValue = meeting?.date;
-    const startTime = meeting?.startTime;
-    const duration = meeting?.duration;
-
-    let dateLabel = '';
-    const parsedDate = dateValue ? parseLocalDate(dateValue) : null;
-    if (parsedDate) {
-      const yearOptions = parsedDate.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' };
-      dateLabel = parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...yearOptions });
-    }
-
-    const timeLabel = startTime ? formatLocalTime(`${dateValue}T${startTime}`) : '';
-    const durationLabel = duration ? `${duration} min` : '';
-
-    return [dateLabel, timeLabel, durationLabel].filter(Boolean).join(' • ');
-  };
-
   const renderMeetingActivity = () => {
     const meetingData = relatedRecord?.record || {};
 
@@ -187,8 +170,15 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     const location = meetingData.location;
     const details = meetingData.notes;
     const meetingBook = meetingData.book;
-    const dateTimeLabel = buildMeetingDateTime(meetingData);
+    const display = formatMeetingDisplay({
+      date: meetingData.date,
+      startTime: meetingData.startTime,
+      timezone: meetingData.timezone,
+    });
     const actionLabel = 'Meeting';
+    const showViewerTime =
+      display.viewerTime &&
+      (display.viewerDate !== display.hostDate || display.viewerTime !== display.hostTime);
 
     return (
       <Box
@@ -207,9 +197,14 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.25 }}>
           {meetingTitle}
         </Typography>
-        {dateTimeLabel && (
+        {(display.hostDate || display.hostTime) && (
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.25 }}>
-            📅 {dateTimeLabel}
+            📅 {display.hostDate}{display.hostTime ? ` · ${display.hostTime}` : ''}{display.hostLabel ? ` (${display.hostLabel})` : ''}
+          </Typography>
+        )}
+        {showViewerTime && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.25 }}>
+            Your time: {display.viewerDate} · {display.viewerTime}
           </Typography>
         )}
         {location && (

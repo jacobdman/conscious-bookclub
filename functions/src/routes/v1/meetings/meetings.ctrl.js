@@ -1,5 +1,22 @@
 const db = require("../../../../db/models/index");
+const moment = require("moment-timezone");
 const {emitToClub, postIncludes, buildPostResponse} = require("../posts/posts.ctrl");
+
+const DEFAULT_TIMEZONE = "UTC";
+
+const isValidTimeZone = (tz) => {
+  if (!tz || typeof tz !== "string") return false;
+  return moment.tz.zone(tz) !== null;
+};
+
+const getMeetingTimezone = async (clubId, providedTz) => {
+  if (isValidTimeZone(providedTz)) return providedTz;
+  if (!clubId) return DEFAULT_TIMEZONE;
+  const club = await db.Club.findByPk(clubId);
+  const configTz = club?.config?.timezone;
+  if (isValidTimeZone(configTz)) return configTz;
+  return DEFAULT_TIMEZONE;
+};
 
 const createMeetingActivityPost = async ({meeting, clubId, userId}) => {
   try {
@@ -156,6 +173,8 @@ const createMeeting = async (req, res, next) => {
       throw error;
     }
 
+    const timezone = await getMeetingTimezone(parseInt(clubId), meetingData.timezone);
+
     const meeting = await db.Meeting.create({
       date: meetingData.date,
       startTime: meetingData.startTime || null,
@@ -165,6 +184,7 @@ const createMeeting = async (req, res, next) => {
       bookId: meetingData.bookId || null,
       notes: meetingData.notes || null,
       clubId: parseInt(clubId),
+      timezone,
     });
 
     // Update book discussion date if book is selected
@@ -234,6 +254,13 @@ const updateMeeting = async (req, res, next) => {
     }
 
     // Update allowed fields
+    let nextTimezone = meeting.timezone;
+
+    if (updates.timezone !== undefined) {
+      nextTimezone = await getMeetingTimezone(parseInt(clubId), updates.timezone);
+      meeting.timezone = nextTimezone;
+    }
+
     if (updates.date !== undefined) {
       meeting.date = updates.date;
     }
@@ -282,25 +309,13 @@ const updateMeeting = async (req, res, next) => {
   }
 };
 
-// Helper function to format date for iCal (YYYYMMDD or YYYYMMDDTHHMMSS)
-// Uses floating time (no timezone) for timed events to preserve local time
-const formatICalDate = (date, isAllDay = true) => {
-  const d = new Date(date);
-  // Use local time components for all parts to maintain consistency
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-
+// Helper function to format date for iCal (YYYYMMDD or with TZID)
+const formatICalDate = (momentObj, tzid, isAllDay = true) => {
   if (isAllDay) {
-    return `${year}${month}${day}`;
+    return `;VALUE=DATE:${momentObj.format("YYYYMMDD")}`;
   }
-
-  // For timed events, use local time components (floating time, no timezone)
-  // This preserves the time as entered by the user
-  const hour = String(d.getHours()).padStart(2, "0");
-  const minute = String(d.getMinutes()).padStart(2, "0");
-  const second = String(d.getSeconds()).padStart(2, "0");
-  return `${year}${month}${day}T${hour}${minute}${second}`;
+  const tzPart = tzid ? `;TZID=${tzid}` : "";
+  return `${tzPart}:${momentObj.format("YYYYMMDDTHHmmss")}`;
 };
 
 // Helper function to escape iCal text (escape commas, semicolons, backslashes, newlines)
@@ -348,32 +363,19 @@ const getMeetingsICal = async (req, res, next) => {
     lines.push("METHOD:PUBLISH");
 
     meetings.forEach((meeting) => {
-      // Parse the date string (YYYY-MM-DD format)
-      const dateParts = meeting.date.split("-").map((v) => parseInt(v, 10));
-      const [year, month, day] = dateParts;
+      const tzid = isValidTimeZone(meeting.timezone) ? meeting.timezone : DEFAULT_TIMEZONE;
 
-      let startDateTime;
-      let endDateTime;
-      let isAllDay = true;
+      // Interpret stored date/startTime in meeting timezone
+      const baseTime = meeting.startTime || "00:00:00";
+      const startMoment = moment.tz(`${meeting.date}T${baseTime}`, tzid);
+      const isAllDay = !meeting.startTime;
 
-      // If startTime is provided, combine date and time using local time
-      if (meeting.startTime) {
-        const timeParts = meeting.startTime.split(":").map((v) => parseInt(v, 10) || 0);
-        const [hours, minutes, seconds] = timeParts;
-
-        // Create date using local time (month is 0-indexed in Date constructor)
-        startDateTime = new Date(year, month - 1, day, hours, minutes, seconds || 0);
-
-        // End time is based on duration (default to 120 minutes / 2 hours if not set)
-        const durationMinutes = meeting.duration || 120;
-        endDateTime = new Date(startDateTime);
-        endDateTime.setMinutes(endDateTime.getMinutes() + durationMinutes);
-
-        isAllDay = false;
+      let endMoment;
+      if (isAllDay) {
+        endMoment = startMoment.clone().add(1, "day");
       } else {
-        // For all-day events, create date at midnight local time
-        startDateTime = new Date(year, month - 1, day, 0, 0, 0);
-        endDateTime = new Date(year, month - 1, day + 1, 0, 0, 0);
+        const durationMinutes = meeting.duration || 120;
+        endMoment = startMoment.clone().add(durationMinutes, "minutes");
       }
 
       // Generate unique ID for the event
@@ -403,11 +405,9 @@ const getMeetingsICal = async (req, res, next) => {
 
       lines.push("BEGIN:VEVENT");
       lines.push(`UID:${uid}`);
-      const dtStartValue = isAllDay ? ";VALUE=DATE" : "";
-      lines.push(`DTSTART${dtStartValue}:${formatICalDate(startDateTime, isAllDay)}`);
-      const dtEndValue = isAllDay ? ";VALUE=DATE" : "";
-      lines.push(`DTEND${dtEndValue}:${formatICalDate(endDateTime, isAllDay)}`);
-      lines.push(`DTSTAMP:${formatICalDate(new Date(), false)}`);
+      lines.push(`DTSTART${formatICalDate(startMoment, isAllDay ? null : tzid, isAllDay)}`);
+      lines.push(`DTEND${formatICalDate(endMoment, isAllDay ? null : tzid, isAllDay)}`);
+      lines.push(`DTSTAMP:${moment.utc().format("YYYYMMDDTHHmmss")}Z`);
       lines.push(`SUMMARY:${escapeICalText(title)}`);
       if (description) {
         lines.push(`DESCRIPTION:${escapeICalText(description)}`);

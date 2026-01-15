@@ -40,6 +40,10 @@ module.exports = function(sequelize, DataTypes) {
           allowNull: true,
           defaultValue: 120, // Default to 2 hours (120 minutes)
         },
+        timezone: {
+          type: DataTypes.STRING(100),
+          allowNull: true,
+        },
       },
       {
         tableName: "meetings",

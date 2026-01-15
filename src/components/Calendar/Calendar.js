@@ -32,6 +32,7 @@ import useClubContext from 'contexts/Club';
 import Layout from 'components/Layout';
 import CalendarSubscription from 'components/CalendarSubscription';
 import { parseLocalDate } from 'utils/dateHelpers';
+import { buildMeetingMoments, getBrowserTimezone } from 'utils/meetingTime';
 
 // Setup moment localizer for react-big-calendar
 const localizer = momentLocalizer(moment);
@@ -89,27 +90,24 @@ const CalendarComponent = () => {
             return 'Book Club Meeting';
           };
 
-          const meetingDate = parseLocalDate(meeting.date);
-          
-          // If startTime is provided, combine date and time
-          let startDateTime = meetingDate;
-          let endDateTime = new Date(meetingDate);
-          let allDay = true;
-          
-          if (meeting.startTime) {
-            // Parse time string (HH:MM:SS or HH:MM)
-            const [hours, minutes] = meeting.startTime.split(':').map(Number);
-            startDateTime = new Date(meetingDate);
-            startDateTime.setHours(hours, minutes || 0, 0, 0);
-            
-            // End time is 2 hours after start (default meeting duration)
+          const moments = buildMeetingMoments({
+            date: meeting.date,
+            startTime: meeting.startTime,
+            timezone: meeting.timezone,
+            fallbackTimezone: getBrowserTimezone(),
+          });
+
+          const baseStart = moments.viewerLocal ? moments.viewerLocal.toDate() : parseLocalDate(meeting.date);
+          let startDateTime = baseStart;
+          let endDateTime = new Date(baseStart);
+          let allDay = !meeting.startTime;
+
+          if (!allDay) {
+            const durationMinutes = meeting.duration || 120;
             endDateTime = new Date(startDateTime);
-            endDateTime.setHours(endDateTime.getHours() + 2);
-            
-            allDay = false;
+            endDateTime.setMinutes(endDateTime.getMinutes() + durationMinutes);
           } else {
-            // For all-day events, use same date for start and end (not next day)
-            endDateTime = new Date(meetingDate);
+            endDateTime = new Date(startDateTime);
             endDateTime.setHours(23, 59, 59, 999);
           }
           
