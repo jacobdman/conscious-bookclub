@@ -3,8 +3,8 @@ const db = require("../../../../db/models/index");
 const DASHBOARD_SECTIONS = [
   "habitLeaderboard",
   "nextMeeting",
-  "quote",
   "quickGoals",
+  "quote",
   "upcomingBooks",
   "feed",
 ];

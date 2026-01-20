@@ -1,8 +1,8 @@
 export const DASHBOARD_SECTIONS = [
   {id: "habitLeaderboard", label: "Habit Leaderboard"},
   {id: "nextMeeting", label: "Next Meeting"},
-  {id: "quote", label: "Quote"},
   {id: "quickGoals", label: "Quick Goals"},
+  {id: "quote", label: "Quote"},
   {id: "upcomingBooks", label: "Upcoming Books"},
   {id: "feed", label: "Feed"},
 ];
