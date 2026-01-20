@@ -169,8 +169,6 @@ const Dashboard = () => {
                         error={meetingsError}
                       />
                     );
-                  case 'quote':
-                    return <QuoteOfWeek key={sectionId} />;
                   case 'quickGoals':
                     return (
                       <React.Fragment key={sectionId}>
@@ -197,6 +195,8 @@ const Dashboard = () => {
                         </Paper>
                       </React.Fragment>
                     );
+                  case 'quote':
+                    return <QuoteOfWeek key={sectionId} />;
                   case 'upcomingBooks':
                     return (
                       <React.Fragment key={sectionId}>

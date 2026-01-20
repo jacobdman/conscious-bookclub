@@ -170,7 +170,7 @@ const updateNotificationPreferences = async (req, res, next) => {
 const updateProfile = async (req, res, next) => {
   try {
     const {userId} = req.params;
-    const {displayName, photoUrl} = req.body;
+    const {displayName, photoUrl, settings} = req.body;
 
     // Verify userId is provided in query for security (user can only update their own profile)
     const requestUserId = req.query.userId;
@@ -201,6 +201,21 @@ const updateProfile = async (req, res, next) => {
     }
     if (photoUrl !== undefined) {
       updateData.photoUrl = photoUrl;
+    }
+    if (settings !== undefined) {
+      if (settings && typeof settings === "object") {
+        const existingSettings = user.settings || {};
+        updateData.settings = {
+          ...existingSettings,
+          ...settings,
+        };
+      } else if (settings === null) {
+        updateData.settings = null;
+      } else {
+        const error = new Error("settings must be an object");
+        error.status = 400;
+        throw error;
+      }
     }
 
     await user.update(updateData);

@@ -2,7 +2,7 @@ import { apiCall } from '../apiHelpers';
 
 // User functions
 export const createUserDocument = async (user) => {
-  await apiCall('/v1/users', {
+  const createdUser = await apiCall('/v1/users', {
     method: 'POST',
     body: JSON.stringify({
       uid: user.uid,
@@ -11,6 +11,7 @@ export const createUserDocument = async (user) => {
       photoURL: user.photoURL,
     }),
   });
+  return createdUser;
 };
 
 export const getUserDocument = async (userId) => {

@@ -40,6 +40,11 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.JSONB,
           field: "notification_settings",
         },
+        settings: {
+          type: DataTypes.JSONB,
+          field: "settings",
+          defaultValue: {},
+        },
       },
       {
         tableName: "users",

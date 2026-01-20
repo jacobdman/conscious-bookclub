@@ -20,6 +20,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const signInWithGoogle = async () => {
@@ -47,9 +48,13 @@ export const AuthProvider = ({ children }) => {
         // If there's a redirect result, handle it
         if (result && result.user) {
           // User signed in via redirect
-          createUserDocument(result.user).catch(() => {
-            // Error creating user document
-          });
+          createUserDocument(result.user)
+            .then((createdUser) => {
+              setUserProfile(createdUser);
+            })
+            .catch(() => {
+              // Error creating user document
+            });
         }
       })
       .catch((error) => {
@@ -73,10 +78,13 @@ export const AuthProvider = ({ children }) => {
       if (user) {
         // Create or update user document
         try {
-          await createUserDocument(user);
+          const createdUser = await createUserDocument(user);
+          setUserProfile(createdUser);
         } catch (error) {
           // Error creating user document
         }
+      } else {
+        setUserProfile(null);
       }
       setUser(user);
       setLoading(false);
@@ -87,6 +95,8 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    userProfile,
+    setUserProfile,
     loading,
     signInWithGoogle,
     logout

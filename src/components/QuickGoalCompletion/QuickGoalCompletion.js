@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -10,6 +10,8 @@ import {
   Alert,
   Chip,
   Divider,
+  Collapse,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -17,8 +19,10 @@ import {
   Button,
   TextField,
 } from '@mui/material';
+import { ExpandMore } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useGoalsContext from 'contexts/Goals';
+import { updateUserProfile } from 'services/users/users.service';
 import {
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
@@ -31,7 +35,7 @@ import {
 } from 'utils/goalHelpers';
 
 const QuickGoalCompletion = () => {
-  const { user } = useAuth();
+  const { user, userProfile, setUserProfile } = useAuth();
   const { 
     goals: allGoals, 
     updateGoal,
@@ -43,6 +47,7 @@ const QuickGoalCompletion = () => {
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState({});
   const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null, quantity: '' });
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Get filtered and sorted goals whenever allGoals changes
   const filteredGoals = useMemo(() => {
@@ -52,6 +57,38 @@ const QuickGoalCompletion = () => {
   }, [allGoals]);
 
   // Goals now include today's entries by default from the API, so no need to fetch them separately
+  useEffect(() => {
+    if (!user) {
+      setIsCollapsed(false);
+      return;
+    }
+
+    const collapsed = userProfile?.settings?.quickGoalCollapsed ?? false;
+    setIsCollapsed(Boolean(collapsed));
+  }, [user, userProfile]);
+
+  const handleCollapseToggle = async () => {
+    const nextCollapsed = !isCollapsed;
+    setIsCollapsed(nextCollapsed);
+
+    if (!user) {
+      return;
+    }
+
+    try {
+      const updatedUser = await updateUserProfile(user.uid, {
+        settings: {
+          quickGoalCollapsed: nextCollapsed,
+        },
+      });
+      if (updatedUser) {
+        setUserProfile(updatedUser);
+      }
+    } catch (saveError) {
+      setIsCollapsed(!nextCollapsed);
+      setError('Failed to save quick goal preference');
+    }
+  };
 
   // Get completion state for a goal
   const getCompletionState = (goal) => {
@@ -289,165 +326,178 @@ const QuickGoalCompletion = () => {
   };
 
 
-  if (error) {
-    return (
-      <Card sx={{ overflow: 'visible' }}>
-        <CardContent>
-          <Alert severity="error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+  const renderGoalsContent = () => {
+    if (error) {
+      return (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      );
+    }
 
-  if (filteredGoals.length === 0) {
+    if (filteredGoals.length === 0) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No goals need attention right now. Great job! 🎉
+        </Typography>
+      );
+    }
+
     return (
-      <Card sx={{ overflow: 'visible' }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Today's Goals
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            No goals need attention right now. Great job! 🎉
-          </Typography>
-        </CardContent>
-      </Card>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {filteredGoals.map((goal, index) => {
+          // Get the latest goal from context to ensure we have current entries
+          const latestGoal = allGoals.find(g => g.id === goal.id) || goal;
+          const isComplete = getCompletionState(latestGoal);
+          const isUpdating = updating[goal.id] || false;
+          const displayItems = getGoalDisplayItems(latestGoal);
+          const progressText = latestGoal.type === 'metric' && latestGoal.progress ? getProgressText(latestGoal, latestGoal.progress) : '';
+          
+          // For milestones, show completed ones first (no checkbox), then next incomplete (with checkbox)
+          // For other goals, show single item with checkbox
+          if (latestGoal.type === 'milestone') {
+            return (
+              <Box key={latestGoal.id}>
+                {displayItems.map((item, itemIndex) => {
+                  const itemComplete = item.completed || false;
+                  const isLastItem = itemIndex === displayItems.length - 1;
+                  const isNextIncomplete = isLastItem && !itemComplete;
+                  
+                  const labelContent = (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          textDecoration: itemComplete ? 'line-through' : 'none',
+                          opacity: itemComplete ? 0.6 : 1,
+                          flex: 1,
+                          ml: itemComplete ? 4 : 0, // Indent completed items
+                        }}
+                      >
+                        {item.text}
+                      </Typography>
+                      {isNextIncomplete && (
+                        <>
+                          <Chip
+                            label={getGoalTypeLabel(latestGoal)}
+                            color={getGoalTypeColor(latestGoal.type)}
+                            size="small"
+                            variant="outlined"
+                          />
+                          {isUpdating && <CircularProgress size={16} />}
+                        </>
+                      )}
+                    </Box>
+                  );
+                  
+                  // Use FormControlLabel only when there's a checkbox, otherwise use Box
+                  if (isNextIncomplete) {
+                    return (
+                      <FormControlLabel
+                        key={itemIndex}
+                        control={
+                          <Checkbox
+                            checked={false}
+                            onChange={() => handleGoalToggle(latestGoal)}
+                            disabled={isUpdating}
+                            color="primary"
+                          />
+                        }
+                        label={labelContent}
+                        sx={{ width: '100%', m: 0 }}
+                      />
+                    );
+                  } else {
+                    return (
+                      <Box key={itemIndex} sx={{ display: 'flex', alignItems: 'center', width: '100%', m: 0 }}>
+                        {labelContent}
+                      </Box>
+                    );
+                  }
+                })}
+                {index < filteredGoals.length - 1 && <Divider sx={{ my: 0.5 }} />}
+              </Box>
+            );
+          }
+          
+          // For non-milestone goals, show single item
+          return (
+            <Box key={latestGoal.id}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isComplete}
+                    onChange={() => handleGoalToggle(latestGoal)}
+                    disabled={isUpdating}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        textDecoration: isComplete ? 'line-through' : 'none',
+                        opacity: isComplete ? 0.6 : 1,
+                        flex: 1
+                      }}
+                    >
+                      {getGoalDisplayText(latestGoal)}
+                      {progressText && (
+                        <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                          ({progressText})
+                        </Typography>
+                      )}
+                    </Typography>
+                    <Chip
+                      label={getGoalTypeLabel(latestGoal)}
+                      color={getGoalTypeColor(latestGoal.type)}
+                      size="small"
+                      variant="outlined"
+                    />
+                    {isUpdating && <CircularProgress size={16} />}
+                  </Box>
+                }
+                sx={{ width: '100%', m: 0 }}
+              />
+              {index < filteredGoals.length - 1 && <Divider sx={{ my: 0.5 }} />}
+            </Box>
+          );
+        })}
+      </Box>
     );
-  }
+  };
 
   return (
     <>
       <Card sx={{ overflow: 'visible' }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Today's Goals
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Track your progress for today
-          </Typography>
-          
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {filteredGoals.map((goal, index) => {
-              // Get the latest goal from context to ensure we have current entries
-              const latestGoal = allGoals.find(g => g.id === goal.id) || goal;
-              const isComplete = getCompletionState(latestGoal);
-              const isUpdating = updating[goal.id] || false;
-              const displayItems = getGoalDisplayItems(latestGoal);
-              const progressText = latestGoal.type === 'metric' && latestGoal.progress ? getProgressText(latestGoal, latestGoal.progress) : '';
-              
-              // For milestones, show completed ones first (no checkbox), then next incomplete (with checkbox)
-              // For other goals, show single item with checkbox
-              if (latestGoal.type === 'milestone') {
-                return (
-                  <Box key={latestGoal.id}>
-                    {displayItems.map((item, itemIndex) => {
-                      const itemComplete = item.completed || false;
-                      const isLastItem = itemIndex === displayItems.length - 1;
-                      const isNextIncomplete = isLastItem && !itemComplete;
-                      
-                      const labelContent = (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              textDecoration: itemComplete ? 'line-through' : 'none',
-                              opacity: itemComplete ? 0.6 : 1,
-                              flex: 1,
-                              ml: itemComplete ? 4 : 0, // Indent completed items
-                            }}
-                          >
-                            {item.text}
-                          </Typography>
-                          {isNextIncomplete && (
-                            <>
-                              <Chip
-                                label={getGoalTypeLabel(latestGoal)}
-                                color={getGoalTypeColor(latestGoal.type)}
-                                size="small"
-                                variant="outlined"
-                              />
-                              {isUpdating && <CircularProgress size={16} />}
-                            </>
-                          )}
-                        </Box>
-                      );
-                      
-                      // Use FormControlLabel only when there's a checkbox, otherwise use Box
-                      if (isNextIncomplete) {
-                        return (
-                          <FormControlLabel
-                            key={itemIndex}
-                            control={
-                              <Checkbox
-                                checked={false}
-                                onChange={() => handleGoalToggle(latestGoal)}
-                                disabled={isUpdating}
-                                color="primary"
-                              />
-                            }
-                            label={labelContent}
-                            sx={{ width: '100%', m: 0 }}
-                          />
-                        );
-                      } else {
-                        return (
-                          <Box key={itemIndex} sx={{ display: 'flex', alignItems: 'center', width: '100%', m: 0 }}>
-                            {labelContent}
-                          </Box>
-                        );
-                      }
-                    })}
-                    {index < filteredGoals.length - 1 && <Divider sx={{ my: 0.5 }} />}
-                  </Box>
-                );
-              }
-              
-              // For non-milestone goals, show single item
-              return (
-                <Box key={latestGoal.id}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={isComplete}
-                        onChange={() => handleGoalToggle(latestGoal)}
-                        disabled={isUpdating}
-                        color="primary"
-                      />
-                    }
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            textDecoration: isComplete ? 'line-through' : 'none',
-                            opacity: isComplete ? 0.6 : 1,
-                            flex: 1
-                          }}
-                        >
-                          {getGoalDisplayText(latestGoal)}
-                          {progressText && (
-                            <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                              ({progressText})
-                            </Typography>
-                          )}
-                        </Typography>
-                        <Chip
-                          label={getGoalTypeLabel(latestGoal)}
-                          color={getGoalTypeColor(latestGoal.type)}
-                          size="small"
-                          variant="outlined"
-                        />
-                        {isUpdating && <CircularProgress size={16} />}
-                      </Box>
-                    }
-                    sx={{ width: '100%', m: 0 }}
-                  />
-                  {index < filteredGoals.length - 1 && <Divider sx={{ my: 0.5 }} />}
-                </Box>
-              );
-            })}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6">
+              Today's Goals
+            </Typography>
+            <IconButton
+              aria-label={isCollapsed ? 'Expand quick goals' : 'Collapse quick goals'}
+              aria-expanded={!isCollapsed}
+              onClick={handleCollapseToggle}
+              size="small"
+            >
+              <ExpandMore
+                sx={{
+                  transform: isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+                  transition: 'transform 0.2s ease',
+                }}
+              />
+            </IconButton>
           </Box>
+          <Collapse in={!isCollapsed}>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Track your progress for today
+              </Typography>
+              {renderGoalsContent()}
+            </Box>
+          </Collapse>
         </CardContent>
       </Card>
 
