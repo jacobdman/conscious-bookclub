@@ -184,6 +184,23 @@ const loadRelatedRecord = async (type, id) => {
       });
       return book ? {id: book.id, ...book.toJSON()} : null;
     }
+
+    if (type === "goal") {
+      const goal = await db.Goal.findByPk(id, {
+        attributes: [
+          "id",
+          "title",
+          "type",
+          "cadence",
+          "targetCount",
+          "targetQuantity",
+          "unit",
+          "clubId",
+          "completedAt",
+        ],
+      });
+      return goal ? {id: goal.id, ...goal.toJSON()} : null;
+    }
   } catch (error) {
     console.error("Failed to load related record", {type, id, error: error.message});
   }

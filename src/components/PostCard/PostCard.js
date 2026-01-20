@@ -162,6 +162,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const relatedRecord = post.relatedRecord || null;
   const isMeetingActivity = post.text?.includes('{meeting_post}') && relatedRecord?.type === 'meeting';
   const isBookCompletionActivity = post.text?.includes('{book_completion_post}') && relatedRecord?.type === 'book';
+  const isGoalCompletionActivity = post.text?.includes('{goal_completion_post}') && relatedRecord?.type === 'goal';
 
   const renderMeetingActivity = () => {
     const meetingData = relatedRecord?.record || {};
@@ -272,6 +273,59 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
             {title}
             {author ? ` by ${author}` : ''}
           </Typography>
+        </Box>
+      </Box>
+    );
+  };
+
+  const renderGoalCompletionActivity = () => {
+    const goalData = relatedRecord?.record || {};
+    const actorName = post.authorName || 'A member';
+    const goalTitle = goalData.title || 'a goal';
+    const goalType = goalData.type ? goalData.type.replace('_', ' ') : 'goal';
+    const cadenceLabel = goalData.cadence ? `${goalData.cadence} ${goalType}` : goalType;
+    let targetLabel = null;
+    if (goalData.type === 'habit' && goalData.targetCount) {
+      targetLabel = `${goalData.targetCount} times`;
+    } else if (goalData.type === 'metric' && goalData.targetQuantity) {
+      targetLabel = `${goalData.targetQuantity} ${goalData.unit || ''}`.trim();
+    }
+
+    return (
+      <Box
+        sx={{
+          backgroundColor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          p: 1.5,
+          mb: 0.5,
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.25 }}>
+          🎉 {actorName} completed a goal
+        </Typography>
+        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+          {goalTitle}
+        </Typography>
+        {cadenceLabel && (
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {cadenceLabel}
+            {targetLabel ? ` · ${targetLabel}` : ''}
+          </Typography>
+        )}
+        <Box sx={{ mt: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleQuickEmoji('🎉');
+            }}
+            sx={{ textTransform: 'none' }}
+          >
+            Celebrate
+          </Button>
         </Box>
       </Box>
     );
@@ -437,6 +491,8 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           renderMeetingActivity()
         ) : isBookCompletionActivity ? (
           renderBookCompletionActivity()
+        ) : isGoalCompletionActivity ? (
+          renderGoalCompletionActivity()
         ) : post.isSpoiler && !isRevealed ? (
           <Box
             onClick={() => {

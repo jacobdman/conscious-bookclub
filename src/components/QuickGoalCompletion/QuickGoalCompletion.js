@@ -21,8 +21,12 @@ import {
 } from '@mui/material';
 import { ExpandMore } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
+import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
+import { createPost } from 'services/posts/posts.service';
 import { updateUserProfile } from 'services/users/users.service';
+import { getGoalProgress } from 'services/goals/goals.service';
 import {
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
@@ -36,6 +40,7 @@ import {
 
 const QuickGoalCompletion = () => {
   const { user, userProfile, setUserProfile } = useAuth();
+  const { currentClub } = useClubContext();
   const { 
     goals: allGoals, 
     updateGoal,
@@ -48,6 +53,7 @@ const QuickGoalCompletion = () => {
   const [updating, setUpdating] = useState({});
   const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null, quantity: '' });
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
 
   // Get filtered and sorted goals whenever allGoals changes
   const filteredGoals = useMemo(() => {
@@ -87,6 +93,58 @@ const QuickGoalCompletion = () => {
     } catch (saveError) {
       setIsCollapsed(!nextCollapsed);
       setError('Failed to save quick goal preference');
+    }
+  };
+
+  const getCompletionLabel = (goal, detail = null) => {
+    const baseLabel = goal?.title || 'this goal';
+    if (detail) {
+      return `${baseLabel}: ${detail}`;
+    }
+    return baseLabel;
+  };
+
+  const openShareDialog = (goal, detail = null) => {
+    setShareDialog({ open: true, goal, label: getCompletionLabel(goal, detail) });
+  };
+
+  const closeShareDialog = () => {
+    setShareDialog({ open: false, goal: null, label: '' });
+  };
+
+  const handleShareConfirm = async () => {
+    if (!user || !currentClub || !shareDialog.goal) {
+      closeShareDialog();
+      return;
+    }
+
+    try {
+      await createPost(currentClub.id, {
+        text: '{goal_completion_post}',
+        isActivity: true,
+        isSpoiler: false,
+        relatedRecordType: 'goal',
+        relatedRecordId: shareDialog.goal.id,
+        authorId: user.uid,
+        authorName: user.displayName || user.email,
+      });
+    } catch (err) {
+      console.error('Failed to share goal completion:', err);
+    } finally {
+      closeShareDialog();
+    }
+  };
+
+  const checkGoalProgressCompletion = async (goal) => {
+    if (!user || !goal) return;
+    const wasCompleted = !!goal.progress?.completed;
+    try {
+      const progress = await getGoalProgress(user.uid, goal.id);
+      if (progress?.completed && !wasCompleted) {
+        openShareDialog(goal);
+      }
+    } catch (err) {
+      console.error('Failed to check goal progress:', err);
     }
   };
 
@@ -136,6 +194,7 @@ const QuickGoalCompletion = () => {
             occurred_at: new Date().toISOString(),
             quantity: null,
           });
+          await checkGoalProgressCompletion(currentGoal);
           // The createEntry function in the provider should update the state
           // The component will re-render when goals state changes
         } else {
@@ -228,6 +287,8 @@ const QuickGoalCompletion = () => {
           return aOrder - bOrder;
         });
         const incompleteMilestone = milestones.find(m => !m.done);
+        const remainingIncomplete = milestones.filter(m => !m.done);
+        const isLastIncomplete = remainingIncomplete.length === 1;
         
         if (incompleteMilestone) {
           // Mark the next incomplete milestone as done
@@ -240,6 +301,9 @@ const QuickGoalCompletion = () => {
           
           const milestoneIdNum = typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
           await updateMilestone(goalId, milestoneIdNum, { done: true });
+          if (isLastIncomplete) {
+            openShareDialog(currentGoal);
+          }
         } else if (isCurrentlyComplete) {
           // If all are done and user unchecks, undo the last completed milestone from today
           const todayBoundaries = getTodayBoundaries();
@@ -302,6 +366,7 @@ const QuickGoalCompletion = () => {
         occurred_at: new Date().toISOString(),
         quantity: quantity,
       });
+      await checkGoalProgressCompletion(goal);
     } catch (err) {
       setError('Failed to create entry');
     } finally {
@@ -522,6 +587,13 @@ const QuickGoalCompletion = () => {
           <Button onClick={handleQuantitySubmit} variant="contained">Add</Button>
         </DialogActions>
       </Dialog>
+
+      <GoalCompletionShareDialog
+        open={shareDialog.open}
+        onClose={closeShareDialog}
+        onConfirm={handleShareConfirm}
+        completionLabel={shareDialog.label}
+      />
     </>
   );
 };

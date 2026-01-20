@@ -158,6 +158,7 @@ const FeedPreview = () => {
             const authorName = post.authorName || post.author?.displayName || 'Unknown';
             const isMeetingActivity = post.text?.includes('{meeting_post}') && post.relatedRecord?.type === 'meeting';
             const isBookCompletionActivity = post.text?.includes('{book_completion_post}') && post.relatedRecord?.type === 'book';
+            const isGoalCompletionActivity = post.text?.includes('{goal_completion_post}') && post.relatedRecord?.type === 'goal';
 
             let previewText = post.text;
             if (isMeetingActivity) {
@@ -175,6 +176,11 @@ const FeedPreview = () => {
               const actorName = post.authorName || 'A reader';
               const bookTitle = book.title || 'a book';
               previewText = `${actorName} finished ${bookTitle}`;
+            } else if (isGoalCompletionActivity) {
+              const goal = post.relatedRecord?.record || {};
+              const actorName = post.authorName || 'A member';
+              const goalTitle = goal.title || 'a goal';
+              previewText = `🎉 ${actorName} completed ${goalTitle}`;
             }
 
             return (

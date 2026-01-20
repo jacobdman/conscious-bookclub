@@ -363,8 +363,12 @@ const GoalsProvider = ({ children }) => {
             return dateB - dateA;
           });
           
+          const normalizedGoal = updatedGoal
+            ? normalizeGoal(updatedGoal, updatedGoal.id, true)
+            : goal;
+
           return {
-            ...normalizeGoal(updatedGoal, updatedGoal.id, true),
+            ...normalizedGoal,
             entries: newEntries,
             entriesPagination: goal.entriesPagination || {
               hasMore: true,

@@ -25,8 +25,12 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
+import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
+import { createPost } from 'services/posts/posts.service';
+import { getGoalProgress } from 'services/goals/goals.service';
 import { 
   getProgressText, 
   getProgressBarValue,
@@ -35,6 +39,7 @@ import {
 
 const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const { user } = useAuth();
+  const { currentClub } = useClubContext();
   const { 
     goals, 
     updateGoal,
@@ -61,6 +66,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     value: null,
     saving: false,
   });
+  const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
   const observerTarget = useRef(null);
   const INITIAL_LIMIT = 10;
   const LOAD_MORE_LIMIT = 10;
@@ -119,6 +125,58 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
   }, [open, goal, fetchGoalEntries]);
 
+  const getCompletionLabel = (goalItem, detail = null) => {
+    const baseLabel = goalItem?.title || 'this goal';
+    if (detail) {
+      return `${baseLabel}: ${detail}`;
+    }
+    return baseLabel;
+  };
+
+  const openShareDialog = (goalItem, detail = null) => {
+    setShareDialog({ open: true, goal: goalItem, label: getCompletionLabel(goalItem, detail) });
+  };
+
+  const closeShareDialog = () => {
+    setShareDialog({ open: false, goal: null, label: '' });
+  };
+
+  const handleShareConfirm = async () => {
+    if (!user || !currentClub || !shareDialog.goal) {
+      closeShareDialog();
+      return;
+    }
+
+    try {
+      await createPost(currentClub.id, {
+        text: '{goal_completion_post}',
+        isActivity: true,
+        isSpoiler: false,
+        relatedRecordType: 'goal',
+        relatedRecordId: shareDialog.goal.id,
+        authorId: user.uid,
+        authorName: user.displayName || user.email,
+      });
+    } catch (err) {
+      console.error('Failed to share goal completion:', err);
+    } finally {
+      closeShareDialog();
+    }
+  };
+
+  const checkGoalProgressCompletion = async (goalItem) => {
+    if (!user || !goalItem) return;
+    const wasCompleted = !!goalItem.progress?.completed;
+    try {
+      const progress = await getGoalProgress(user.uid, goalItem.id);
+      if (progress?.completed && !wasCompleted) {
+        openShareDialog(goalItem);
+      }
+    } catch (err) {
+      console.error('Failed to check goal progress:', err);
+    }
+  };
+
   const handleAddEntry = () => {
     setEntryDialog({ open: true, entry: null, saving: false, error: null });
   };
@@ -149,6 +207,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         await updateEntry(goal.id, entryDialog.entry.id, entryData);
       } else {
         await createEntry(goal.id, entryData);
+        await checkGoalProgressCompletion(goal);
       }
       
       setEntryDialog({ open: false, entry: null, saving: false, error: null });
@@ -245,6 +304,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
 
     const newDoneState = !milestone.done;
+    const remainingIncomplete = (goal.milestones || []).filter(m => !m.done);
+    const isLastIncomplete = newDoneState && remainingIncomplete.length === 1;
 
     try {
       setUpdatingMilestones(prev => ({ ...prev, [milestoneIdNum]: true }));
@@ -252,6 +313,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         done: newDoneState,
         doneAt: newDoneState ? new Date().toISOString() : null
       });
+      if (isLastIncomplete) {
+        openShareDialog(goal);
+      }
     } catch (err) {
       console.error('Failed to update milestone:', err);
     } finally {
@@ -697,6 +761,13 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
           </DialogActions>
         </Dialog>
       </LocalizationProvider>
+
+      <GoalCompletionShareDialog
+        open={shareDialog.open}
+        onClose={closeShareDialog}
+        onConfirm={handleShareConfirm}
+        completionLabel={shareDialog.label}
+      />
     </>
   );
 };

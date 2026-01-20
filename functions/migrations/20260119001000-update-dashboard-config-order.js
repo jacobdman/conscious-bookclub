@@ -28,13 +28,13 @@ module.exports = {
         const mapped = [];
 
         order
-          .filter((id) => DASHBOARD_SECTION_ORDER.includes(id))
-          .forEach((id) => {
-            mapped.push({
-              id,
-              enabled: typeof sections[id]?.enabled === "boolean" ? sections[id].enabled : true,
+            .filter((id) => DASHBOARD_SECTION_ORDER.includes(id))
+            .forEach((id) => {
+              mapped.push({
+                id,
+                enabled: typeof sections[id]?.enabled === "boolean" ? sections[id].enabled : true,
+              });
             });
-          });
 
         Object.keys(sections).forEach((id) => {
           if (!DASHBOARD_SECTION_ORDER.includes(id)) return;
@@ -64,30 +64,30 @@ module.exports = {
 
     try {
       await queryInterface.sequelize.query(
-        `ALTER TABLE clubs
+          `ALTER TABLE clubs
          ALTER COLUMN dashboard_config
          SET DEFAULT '${JSON.stringify(DEFAULT_DASHBOARD_CONFIG)}'::jsonb`,
-        { transaction },
+          {transaction},
       );
 
       const clubs = await queryInterface.sequelize.query(
-        "SELECT id, dashboard_config FROM clubs",
-        { type: Sequelize.QueryTypes.SELECT, transaction },
+          "SELECT id, dashboard_config FROM clubs",
+          {type: Sequelize.QueryTypes.SELECT, transaction},
       );
 
       for (const club of clubs) {
         const nextConfig = buildDashboardConfig(club.dashboard_config);
         await queryInterface.sequelize.query(
-          `UPDATE clubs
+            `UPDATE clubs
            SET dashboard_config = :dashboardConfig::jsonb
            WHERE id = :id`,
-          {
-            replacements: {
-              dashboardConfig: JSON.stringify(nextConfig),
-              id: club.id,
+            {
+              replacements: {
+                dashboardConfig: JSON.stringify(nextConfig),
+                id: club.id,
+              },
+              transaction,
             },
-            transaction,
-          },
         );
       }
 
@@ -124,13 +124,13 @@ module.exports = {
         const mapped = [];
 
         order
-          .filter((id) => DASHBOARD_SECTION_ORDER.includes(id))
-          .forEach((id) => {
-            mapped.push({
-              id,
-              enabled: typeof sections[id]?.enabled === "boolean" ? sections[id].enabled : true,
+            .filter((id) => DASHBOARD_SECTION_ORDER.includes(id))
+            .forEach((id) => {
+              mapped.push({
+                id,
+                enabled: typeof sections[id]?.enabled === "boolean" ? sections[id].enabled : true,
+              });
             });
-          });
 
         Object.keys(sections).forEach((id) => {
           if (!DASHBOARD_SECTION_ORDER.includes(id)) return;
@@ -160,30 +160,30 @@ module.exports = {
 
     try {
       await queryInterface.sequelize.query(
-        `ALTER TABLE clubs
+          `ALTER TABLE clubs
          ALTER COLUMN dashboard_config
          SET DEFAULT '${JSON.stringify(DEFAULT_DASHBOARD_CONFIG)}'::jsonb`,
-        { transaction },
+          {transaction},
       );
 
       const clubs = await queryInterface.sequelize.query(
-        "SELECT id, dashboard_config FROM clubs",
-        { type: Sequelize.QueryTypes.SELECT, transaction },
+          "SELECT id, dashboard_config FROM clubs",
+          {type: Sequelize.QueryTypes.SELECT, transaction},
       );
 
       for (const club of clubs) {
         const nextConfig = buildDashboardConfig(club.dashboard_config);
         await queryInterface.sequelize.query(
-          `UPDATE clubs
+            `UPDATE clubs
            SET dashboard_config = :dashboardConfig::jsonb
            WHERE id = :id`,
-          {
-            replacements: {
-              dashboardConfig: JSON.stringify(nextConfig),
-              id: club.id,
+            {
+              replacements: {
+                dashboardConfig: JSON.stringify(nextConfig),
+                id: club.id,
+              },
+              transaction,
             },
-            transaction,
-          },
         );
       }
 
