@@ -1,4 +1,5 @@
 const db = require("../db/models/index");
+const moment = require("moment-timezone");
 
 // Helper function to get goal entries
 const getGoalEntries = async (userId, goalId, periodStart, periodEnd) => {
@@ -22,97 +23,72 @@ const getGoalEntries = async (userId, goalId, periodStart, periodEnd) => {
 };
 
 // Helper function to get period boundaries
-const getPeriodBoundaries = (cadence, timestamp = null) => {
-  const now = timestamp || new Date();
-  const utcNow = new Date(now.toISOString());
+const getPeriodBoundaries = (cadence, timestamp = null, timezone = null) => {
+  const base = timestamp ? moment(timestamp) : moment();
+  const zonedNow = timezone ? base.tz(timezone) : base.utc();
 
-  let start; let end;
+  let start;
+  let end;
 
   switch (cadence) {
     case "day": {
-      start = new Date(Date.UTC(
-          utcNow.getUTCFullYear(),
-          utcNow.getUTCMonth(),
-          utcNow.getUTCDate(),
-      ));
-      end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 1);
+      start = zonedNow.clone().startOf("day");
+      end = start.clone().add(1, "day");
       break;
     }
     case "week": {
-      const dayOfWeek = utcNow.getUTCDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const monday = new Date(utcNow);
-      monday.setUTCDate(utcNow.getUTCDate() - daysToMonday);
-      start = new Date(Date.UTC(
-          monday.getUTCFullYear(),
-          monday.getUTCMonth(),
-          monday.getUTCDate(),
-      ));
-      end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 7);
+      start = zonedNow.clone().startOf("week");
+      end = start.clone().add(1, "week");
       break;
     }
     case "month": {
-      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), 1));
-      end = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth() + 1, 1));
+      start = zonedNow.clone().startOf("month");
+      end = start.clone().add(1, "month");
       break;
     }
     case "quarter": {
-      const quarter = Math.floor(utcNow.getUTCMonth() / 3);
-      start = new Date(Date.UTC(utcNow.getUTCFullYear(), quarter * 3, 1));
-      end = new Date(Date.UTC(utcNow.getUTCFullYear(), (quarter + 1) * 3, 1));
+      start = zonedNow.clone().startOf("quarter");
+      end = start.clone().add(1, "quarter");
       break;
     }
     default:
       throw new Error(`Invalid cadence: ${cadence}`);
   }
 
-  return {start, end};
+  return {start: start.toDate(), end: end.toDate()};
 };
 
 // Helper to get previous period boundaries
-const getPreviousPeriodBoundaries = (cadence, currentStart) => {
-  const prevStart = new Date(currentStart);
+const getPreviousPeriodBoundaries = (cadence, currentStart, timezone = null) => {
+  const base = timezone ? moment.tz(currentStart, timezone) : moment(currentStart).utc();
+
+  let start;
+  let end;
 
   switch (cadence) {
     case "day":
-      prevStart.setUTCDate(prevStart.getUTCDate() - 1);
+      start = base.clone().subtract(1, "day");
+      end = start.clone().add(1, "day");
       break;
     case "week":
-      prevStart.setUTCDate(prevStart.getUTCDate() - 7);
+      start = base.clone().subtract(1, "week");
+      end = start.clone().add(1, "week");
       break;
     case "month":
-      prevStart.setUTCMonth(prevStart.getUTCMonth() - 1);
+      start = base.clone().subtract(1, "month");
+      end = start.clone().add(1, "month");
       break;
     case "quarter":
-      prevStart.setUTCMonth(prevStart.getUTCMonth() - 3);
+      start = base.clone().subtract(1, "quarter");
+      end = start.clone().add(1, "quarter");
       break;
     default:
-      // Invalid cadence, but continue with original date
+      start = base.clone();
+      end = base.clone();
       break;
   }
 
-  const prevEnd = new Date(prevStart);
-  switch (cadence) {
-    case "day":
-      prevEnd.setUTCDate(prevEnd.getUTCDate() + 1);
-      break;
-    case "week":
-      prevEnd.setUTCDate(prevEnd.getUTCDate() + 7);
-      break;
-    case "month":
-      prevEnd.setUTCMonth(prevEnd.getUTCMonth() + 1);
-      break;
-    case "quarter":
-      prevEnd.setUTCMonth(prevEnd.getUTCMonth() + 3);
-      break;
-    default:
-      // Invalid cadence, but continue with original date
-      break;
-  }
-
-  return {start: prevStart, end: prevEnd};
+  return {start: start.toDate(), end: end.toDate()};
 };
 
 // Calculate habit weight based on position among habits only
@@ -125,13 +101,19 @@ const calculateHabitWeight = (habitPosition) => {
 // includeStreak: if true, calculates streak (consecutive completed periods
 // from most recent)
 const calculateHabitConsistency = async (
-    userId, goal, startDate, endDate, includeStreak = true) => {
+    userId,
+    goal,
+    startDate,
+    endDate,
+    includeStreak = true,
+    timezone = null,
+) => {
   if (goal.type !== "habit" || !goal.cadence) {
     return null;
   }
 
   const periods = [];
-  let currentBoundaries = getPeriodBoundaries(goal.cadence);
+  let currentBoundaries = getPeriodBoundaries(goal.cadence, null, timezone);
 
   // If end date is in the future, use current period as end
   const effectiveEndDate = endDate && endDate < new Date() ? endDate : new Date();
@@ -162,7 +144,11 @@ const calculateHabitConsistency = async (
       });
     }
 
-    currentBoundaries = getPreviousPeriodBoundaries(goal.cadence, currentBoundaries.start);
+    currentBoundaries = getPreviousPeriodBoundaries(
+        goal.cadence,
+        currentBoundaries.start,
+        timezone,
+    );
     periodIndex++;
 
     // Safety limit to prevent infinite loops

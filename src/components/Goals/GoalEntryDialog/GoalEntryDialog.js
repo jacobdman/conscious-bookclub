@@ -38,7 +38,7 @@ const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null, saving = f
         });
       }
     }
-  }, [entry, goal, open]);
+  }, [entry, goal?.type, open]);
 
   // Show snackbar when error prop changes
   useEffect(() => {
@@ -52,6 +52,9 @@ const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null, saving = f
   };
 
   const handleSave = () => {
+    if (saving) {
+      return;
+    }
     if (goal?.type === 'metric' && (!formData.quantity || formData.quantity <= 0)) {
       setSnackbar({ open: true, message: 'Quantity must be greater than 0 for metric goals' });
       return;

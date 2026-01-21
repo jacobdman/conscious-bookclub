@@ -51,7 +51,13 @@ const {Op} = db;
  * @param {Date} endDate - End date for the report (optional, defaults to now)
  * @return {Promise<Object>} Report data with leaderboard and streakLeaderboard
  */
-const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = null) => {
+const getLeaderboardReport = async (
+    clubId,
+    userId,
+    startDate = null,
+    endDate = null,
+    reportTimezone = null,
+) => {
   // Verify membership
   const membership = await db.ClubMember.findOne({
     where: {clubId: parseInt(clubId), userId},
@@ -83,7 +89,7 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
       {
         model: db.User,
         as: "user",
-        attributes: ["uid", "email", "displayName", "photoUrl"],
+        attributes: ["uid", "email", "displayName", "photoUrl", "timezone"],
       },
     ],
   });
@@ -96,6 +102,7 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
   // Process each member
   await Promise.all(members.map(async (member) => {
     const memberUserId = member.userId;
+    const memberTimezone = member.user?.timezone || reportTimezone || null;
 
     // SQL Query 2: Get ALL goals for this member in this club (not just habits)
     // SELECT * FROM goals
@@ -169,7 +176,11 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
           }
 
           const periods = [];
-          let currentBoundaries = getPeriodBoundaries(goal.cadence, effectiveEndDate);
+          let currentBoundaries = getPeriodBoundaries(
+              goal.cadence,
+              effectiveEndDate,
+              memberTimezone,
+          );
 
           // If the current period is incomplete, move back one period
           // so we only score completed periods
@@ -177,6 +188,7 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
             currentBoundaries = getPreviousPeriodBoundaries(
                 goal.cadence,
                 currentBoundaries.start,
+                memberTimezone,
             );
           }
 
@@ -212,7 +224,11 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
               });
             }
 
-            currentBoundaries = getPreviousPeriodBoundaries(goal.cadence, currentBoundaries.start);
+            currentBoundaries = getPreviousPeriodBoundaries(
+                goal.cadence,
+                currentBoundaries.start,
+                memberTimezone,
+            );
             periodIndex++;
 
             // Safety limit to prevent infinite loops
@@ -283,7 +299,7 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
 
     for (const goal of metricGoals) {
       if (goal.cadence) {
-        const boundaries = getPeriodBoundaries(goal.cadence);
+        const boundaries = getPeriodBoundaries(goal.cadence, null, memberTimezone);
         const entries = await getGoalEntries(
             memberUserId,
             goal.id,
@@ -371,8 +387,19 @@ const getLeaderboardReport = async (clubId, userId, startDate = null, endDate = 
     }
     return nameA.localeCompare(nameB);
   });
+  let currentRank = 1;
+  let tieOffset = 0;
+  let lastScore = null;
   leaderboard.forEach((entry, index) => {
-    entry.rank = index + 1;
+    if (lastScore !== null && entry.consistencyScore === lastScore) {
+      tieOffset += 1;
+      entry.rank = currentRank;
+    } else {
+      currentRank = index + 1;
+      entry.rank = currentRank;
+      tieOffset = 0;
+      lastScore = entry.consistencyScore;
+    }
   });
 
   // Create streak leaderboard (sorted by longest streak)

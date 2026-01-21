@@ -14,6 +14,7 @@ const getHabitConsistency = async (req, res, next) => {
     const clubId = req.query.clubId;
     const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+    const timezone = req.query.timezone || null;
 
     if (!userId) {
       const error = new Error("userId is required");
@@ -96,6 +97,7 @@ const getLeaderboard = async (req, res, next) => {
     const userId = req.query.userId;
     const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+    const timezone = req.query.timezone || null;
 
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -109,7 +111,7 @@ const getLeaderboard = async (req, res, next) => {
       throw error;
     }
 
-    const result = await leaderboardReport(clubId, userId, startDate, endDate);
+    const result = await leaderboardReport(clubId, userId, startDate, endDate, timezone);
     res.json(result);
   } catch (e) {
     next(e);

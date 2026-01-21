@@ -1,5 +1,13 @@
 import { apiCall } from '../apiHelpers';
 
+const getClientTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    return null;
+  }
+};
+
 /**
  * Get habit consistency report for a user
  * @param {string} userId - User ID
@@ -67,6 +75,8 @@ export const getHabitStreakReport = async (userId, clubId, startDate, endDate) =
  */
 export const getLeaderboardReport = async (clubId, userId, startDate, endDate) => {
   const params = new URLSearchParams({ clubId: clubId.toString(), userId });
+  const timezone = getClientTimezone();
+  if (timezone) params.append('timezone', timezone);
   if (startDate) {
     params.append('startDate', startDate.toISOString());
   }

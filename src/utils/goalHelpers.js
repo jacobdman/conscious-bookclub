@@ -2,6 +2,8 @@
  * Utility functions for goal management and period calculations
  */
 
+import { formatLocalDate } from 'utils/dateHelpers';
+
 /**
  * Normalize goal type (handle variations like 'one-time' vs 'one_time')
  * @param {string} type - Goal type
@@ -24,7 +26,7 @@ export const getCurrentPeriodId = (cadence) => {
   
   switch(cadence) {
     case 'day':
-      return now.toISOString().split('T')[0]; // "2025-10-13"
+      return formatLocalDate(now); // "2025-10-13"
     
     case 'week':
       const weekNum = getWeekNumber(now);
@@ -49,38 +51,34 @@ export const getCurrentPeriodId = (cadence) => {
  * @returns {Object} - Object with start and end Date objects
  */
 export const getPeriodBoundaries = (cadence, timestamp = null) => {
-  const now = timestamp || new Date();
-  const utcNow = new Date(now.toISOString());
+  const now = timestamp ? new Date(timestamp) : new Date();
   
   let start, end;
   
   switch (cadence) {
     case 'day': {
-      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate()));
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 1);
+      end.setDate(end.getDate() + 1);
       break;
     }
     case 'week': {
-      // Week starts on Monday (ISO week)
-      const dayOfWeek = utcNow.getUTCDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const monday = new Date(utcNow);
-      monday.setUTCDate(utcNow.getUTCDate() - daysToMonday);
-      start = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate()));
+      // Week starts on Sunday (local week)
+      const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      start = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate());
       end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 7);
+      end.setDate(end.getDate() + 7);
       break;
     }
     case 'month': {
-      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), 1));
-      end = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth() + 1, 1));
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       break;
     }
     case 'quarter': {
-      const quarter = Math.floor(utcNow.getUTCMonth() / 3);
-      start = new Date(Date.UTC(utcNow.getUTCFullYear(), quarter * 3, 1));
-      end = new Date(Date.UTC(utcNow.getUTCFullYear(), (quarter + 1) * 3, 1));
+      const quarter = Math.floor(now.getMonth() / 3);
+      start = new Date(now.getFullYear(), quarter * 3, 1);
+      end = new Date(now.getFullYear(), (quarter + 1) * 3, 1);
       break;
     }
     default:
@@ -96,9 +94,12 @@ export const getPeriodBoundaries = (cadence, timestamp = null) => {
  * @returns {number} - The week number (1-53)
  */
 export const getWeekNumber = (date) => {
-  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-  const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
-  return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+  const startOfYear = new Date(date.getFullYear(), 0, 1);
+  const dayOffset = startOfYear.getDay();
+  const startOfFirstWeek = new Date(startOfYear);
+  startOfFirstWeek.setDate(startOfYear.getDate() - dayOffset);
+  const diffDays = Math.floor((date - startOfFirstWeek) / 86400000);
+  return Math.floor(diffDays / 7) + 1;
 };
 
 /**

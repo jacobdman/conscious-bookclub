@@ -68,8 +68,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   });
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
   const observerTarget = useRef(null);
-  const INITIAL_LIMIT = 10;
-  const LOAD_MORE_LIMIT = 10;
+  const initialEntriesLoaded = useRef({});
+  const INITIAL_LIMIT = 20;
+  const LOAD_MORE_LIMIT = 20;
 
   // Get the current goal from the provider context to ensure we have the latest version
   // This ensures the UI updates when milestones are toggled
@@ -117,13 +118,19 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
   // Fetch initial entries when modal opens or goal changes
   useEffect(() => {
-    if (open && goal && (goal.type === 'habit' || goal.type === 'metric')) {
-      // Only fetch if entries are not already cached
-      if (!goal.entries || goal.entries.length === 0) {
-        fetchGoalEntries(goal.id, INITIAL_LIMIT, 0, false);
-      }
+    if (!open || !goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
+
+    if (!initialEntriesLoaded.current[goal.id]) {
+      initialEntriesLoaded.current[goal.id] = true;
+      fetchGoalEntries(goal.id, INITIAL_LIMIT, 0, false);
     }
   }, [open, goal, fetchGoalEntries]);
+
+  useEffect(() => {
+    if (!open && goal?.id) {
+      delete initialEntriesLoaded.current[goal.id];
+    }
+  }, [open, goal?.id]);
 
   const getCompletionLabel = (goalItem, detail = null) => {
     const baseLabel = goalItem?.title || 'this goal';
@@ -199,6 +206,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     if (!user || !goal) return;
 
     const isUpdate = !!entryDialog.entry;
+    if (entryDialog.saving) return;
 
     setEntryDialog(prev => ({ ...prev, saving: true, error: null }));
 

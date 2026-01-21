@@ -1,8 +1,18 @@
 import { apiCall } from '../apiHelpers';
 
+const getClientTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    return null;
+  }
+};
+
 // Goals CRUD functions
 export const getGoals = async (userId, clubId, options = {}) => {
   const params = new URLSearchParams({ userId, clubId: clubId.toString() });
+  const timezone = options.timezone || getClientTimezone();
+  if (timezone) params.append('timezone', timezone);
   if (options.type) params.append('type', options.type);
   if (options.completed !== undefined) params.append('completed', options.completed.toString());
   if (options.sort) params.append('sort', options.sort);
@@ -22,6 +32,8 @@ export const addGoal = async (userId, clubId, goal) => {
 
 export const updateGoal = async (userId, clubId, goalId, updates) => {
   const params = new URLSearchParams({ userId, clubId: clubId.toString() });
+  const timezone = getClientTimezone();
+  if (timezone) params.append('timezone', timezone);
   const result = await apiCall(`/v1/goals/${goalId}?${params}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
@@ -121,6 +133,8 @@ export const deleteGoalEntry = async (userId, goalId, entryId) => {
 // Goal progress functions
 export const getGoalProgress = async (userId, goalId, period = 'current') => {
   const params = new URLSearchParams({ userId, period });
+  const timezone = getClientTimezone();
+  if (timezone) params.append('timezone', timezone);
   return apiCall(`/v1/goals/${goalId}/progress?${params}`);
 };
 

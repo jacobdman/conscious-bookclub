@@ -1,4 +1,5 @@
 const db = require("../../../../db/models/index");
+const moment = require("moment-timezone");
 
 // TODO: Seriously refactor this controller (too much logic). Lots of endpoints should be combined.
 
@@ -6,7 +7,7 @@ const db = require("../../../../db/models/index");
 const getMilestones = async (goalId) => {
   const milestones = await db.Milestone.findAll({
     where: {goalId},
-    order: [["order", "ASC"], ["created_at", "ASC"]],
+    order: [["order", "ASC"]],
   });
   return milestones.map((m) => ({id: m.id, ...m.toJSON()}));
 };
@@ -40,61 +41,50 @@ const getGoalEntries = async (userId, goalId, periodStart, periodEnd, limit = nu
 };
 
 // Helper function to get period boundaries
-const getPeriodBoundaries = (
-    cadence,
-    timestamp = null,
-) => {
-  const now = timestamp || new Date();
-  const utcNow = new Date(now.toISOString());
+const getPeriodBoundaries = (cadence, timestamp = null, timezone = null) => {
+  const base = timestamp ? moment(timestamp) : moment();
+  const zonedNow = timezone ? base.tz(timezone) : base.utc();
 
-  let start; let end;
+  let start;
+  let end;
 
   switch (cadence) {
     case "day": {
-      start = new Date(Date.UTC(
-          utcNow.getUTCFullYear(),
-          utcNow.getUTCMonth(),
-          utcNow.getUTCDate(),
-      ));
-      end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 1);
+      start = zonedNow.clone().startOf("day");
+      end = start.clone().add(1, "day");
       break;
     }
     case "week": {
-      // Week starts on Monday (ISO week)
-      const dayOfWeek = utcNow.getUTCDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const monday = new Date(utcNow);
-      monday.setUTCDate(utcNow.getUTCDate() - daysToMonday);
-      start = new Date(Date.UTC(
-          monday.getUTCFullYear(),
-          monday.getUTCMonth(),
-          monday.getUTCDate(),
-      ));
-      end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 7);
+      start = zonedNow.clone().startOf("week");
+      end = start.clone().add(1, "week");
       break;
     }
     case "month": {
-      start = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), 1));
-      end = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth() + 1, 1));
+      start = zonedNow.clone().startOf("month");
+      end = start.clone().add(1, "month");
       break;
     }
     case "quarter": {
-      const quarter = Math.floor(utcNow.getUTCMonth() / 3);
-      start = new Date(Date.UTC(utcNow.getUTCFullYear(), quarter * 3, 1));
-      end = new Date(Date.UTC(utcNow.getUTCFullYear(), (quarter + 1) * 3, 1));
+      start = zonedNow.clone().startOf("quarter");
+      end = start.clone().add(1, "quarter");
       break;
     }
     default:
       throw new Error(`Invalid cadence: ${cadence}`);
   }
 
-  return {start, end};
+  return {start: start.toDate(), end: end.toDate()};
+};
+
+const getUserTimezone = async (userId, requestTimezone = null) => {
+  if (requestTimezone) return requestTimezone;
+  if (!userId) return null;
+  const user = await db.User.findByPk(userId);
+  return user?.timezone || null;
 };
 
 // Helper function to evaluate goal
-const evaluateGoal = async (userId, goalId, period = "current", timestamp = null) => {
+const evaluateGoal = async (userId, goalId, period = "current", timestamp = null, timezone = null) => {
   const goal = await db.Goal.findOne({where: {id: goalId, userId}});
   if (!goal) {
     throw new Error("Goal not found");
@@ -130,7 +120,7 @@ const evaluateGoal = async (userId, goalId, period = "current", timestamp = null
   let end = null;
 
   if (period === "current") {
-    const boundaries = getPeriodBoundaries(goalData.cadence, timestamp);
+    const boundaries = getPeriodBoundaries(goalData.cadence, timestamp, timezone);
     start = boundaries.start;
     end = boundaries.end;
   } else if (period === "all") {
@@ -140,10 +130,15 @@ const evaluateGoal = async (userId, goalId, period = "current", timestamp = null
   } else if (period.includes(",")) {
     // Custom date range: 'YYYY-MM-DD,YYYY-MM-DD'
     const [startStr, endStr] = period.split(",");
-    start = new Date(startStr);
-    end = new Date(endStr);
-    // Set end to end of day
-    end.setHours(23, 59, 59, 999);
+    if (timezone) {
+      start = moment.tz(startStr, "YYYY-MM-DD", timezone).startOf("day").toDate();
+      end = moment.tz(endStr, "YYYY-MM-DD", timezone).endOf("day").toDate();
+    } else {
+      start = new Date(startStr);
+      end = new Date(endStr);
+      // Set end to end of day
+      end.setHours(23, 59, 59, 999);
+    }
   } else {
     throw new Error(
         `Invalid period: ${period}. Must be 'current', 'all', or 'YYYY-MM-DD,YYYY-MM-DD'`,
@@ -226,25 +221,17 @@ const getGoals = async (req, res, next) => {
       ],
     });
 
-    // Helper to get today's boundaries in UTC
-    // We use UTC boundaries for consistency, and fetch a wider window to cover
-    // "today" in any timezone (up to UTC-12, which is 12 hours behind UTC)
+    // Helper to get today's boundaries in the user's timezone when available
+    const userTimezone = await getUserTimezone(userId, req.query.timezone);
+
     const getTodayBoundaries = () => {
-      const now = new Date();
-      const utcNow = new Date(now.toISOString());
+      const now = moment();
+      const zonedNow = userTimezone ? now.tz(userTimezone) : now.utc();
 
-      // Start of today in UTC
-      const start = new Date(Date.UTC(
-          utcNow.getUTCFullYear(),
-          utcNow.getUTCMonth(),
-          utcNow.getUTCDate(),
-      ));
+      const start = zonedNow.clone().startOf("day");
+      const end = start.clone().add(1, "day");
 
-      // End of today in UTC (start of tomorrow)
-      const end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 1);
-
-      return {start, end};
+      return {start: start.toDate(), end: end.toDate()};
     };
 
     // Compute progress for each goal and build response
@@ -259,7 +246,7 @@ const getGoals = async (req, res, next) => {
           // Calculate progress based on period
           let progress = null;
           try {
-            progress = await evaluateGoal(userId, goal.id, period);
+            progress = await evaluateGoal(userId, goal.id, period, null, userTimezone);
           } catch (err) {
             // If progress calculation fails, continue without progress
             console.error(`Error calculating progress for goal ${goal.id}:`, err);
@@ -272,16 +259,25 @@ const getGoals = async (req, res, next) => {
           if ((goalData.type === "habit" || goalData.type === "metric") && goalData.cadence) {
             try {
               const todayBoundaries = getTodayBoundaries();
-              // Expand window to cover "today" in any timezone (UTC-12 to UTC+14)
-              // Fetch from 24 hours before UTC today start to 24 hours after UTC today start
-              const expandedStart = new Date(todayBoundaries.start);
-              expandedStart.setUTCDate(expandedStart.getUTCDate() - 1);
-              const expandedEnd = new Date(todayBoundaries.end);
-              expandedEnd.setUTCDate(expandedEnd.getUTCDate() + 1);
+              if (userTimezone) {
+                todayEntries = await getGoalEntries(
+                    userId,
+                    goal.id,
+                    todayBoundaries.start,
+                    todayBoundaries.end,
+                );
+              } else {
+                // Expand window to cover "today" in any timezone (UTC-12 to UTC+14)
+                // Fetch from 24 hours before UTC today start to 24 hours after UTC today start
+                const expandedStart = new Date(todayBoundaries.start);
+                expandedStart.setUTCDate(expandedStart.getUTCDate() - 1);
+                const expandedEnd = new Date(todayBoundaries.end);
+                expandedEnd.setUTCDate(expandedEnd.getUTCDate() + 1);
 
-              // Return all entries from the expanded window
-              // Frontend will filter to "today" using local time boundaries
-              todayEntries = await getGoalEntries(userId, goal.id, expandedStart, expandedEnd);
+                // Return all entries from the expanded window
+                // Frontend will filter to "today" using local time boundaries
+                todayEntries = await getGoalEntries(userId, goal.id, expandedStart, expandedEnd);
+              }
             } catch (err) {
               // If fetching today's entries fails, continue without them
               console.error(`Error fetching today's entries for goal ${goal.id}:`, err);
@@ -457,7 +453,8 @@ const updateGoal = async (req, res, next) => {
     // Calculate progress with 'current' period
     let progress = null;
     try {
-      progress = await evaluateGoal(userId, goalId, "current");
+      const userTimezone = await getUserTimezone(userId, req.query.timezone);
+      progress = await evaluateGoal(userId, goalId, "current", null, userTimezone);
     } catch (err) {
       // If progress calculation fails, continue without progress
       console.error(`Error calculating progress for goal ${goalId}:`, err);
@@ -744,7 +741,8 @@ const getGoalProgress = async (req, res, next) => {
       throw error;
     }
 
-    const progress = await evaluateGoal(userId, parseInt(goalId), period);
+    const userTimezone = await getUserTimezone(userId, req.query.timezone);
+    const progress = await evaluateGoal(userId, parseInt(goalId), period, null, userTimezone);
     res.json(progress);
   } catch (e) {
     next(e);

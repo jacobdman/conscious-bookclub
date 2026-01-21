@@ -25,12 +25,12 @@ const HabitConsistencyLeaderboardWithData = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Date range state - default to current quarter (UTC anchored)
+  // Date range state - default to current quarter (local time)
   const { startDate, endDate } = useMemo(() => {
     const now = new Date();
-    const quarter = Math.floor(now.getUTCMonth() / 3);
-    const defaultStart = new Date(Date.UTC(now.getUTCFullYear(), quarter * 3, 1, 0, 0, 0, 0));
-    const defaultEnd = new Date(Date.UTC(now.getUTCFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999));
+    const quarter = Math.floor(now.getMonth() / 3);
+    const defaultStart = new Date(now.getFullYear(), quarter * 3, 1, 0, 0, 0, 0);
+    const defaultEnd = new Date(now.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999);
 
     return {
       startDate: propStartDate || defaultStart,

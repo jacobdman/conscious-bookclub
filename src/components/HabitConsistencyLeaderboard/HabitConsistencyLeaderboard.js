@@ -25,7 +25,17 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {
     const rankA = a.rank ?? Number.POSITIVE_INFINITY;
     const rankB = b.rank ?? Number.POSITIVE_INFINITY;
-    return rankA - rankB;
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+    const scoreA = a.consistencyScore ?? 0;
+    const scoreB = b.consistencyScore ?? 0;
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA;
+    }
+    const nameA = (a.user.displayName || '').toLowerCase();
+    const nameB = (b.user.displayName || '').toLowerCase();
+    return nameA.localeCompare(nameB);
   });
 
   const itemWidth = 100; // minWidth of each item
@@ -83,11 +93,11 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
                 sx={{
                   width: 64,
                   height: 64,
-                  border: entry.rank <= 3 ? '3px solid' : 'none',
+                  border: rank <= 3 ? '3px solid' : 'none',
                   borderColor:
-                    entry.rank === 1 ? 'gold' :
-                    entry.rank === 2 ? 'silver' :
-                    entry.rank === 3 ? '#CD7F32' : 'transparent',
+                    rank === 1 ? 'gold' :
+                    rank === 2 ? 'silver' :
+                    rank === 3 ? '#CD7F32' : 'transparent',
                 }}
               >
                 {entry.user.displayName?.charAt(0) || '?'}
