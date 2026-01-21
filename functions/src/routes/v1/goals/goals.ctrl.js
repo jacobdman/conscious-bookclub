@@ -12,6 +12,26 @@ const getMilestones = async (goalId) => {
   return milestones.map((m) => ({id: m.id, ...m.toJSON()}));
 };
 
+const syncMilestoneGoalCompletion = async (goalId) => {
+  const parsedGoalId = parseInt(goalId);
+  const goal = await db.Goal.findByPk(parsedGoalId);
+  if (!goal || goal.type !== "milestone") {
+    return;
+  }
+
+  const milestones = await db.Milestone.findAll({
+    where: {goalId: parsedGoalId},
+    attributes: ["done"],
+  });
+  const allDone = milestones.length > 0 && milestones.every((milestone) => milestone.done);
+
+  if (allDone && !goal.completed) {
+    await goal.update({completed: true, completedAt: new Date()});
+  } else if (!allDone && goal.completed) {
+    await goal.update({completed: false, completedAt: null});
+  }
+};
+
 // Helper function to get goal entries
 const getGoalEntries = async (userId, goalId, periodStart, periodEnd, limit = null, offset = 0) => {
   const whereClause = {
@@ -84,7 +104,13 @@ const getUserTimezone = async (userId, requestTimezone = null) => {
 };
 
 // Helper function to evaluate goal
-const evaluateGoal = async (userId, goalId, period = "current", timestamp = null, timezone = null) => {
+const evaluateGoal = async (
+    userId,
+    goalId,
+    period = "current",
+    timestamp = null,
+    timezone = null,
+) => {
   const goal = await db.Goal.findOne({where: {id: goalId, userId}});
   if (!goal) {
     throw new Error("Goal not found");
@@ -363,6 +389,7 @@ const createGoal = async (req, res, next) => {
           order: milestoneData.order !== undefined ? milestoneData.order : i,
         });
       }
+      await syncMilestoneGoalCompletion(goal.id);
     }
 
     // Fetch the complete goal with milestones to return all fields
@@ -436,6 +463,7 @@ const updateGoal = async (req, res, next) => {
           order: milestoneData.order !== undefined ? milestoneData.order : i,
         });
       }
+      await syncMilestoneGoalCompletion(goalId);
     }
 
     // Fetch the updated goal with milestones
@@ -617,6 +645,7 @@ const markMilestoneComplete = async (req, res, next) => {
           {where: {id: milestones[milestoneIndex].id}},
       );
     }
+    await syncMilestoneGoalCompletion(goalId);
     res.json({success: true});
   } catch (e) {
     next(e);
@@ -772,6 +801,7 @@ const createMilestone = async (req, res, next) => {
       doneAt: milestoneData.doneAt || null,
       order: order,
     });
+    await syncMilestoneGoalCompletion(goalId);
     res.status(201).json({id: milestone.id, ...milestone.toJSON()});
   } catch (e) {
     next(e);
@@ -797,6 +827,7 @@ const deleteMilestone = async (req, res, next) => {
     }
 
     await milestone.destroy();
+    await syncMilestoneGoalCompletion(goalId);
     res.sendStatus(204);
   } catch (e) {
     next(e);
@@ -836,6 +867,7 @@ const updateMilestone = async (req, res, next) => {
       doneAt: doneAtValue,
       order: updates.order !== undefined ? updates.order : milestone.order,
     });
+    await syncMilestoneGoalCompletion(milestone.goalId);
     res.json({id: milestone.id, ...milestone.toJSON()});
   } catch (e) {
     next(e);

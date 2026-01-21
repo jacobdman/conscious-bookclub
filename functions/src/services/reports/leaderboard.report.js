@@ -49,6 +49,7 @@ const {Op} = db;
  * @param {string} userId - User ID (for membership verification)
  * @param {Date} startDate - Start date for the report (optional, defaults to last 8 weeks)
  * @param {Date} endDate - End date for the report (optional, defaults to now)
+ * @param {string|null} reportTimezone - Timezone for period calculations
  * @return {Promise<Object>} Report data with leaderboard and streakLeaderboard
  */
 const getLeaderboardReport = async (
@@ -388,16 +389,13 @@ const getLeaderboardReport = async (
     return nameA.localeCompare(nameB);
   });
   let currentRank = 1;
-  let tieOffset = 0;
   let lastScore = null;
   leaderboard.forEach((entry, index) => {
     if (lastScore !== null && entry.consistencyScore === lastScore) {
-      tieOffset += 1;
       entry.rank = currentRank;
     } else {
       currentRank = index + 1;
       entry.rank = currentRank;
-      tieOffset = 0;
       lastScore = entry.consistencyScore;
     }
   });

@@ -14,8 +14,6 @@ const getHabitConsistency = async (req, res, next) => {
     const clubId = req.query.clubId;
     const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
-    const timezone = req.query.timezone || null;
-
     if (!userId) {
       const error = new Error("userId is required");
       error.status = 400;
