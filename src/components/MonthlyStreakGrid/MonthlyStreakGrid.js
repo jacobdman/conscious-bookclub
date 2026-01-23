@@ -205,7 +205,7 @@ const MonthlyStreakGrid = ({
                   : isFuture
                     ? 'action.disabledBackground'
                     : 'background.paper';
-                const borderColor = hasEntry ? 'primary.main' : isFuture ? 'action.disabledBackground' : 'divider';
+                const borderColor = hasEntry ? 'primary.main' : isFuture ? 'transparent' : 'divider';
                 const baseTextColor = hasEntry ? 'common.white' : isFuture ? 'text.disabled' : 'text.primary';
                 const textColor = isOutsideMonth && !hasEntry ? 'text.disabled' : baseTextColor;
                 const isClickable = typeof onDayClick === 'function';
@@ -220,14 +220,14 @@ const MonthlyStreakGrid = ({
                       aspectRatio: '1 / 1',
                       borderRadius: '999px',
                       backgroundColor,
-                      border: '1px solid',
+                      border: isFuture ? 'none' : '1px solid',
                       borderColor,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: '0.65rem',
                       color: textColor,
-                      opacity: isOutsideMonth ? 0.6 : 1,
+                      opacity: isOutsideMonth ? 0.6 : isFuture ? 0.75 : 1,
                       cursor: isClickable ? 'pointer' : 'default',
                     }}
                   >

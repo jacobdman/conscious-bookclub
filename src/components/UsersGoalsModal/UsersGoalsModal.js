@@ -327,7 +327,10 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
               <List disablePadding>
                 {goalsNoEntry.map((goal, index) => (
                   <React.Fragment key={goal.id}>
-                    <ListItemButton onClick={() => setSelectedGoal(goal)} sx={{ px: 1 }}>
+                    <ListItemButton
+                      onClick={() => setSelectedGoal(goal)}
+                      sx={{ px: 1, opacity: 0.7 }}
+                    >
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
                           {goal.title || 'Goal'}
@@ -335,7 +338,7 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                         <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
                       </Box>
                       <Typography variant="caption" color="text.secondary">
-                        No entries today
+                        —
                       </Typography>
                     </ListItemButton>
                     {index < goalsNoEntry.length - 1 && <Divider />}
