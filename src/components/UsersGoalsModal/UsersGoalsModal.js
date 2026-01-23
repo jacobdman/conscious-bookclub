@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 // UI
 import {
   Box,
@@ -11,6 +19,7 @@ import {
   Divider,
   List,
   ListItemButton,
+  Slide,
   Stack,
   Typography,
 } from '@mui/material';
@@ -33,6 +42,10 @@ import {
 
 const getUserId = (user) => user?.uid || user?.id || user?.userId || user?.user_id;
 
+const SlideUpTransition = forwardRef((props, ref) => (
+  <Slide direction="up" ref={ref} {...props} />
+));
+
 const UsersGoalsModal = ({ open, onClose, user }) => {
   const { currentClub } = useClubContext();
   const [loading, setLoading] = useState(false);
@@ -44,6 +57,10 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
   const [allEntries, setAllEntries] = useState([]);
   const [monthLoading, setMonthLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [containerHeight, setContainerHeight] = useState(null);
+
+  const listRef = useRef(null);
+  const detailRef = useRef(null);
 
   const targetUserId = getUserId(user);
   const displayName = user?.displayName || user?.name || user?.email || 'User';
@@ -177,8 +194,34 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
     selectedGoal ? getGoalStreakSummary(selectedGoal, allEntries) : null
   ), [selectedGoal, allEntries]);
 
+  const showDetail = Boolean(selectedGoal);
+
+  useLayoutEffect(() => {
+    const activeRef = showDetail ? detailRef : listRef;
+    if (!activeRef.current) return;
+    const nextHeight = activeRef.current.offsetHeight;
+    if (nextHeight) {
+      setContainerHeight(nextHeight);
+    }
+  }, [
+    showDetail,
+    goalsToday,
+    goalsNoEntry,
+    selectedGoal,
+    monthEntries,
+    monthLoading,
+    loading,
+    error,
+  ]);
+
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      TransitionComponent={SlideUpTransition}
+    >
       <DialogTitle sx={{ pb: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <ProfileAvatar
@@ -204,148 +247,173 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
           <Typography variant="body2" color="error" textAlign="center">
             {error}
           </Typography>
-        ) : selectedGoal ? (
-          <Box>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2, gap: 2 }}>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  {selectedGoal.title || 'Goal'}
-                </Typography>
-                {selectedGoal.type !== 'one_time' && (
-                  <Typography variant="caption" color="text.secondary">
-                    {monthLabel}
-                  </Typography>
-                )}
-              </Box>
-              <GoalTypeChip goal={selectedGoal} />
-            </Stack>
-
-            {selectedGoal.type === 'one_time' ? (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-                  Due date
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {formatDate(selectedGoal.dueAt || selectedGoal.due_at)}
-                </Typography>
-              </Box>
-            ) : selectedGoal.type === 'milestone' ? (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-                  Milestones
-                </Typography>
-                {Array.isArray(selectedGoal.milestones) && selectedGoal.milestones.length > 0 ? (
-                  <List disablePadding>
-                    {[...selectedGoal.milestones]
-                      .sort((a, b) => {
-                        const orderA = a.order ?? a.id ?? a.ID ?? 0;
-                        const orderB = b.order ?? b.id ?? b.ID ?? 0;
-                        return orderA - orderB;
-                      })
-                      .map((milestone, index, sortedMilestones) => (
-                      <React.Fragment key={milestone.id || milestone.title || index}>
-                        <Box sx={{ px: 1, py: 1 }}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              textDecoration: milestone.done ? 'line-through' : 'none',
-                              opacity: milestone.done ? 0.6 : 1,
-                            }}
-                          >
-                            {milestone.title || 'Untitled milestone'}
-                          </Typography>
-                        </Box>
-                        {index < sortedMilestones.length - 1 && <Divider />}
-                      </React.Fragment>
-                      ))}
-                  </List>
-                ) : (
-                  <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
-                    No milestones available.
-                  </Typography>
-                )}
-              </Box>
-            ) : monthLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : (
-              <MonthlyStreakGrid
-                entries={monthEntries}
-                monthDate={monthCursor}
-                onPrevMonth={() => {
-                  setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-                }}
-                onNextMonth={() => {
-                  setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-                }}
-                cadence={selectedGoal?.cadence}
-                progressPercent={monthProgressPercent}
-                weeklyProgressByRow={weeklyProgressByRow}
-                streakSummary={streakSummary}
-              />
-            )}
-          </Box>
         ) : (
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-              Today’s Goal Entries
-            </Typography>
-            {goalsToday.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
-                No goal entries yet today.
-              </Typography>
-            ) : (
-              <List disablePadding sx={{ mb: 2 }}>
-                {goalsToday.map((goal, index) => (
-                  <React.Fragment key={goal.id}>
-                    <ListItemButton onClick={() => setSelectedGoal(goal)} sx={{ px: 1 }}>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
-                          {goal.title || 'Goal'}
-                        </Typography>
-                        <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
-                      </Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {goal.summaryLabel}
-                      </Typography>
-                    </ListItemButton>
-                    {index < goalsToday.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            )}
+          <Box
+            sx={{
+              position: 'relative',
+              minHeight: containerHeight ? `${containerHeight}px` : 240,
+              height: containerHeight ? `${containerHeight}px` : 'auto',
+              overflow: 'hidden',
+            }}
+          >
+            <Slide
+              direction="right"
+              in={!showDetail}
+              mountOnEnter
+              unmountOnExit
+              timeout={250}
+            >
+              <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%' }} ref={listRef}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                  Today’s Goal Entries
+                </Typography>
+                {goalsToday.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
+                    No goal entries yet today.
+                  </Typography>
+                ) : (
+                  <List disablePadding sx={{ mb: 2 }}>
+                    {goalsToday.map((goal, index) => (
+                      <React.Fragment key={goal.id}>
+                        <ListItemButton onClick={() => setSelectedGoal(goal)} sx={{ px: 1 }}>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
+                              {goal.title || 'Goal'}
+                            </Typography>
+                            <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
+                          </Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {goal.summaryLabel}
+                          </Typography>
+                        </ListItemButton>
+                        {index < goalsToday.length - 1 && <Divider />}
+                      </React.Fragment>
+                    ))}
+                  </List>
+                )}
 
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-              Goals Without Entries Today
-            </Typography>
-            {goalsNoEntry.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
-                No other goals in progress.
-              </Typography>
-            ) : (
-              <List disablePadding>
-                {goalsNoEntry.map((goal, index) => (
-                  <React.Fragment key={goal.id}>
-                    <ListItemButton
-                      onClick={() => setSelectedGoal(goal)}
-                      sx={{ px: 1, opacity: 0.7 }}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
-                          {goal.title || 'Goal'}
-                        </Typography>
-                        <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
-                      </Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                  Goals Without Entries Today
+                </Typography>
+                {goalsNoEntry.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
+                    No other goals in progress.
+                  </Typography>
+                ) : (
+                  <List disablePadding>
+                    {goalsNoEntry.map((goal, index) => (
+                      <React.Fragment key={goal.id}>
+                        <ListItemButton
+                          onClick={() => setSelectedGoal(goal)}
+                          sx={{ px: 1, opacity: 0.7 }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
+                              {goal.title || 'Goal'}
+                            </Typography>
+                            <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
+                          </Box>
+                          <Typography variant="caption" color="text.secondary">
+                            —
+                          </Typography>
+                        </ListItemButton>
+                        {index < goalsNoEntry.length - 1 && <Divider />}
+                      </React.Fragment>
+                    ))}
+                  </List>
+                )}
+              </Box>
+            </Slide>
+
+            <Slide
+              direction="left"
+              in={showDetail}
+              mountOnEnter
+              unmountOnExit
+              timeout={250}
+            >
+              <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%' }} ref={detailRef}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2, gap: 2 }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      {selectedGoal?.title || 'Goal'}
+                    </Typography>
+                    {selectedGoal?.type !== 'one_time' && (
                       <Typography variant="caption" color="text.secondary">
-                        —
+                        {monthLabel}
                       </Typography>
-                    </ListItemButton>
-                    {index < goalsNoEntry.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            )}
+                    )}
+                  </Box>
+                  <GoalTypeChip goal={selectedGoal} />
+                </Stack>
+
+                {selectedGoal?.type === 'one_time' ? (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                      Due date
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {formatDate(selectedGoal?.dueAt || selectedGoal?.due_at)}
+                    </Typography>
+                  </Box>
+                ) : selectedGoal?.type === 'milestone' ? (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                      Milestones
+                    </Typography>
+                    {Array.isArray(selectedGoal?.milestones) && selectedGoal.milestones.length > 0 ? (
+                      <List disablePadding>
+                        {[...selectedGoal.milestones]
+                          .sort((a, b) => {
+                            const orderA = a.order ?? a.id ?? a.ID ?? 0;
+                            const orderB = b.order ?? b.id ?? b.ID ?? 0;
+                            return orderA - orderB;
+                          })
+                          .map((milestone, index, sortedMilestones) => (
+                          <React.Fragment key={milestone.id || milestone.title || index}>
+                            <Box sx={{ px: 1, py: 1 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  textDecoration: milestone.done ? 'line-through' : 'none',
+                                  opacity: milestone.done ? 0.6 : 1,
+                                }}
+                              >
+                                {milestone.title || 'Untitled milestone'}
+                              </Typography>
+                            </Box>
+                            {index < sortedMilestones.length - 1 && <Divider />}
+                          </React.Fragment>
+                          ))}
+                      </List>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
+                        No milestones available.
+                      </Typography>
+                    )}
+                  </Box>
+                ) : monthLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : (
+                  <MonthlyStreakGrid
+                    entries={monthEntries}
+                    monthDate={monthCursor}
+                    onPrevMonth={() => {
+                      setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+                    }}
+                    onNextMonth={() => {
+                      setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+                    }}
+                    cadence={selectedGoal?.cadence}
+                    progressPercent={monthProgressPercent}
+                    weeklyProgressByRow={weeklyProgressByRow}
+                    streakSummary={streakSummary}
+                  />
+                )}
+              </Box>
+            </Slide>
           </Box>
         )}
       </DialogContent>
