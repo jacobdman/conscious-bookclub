@@ -140,7 +140,7 @@ export const isTodayOrOverdue = (date) => {
 
 /**
  * Sort goals by priority for quick completion view
- * Priority order: daily habits → one-time/milestones → weekly habits
+ * Priority order: due one-time → milestones → metrics → habits
  * @param {Array} goals - Array of goal objects
  * @returns {Array} - Sorted goals array
  */
@@ -149,21 +149,21 @@ export const sortGoalsByPriority = (goals) => {
     // Normalize types
     const aType = normalizeGoalType(a.type);
     const bType = normalizeGoalType(b.type);
-    
-    // Daily cadence goals first
-    if (a.cadence === 'day' && b.cadence !== 'day') return -1;
-    if (b.cadence === 'day' && a.cadence !== 'day') return 1;
-    
-    // Then one-time and milestone goals (prioritize incomplete ones)
-    const aIsOneTimeOrMilestone = (aType === 'one_time' || aType === 'milestone') && !a.completed;
-    const bIsOneTimeOrMilestone = (bType === 'one_time' || bType === 'milestone') && !b.completed;
-    
-    if (aIsOneTimeOrMilestone && !bIsOneTimeOrMilestone) return -1;
-    if (bIsOneTimeOrMilestone && !aIsOneTimeOrMilestone) return 1;
-    
-    // Then weekly cadence goals
-    if (a.cadence === 'week' && b.cadence !== 'week') return -1;
-    if (b.cadence === 'week' && a.cadence !== 'week') return 1;
+
+    const getPriority = (goal, goalType) => {
+      if (goalType === 'one_time') {
+        return goal.dueAt || goal.due_at ? 0 : 4;
+      }
+      if (goalType === 'milestone') return 1;
+      if (goalType === 'metric') return 2;
+      if (goalType === 'habit') return 3;
+      return 4;
+    };
+
+    const aPriority = getPriority(a, aType);
+    const bPriority = getPriority(b, bType);
+
+    if (aPriority !== bPriority) return aPriority - bPriority;
     
     // Finally, sort by creation date (newest first)
     return new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0);
@@ -204,9 +204,18 @@ export const filterGoalsForQuickCompletion = (goals) => {
         return false;
         
       case 'milestone':
-        // Show if has any milestones (completed or incomplete)
-        // Note: milestone goals may not have due dates on individual milestones
-        return goal.milestones && goal.milestones.length > 0;
+        // Show if there is an incomplete milestone,
+        // or if a milestone was completed today (so it can be undone).
+        if (!goal.milestones || goal.milestones.length === 0) return false;
+        if (goal.milestones.some(milestone => !milestone.done)) return true;
+
+        const { start, end } = getTodayBoundaries();
+        return goal.milestones.some(milestone => {
+          const doneAt = milestone.doneAt || milestone.done_at;
+          if (!doneAt) return false;
+          const doneDate = new Date(doneAt);
+          return doneDate >= start && doneDate < end;
+        });
         
       default:
         return false;

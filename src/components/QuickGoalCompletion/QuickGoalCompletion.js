@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Box,
   Card,
@@ -7,6 +7,7 @@ import {
   Checkbox,
   FormControlLabel,
   CircularProgress,
+  LinearProgress,
   Alert,
   Chip,
   Divider,
@@ -19,7 +20,7 @@ import {
   Button,
   TextField,
 } from '@mui/material';
-import { ExpandMore } from '@mui/icons-material';
+import { ExpandMore, DeleteOutline } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
@@ -27,11 +28,14 @@ import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
 import { createPost } from 'services/posts/posts.service';
 import { updateUserProfile } from 'services/users/users.service';
 import { getGoalProgress } from 'services/goals/goals.service';
+import { formatSemanticDate } from 'utils/dateHelpers';
 import {
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
   getTodayBoundaries,
+  hasEntryToday,
   getProgressText,
+  getProgressBarValue,
   formatMilestoneDisplay,
   normalizeGoalType,
   getGoalTypeLabel,
@@ -54,6 +58,8 @@ const QuickGoalCompletion = () => {
   const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null, quantity: '' });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
+  const longPressTimeoutRef = useRef(null);
+  const longPressTriggeredRef = useRef(false);
 
   // Get filtered and sorted goals whenever allGoals changes
   const filteredGoals = useMemo(() => {
@@ -137,6 +143,7 @@ const QuickGoalCompletion = () => {
 
   const checkGoalProgressCompletion = async (goal) => {
     if (!user || !goal) return;
+    if (goal.cadence === 'day') return;
     const wasCompleted = !!goal.progress?.completed;
     try {
       const progress = await getGoalProgress(user.uid, goal.id);
@@ -347,6 +354,85 @@ const QuickGoalCompletion = () => {
     }
   };
 
+  const handleQuickAdd = async (goal) => {
+    if (!user || !goal) return;
+
+    const goalId = goal.id;
+    if (updating[goalId]) {
+      return;
+    }
+
+    const currentGoal = allGoals.find(g => g.id === goalId) || goal;
+
+    try {
+      if (currentGoal.type === 'metric') {
+        setQuantityDialog({ open: true, goal: currentGoal, quantity: '' });
+        return;
+      }
+
+      if (currentGoal.type === 'habit') {
+        setUpdating(prev => ({ ...prev, [goalId]: true }));
+        await createEntry(goalId, {
+          occurred_at: new Date().toISOString(),
+          quantity: null,
+        });
+        await checkGoalProgressCompletion(currentGoal);
+      }
+    } catch (err) {
+      setError('Failed to create entry');
+    } finally {
+      setUpdating(prev => ({ ...prev, [goalId]: false }));
+    }
+  };
+
+  const handleRowClick = (goal) => {
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
+    handleQuickAdd(goal);
+  };
+
+  const handleTouchStart = (goal, canDelete) => {
+    if (!canDelete) return;
+    longPressTriggeredRef.current = false;
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+    }
+    longPressTimeoutRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      handleGoalToggle(goal);
+    }, 600);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+  };
+
+  const getLatestEntry = (goal) => {
+    const entries = goal.entries || [];
+    if (entries.length === 0) return null;
+
+    let latestEntry = null;
+    entries.forEach(entry => {
+      const entryDate = new Date(entry.occurred_at || entry.occurredAt);
+      if (Number.isNaN(entryDate.getTime())) return;
+      if (!latestEntry) {
+        latestEntry = entry;
+        return;
+      }
+      const latestDate = new Date(latestEntry.occurred_at || latestEntry.occurredAt);
+      if (entryDate > latestDate) {
+        latestEntry = entry;
+      }
+    });
+
+    return latestEntry;
+  };
+
   const handleQuantitySubmit = async () => {
     if (!user || !quantityDialog.goal) return;
 
@@ -417,6 +503,14 @@ const QuickGoalCompletion = () => {
           const isUpdating = updating[goal.id] || false;
           const displayItems = getGoalDisplayItems(latestGoal);
           const progressText = latestGoal.type === 'metric' && latestGoal.progress ? getProgressText(latestGoal, latestGoal.progress) : '';
+          const latestEntry = getLatestEntry(latestGoal);
+          const latestEntryDate = latestEntry ? (latestEntry.occurred_at || latestEntry.occurredAt) : null;
+          const lastActivityLabel = latestEntryDate ? formatSemanticDate(latestEntryDate) : '';
+          const lastActivityQuantity = latestGoal.type === 'metric' && latestEntry?.quantity !== undefined && latestEntry?.quantity !== null
+            ? ` (${latestEntry.quantity})`
+            : '';
+          const hasTodayEntry = latestGoal.type !== 'milestone' ? hasEntryToday(latestGoal.entries || []) : false;
+          const progressValue = getProgressBarValue(latestGoal);
           
           // For milestones, show completed ones first (no checkbox), then next incomplete (with checkbox)
           // For other goals, show single item with checkbox
@@ -485,6 +579,90 @@ const QuickGoalCompletion = () => {
             );
           }
           
+          if (latestGoal.type === 'habit' || latestGoal.type === 'metric') {
+            return (
+              <Box key={latestGoal.id}>
+                <Box
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleRowClick(latestGoal)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleRowClick(latestGoal);
+                    }
+                  }}
+                  onTouchStart={() => handleTouchStart(latestGoal, hasTodayEntry)}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchMove={handleTouchEnd}
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.5,
+                    width: '100%',
+                    cursor: 'pointer',
+                    px: 0.5,
+                    py: 0.75,
+                    borderRadius: 1,
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ flex: 1 }}>
+                      {getGoalDisplayText(latestGoal)}
+                      {progressText && (
+                        <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                          ({progressText})
+                        </Typography>
+                      )}
+                    </Typography>
+                    <Chip
+                      label={getGoalTypeLabel(latestGoal)}
+                      color={getGoalTypeColor(latestGoal.type)}
+                      size="small"
+                      variant="outlined"
+                    />
+                    {isUpdating && <CircularProgress size={16} />}
+                    {hasTodayEntry && (
+                      <IconButton
+                        size="small"
+                        aria-label="Delete latest entry"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleGoalToggle(latestGoal);
+                        }}
+                      >
+                        <DeleteOutline fontSize="inherit" />
+                      </IconButton>
+                    )}
+                  </Box>
+                  {(lastActivityLabel || hasTodayEntry) && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {lastActivityLabel && (
+                        <Typography variant="caption" color="text.secondary">
+                          Last activity: {lastActivityLabel}{lastActivityQuantity}
+                        </Typography>
+                      )}
+                      {hasTodayEntry && (
+                        <Typography variant="caption" color="text.secondary">
+                          Long-press to delete
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                  <LinearProgress
+                    variant="determinate"
+                    value={progressValue}
+                    sx={{ height: 6, borderRadius: 999, backgroundColor: 'action.hover' }}
+                  />
+                </Box>
+                {index < filteredGoals.length - 1 && <Divider sx={{ my: 0.5 }} />}
+              </Box>
+            );
+          }
+
           // For non-milestone goals, show single item
           return (
             <Box key={latestGoal.id}>

@@ -10,6 +10,7 @@ import {
   updateGoalEntry,
   deleteGoalEntry,
   getGoalEntries,
+  getGoalProgress,
   createMilestone,
   deleteMilestone,
   updateMilestone,
@@ -258,6 +259,13 @@ const GoalsProvider = ({ children }) => {
         created_at: savedEntry.created_at || savedEntry.createdAt,
       };
 
+      let updatedProgress = null;
+      try {
+        updatedProgress = await getGoalProgress(user.uid, goalId);
+      } catch (progressError) {
+        console.error('Error fetching goal progress:', progressError);
+      }
+
       // Update goal in state with new entry added to entries array
       setGoals(prev => {
         const updatedGoals = prev.map(goal => {
@@ -282,6 +290,7 @@ const GoalsProvider = ({ children }) => {
               return {
                 ...goal,
                 entries: sortedEntries, // New array reference
+                progress: updatedProgress || goal.progress,
                 entriesPagination: {
                   ...(goal.entriesPagination || {
                     hasMore: true,
@@ -306,6 +315,7 @@ const GoalsProvider = ({ children }) => {
               const updatedGoalObj = {
                 ...goal,
                 entries: sortedEntries, // New array reference
+                progress: updatedProgress || goal.progress,
                 entriesPagination: {
                   ...(goal.entriesPagination || {
                     hasMore: true,
@@ -321,6 +331,7 @@ const GoalsProvider = ({ children }) => {
                 return {
                   ...normalizedUpdatedGoal,
                   entries: sortedEntries, // Use the same sorted entries
+                  progress: updatedProgress || normalizedUpdatedGoal.progress || goal.progress,
                   entriesPagination: updatedGoalObj.entriesPagination
                 };
               }
@@ -395,6 +406,13 @@ const GoalsProvider = ({ children }) => {
       // DELETE endpoint returns 204 (no content), so we handle it optimistically
       await deleteGoalEntry(user.uid, goalId, entryId);
 
+      let updatedProgress = null;
+      try {
+        updatedProgress = await getGoalProgress(user.uid, goalId);
+      } catch (progressError) {
+        console.error('Error fetching goal progress:', progressError);
+      }
+
       // Update goal in state with entry removed from entries array
       let updatedGoalResult = null;
       setGoals(prev => prev.map(goal => {
@@ -406,6 +424,7 @@ const GoalsProvider = ({ children }) => {
           updatedGoalResult = {
             ...goal,
             entries: newEntries,
+            progress: updatedProgress || goal.progress,
             entriesPagination: goal.entriesPagination || {
               hasMore: true,
               offset: 0,
