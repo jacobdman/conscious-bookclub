@@ -15,7 +15,7 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
-const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null, saving = false, error = null }) => {
+const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null, initialDate = null, saving = false, error = null }) => {
   const [formData, setFormData] = useState({
     occurred_at: new Date(),
     quantity: null,
@@ -32,13 +32,14 @@ const GoalEntryDialog = ({ open, onClose, onSave, goal, entry = null, saving = f
           quantity: entry.quantity || null,
         });
       } else {
+        const baseDate = initialDate ? new Date(initialDate) : new Date();
         setFormData({
-          occurred_at: new Date(),
+          occurred_at: baseDate,
           quantity: goal?.type === 'metric' ? 0 : null,
         });
       }
     }
-  }, [entry, goal?.type, open]);
+  }, [entry, goal?.type, initialDate, open]);
 
   // Show snackbar when error prop changes
   useEffect(() => {

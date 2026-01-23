@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,8 +19,11 @@ import {
   Checkbox,
   TextField,
   DialogActions,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
-import { Close, Add, Edit, Delete, DragIndicator } from '@mui/icons-material';
+import { Close, Add, Edit, Delete, DragIndicator, ExpandMore } from '@mui/icons-material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -29,12 +32,14 @@ import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
 import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
+import MonthlyStreakGrid from 'components/MonthlyStreakGrid';
 import { createPost } from 'services/posts/posts.service';
 import { getGoalProgress } from 'services/goals/goals.service';
 import { 
   getProgressText, 
   getProgressBarValue,
   formatDate,
+  getPeriodBoundaries,
 } from 'utils/goalHelpers';
 
 const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
@@ -47,12 +52,13 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     updateEntry,
     deleteEntry,
     fetchGoalEntries,
+    fetchGoalEntriesForMonth,
     createMilestone,
     deleteMilestone,
     updateMilestone,
     bulkUpdateMilestones,
   } = useGoalsContext();
-  const [entryDialog, setEntryDialog] = useState({ open: false, entry: null, saving: false, error: null });
+  const [entryDialog, setEntryDialog] = useState({ open: false, entry: null, saving: false, error: null, initialDate: null });
   const [draggedMilestoneId, setDraggedMilestoneId] = useState(null);
   const [draggedOverMilestoneId, setDraggedOverMilestoneId] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -66,6 +72,14 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     value: null,
     saving: false,
   });
+  const [monthCursor, setMonthCursor] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [monthEntries, setMonthEntries] = useState([]);
+  const [monthEntriesPool, setMonthEntriesPool] = useState([]);
+  const [monthEntriesLoading, setMonthEntriesLoading] = useState(false);
+  const [weekEntriesPool, setWeekEntriesPool] = useState([]);
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
   const observerTarget = useRef(null);
   const initialEntriesLoaded = useRef({});
@@ -132,6 +146,86 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
   }, [open, goal?.id]);
 
+  useEffect(() => {
+    if (!open || !goal?.id) return;
+    const now = new Date();
+    setMonthCursor(new Date(now.getFullYear(), now.getMonth(), 1));
+  }, [open, goal?.id]);
+
+  const loadMonthEntries = useCallback(async (targetMonth = monthCursor) => {
+    if (!goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
+
+    try {
+      setMonthEntriesLoading(true);
+      const entriesForMonth = await fetchGoalEntriesForMonth(goal.id, targetMonth);
+      setMonthEntries(entriesForMonth || []);
+
+      const year = targetMonth.getFullYear();
+      const month = targetMonth.getMonth();
+      const monthsToLoad = [
+        new Date(year, month - 1, 1),
+        new Date(year, month, 1),
+        new Date(year, month + 1, 1),
+      ];
+      const monthEntriesList = await Promise.all(
+        monthsToLoad.map((monthDate) => fetchGoalEntriesForMonth(goal.id, monthDate))
+      );
+      const combinedEntries = [];
+      const entryIds = new Set();
+      monthEntriesList.flat().forEach((entry) => {
+        if (!entry || entryIds.has(entry.id)) return;
+        entryIds.add(entry.id);
+        combinedEntries.push(entry);
+      });
+      setMonthEntriesPool(combinedEntries);
+    } catch (err) {
+      console.error('Failed to load month entries:', err);
+    } finally {
+      setMonthEntriesLoading(false);
+    }
+  }, [goal, fetchGoalEntriesForMonth, monthCursor]);
+
+  const loadWeekEntriesPool = useCallback(async () => {
+    if (!goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
+    if (goal.cadence !== 'week') {
+      setWeekEntriesPool([]);
+      return;
+    }
+
+    try {
+      const year = monthCursor.getFullYear();
+      const month = monthCursor.getMonth();
+      const monthsToLoad = [
+        new Date(year, month - 1, 1),
+        new Date(year, month, 1),
+        new Date(year, month + 1, 1),
+      ];
+
+      const monthEntriesList = await Promise.all(
+        monthsToLoad.map((monthDate) => fetchGoalEntriesForMonth(goal.id, monthDate))
+      );
+
+      const combinedEntries = [];
+      const entryIds = new Set();
+      monthEntriesList.flat().forEach((entry) => {
+        if (!entry || entryIds.has(entry.id)) return;
+        entryIds.add(entry.id);
+        combinedEntries.push(entry);
+      });
+
+      setWeekEntriesPool(combinedEntries);
+    } catch (err) {
+      console.error('Failed to load week entries pool:', err);
+    }
+  }, [goal, fetchGoalEntriesForMonth, monthCursor]);
+
+  useEffect(() => {
+    if (!open || !goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
+
+    loadMonthEntries();
+    loadWeekEntriesPool();
+  }, [open, goal, monthCursor, loadMonthEntries, loadWeekEntriesPool]);
+
   const getCompletionLabel = (goalItem, detail = null) => {
     const baseLabel = goalItem?.title || 'this goal';
     if (detail) {
@@ -185,11 +279,15 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   };
 
   const handleAddEntry = () => {
-    setEntryDialog({ open: true, entry: null, saving: false, error: null });
+    setEntryDialog({ open: true, entry: null, saving: false, error: null, initialDate: null });
   };
 
   const handleEditEntry = (entry) => {
-    setEntryDialog({ open: true, entry, saving: false, error: null });
+    setEntryDialog({ open: true, entry, saving: false, error: null, initialDate: null });
+  };
+
+  const handleDayEntry = (dateValue) => {
+    setEntryDialog({ open: true, entry: null, saving: false, error: null, initialDate: dateValue });
   };
 
   const handleDeleteEntry = async (entry) => {
@@ -197,6 +295,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
     try {
       await deleteEntry(goal.id, entry.id);
+      await loadMonthEntries();
+      await loadWeekEntriesPool();
     } catch (err) {
       console.error('Failed to delete entry:', err);
     }
@@ -217,6 +317,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         await createEntry(goal.id, entryData);
         await checkGoalProgressCompletion(goal);
       }
+
+      await loadMonthEntries();
+      await loadWeekEntriesPool();
       
       setEntryDialog({ open: false, entry: null, saving: false, error: null });
     } catch (err) {
@@ -433,10 +536,55 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
   };
 
-  if (!goal) return null;
+  const progress = goal?.progress;
+  const hasProgress = progress && (goal?.type === 'habit' || goal?.type === 'metric');
 
-  const progress = goal.progress;
-  const hasProgress = progress && (goal.type === 'habit' || goal.type === 'metric');
+  const getPercentForEntries = useCallback((entriesForPeriod) => {
+    if (!goal || !entriesForPeriod) return null;
+    if (goal.cadence !== 'week' && goal.cadence !== 'month') return null;
+
+    const actual = goal.measure === 'sum'
+      ? entriesForPeriod.reduce((acc, entry) => acc + (parseFloat(entry.quantity) || 0), 0)
+      : entriesForPeriod.length;
+    const targetValue = goal.measure === 'sum'
+      ? parseFloat(goal.targetQuantity || goal.target || 0)
+      : parseFloat(goal.targetCount || goal.target || 0);
+
+    if (!targetValue) return 0;
+    return Math.round(Math.min((actual / targetValue) * 100, 100));
+  }, [goal]);
+
+  const weeklyProgressByRow = useMemo(() => {
+    if (goal?.cadence !== 'week') return null;
+    const year = monthCursor.getFullYear();
+    const month = monthCursor.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+
+    return Array.from({ length: 5 }, (_, rowIndex) => {
+      const anchorDate = new Date(year, month, 1 - firstDayOfMonth + (rowIndex * 7));
+      const { start, end } = getPeriodBoundaries('week', anchorDate);
+      const entriesForWeek = (weekEntriesPool || []).filter(entry => {
+        const entryDate = new Date(entry.occurred_at || entry.occurredAt || 0);
+        return entryDate >= start && entryDate < end;
+      });
+
+      return getPercentForEntries(entriesForWeek);
+    });
+  }, [goal?.cadence, monthCursor, weekEntriesPool, getPercentForEntries]);
+
+  const monthProgressPercent = useMemo(() => (
+    goal?.cadence === 'month' ? getPercentForEntries(monthEntries) : null
+  ), [goal?.cadence, getPercentForEntries, monthEntries]);
+
+  const handlePrevMonth = () => {
+    setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  if (!goal) return null;
 
   return (
     <>
@@ -451,7 +599,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 2 }}>
-          <Typography variant="h5">{goal.title}</Typography>
+          <Typography variant="h5" component="div">{goal.title}</Typography>
           <IconButton onClick={onClose} size="small">
             <Close />
           </IconButton>
@@ -649,9 +797,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
             {/* Entries Section (for habit/metric goals) */}
             {(goal.type === 'habit' || goal.type === 'metric') && (
-              <Paper sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">Entry History</Typography>
+              <>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
                   <Button
                     variant="contained"
                     startIcon={<Add />}
@@ -661,66 +808,88 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                   </Button>
                 </Box>
 
-                {entries.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
-                    No entries yet
-                  </Typography>
-                ) : (
-                  <>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Date & Time</TableCell>
-                          {goal.type === 'metric' && <TableCell>Quantity</TableCell>}
-                          <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {entries.map((entry) => (
-                          <TableRow key={entry.id}>
-                            <TableCell>{formatDateTime(entry.occurred_at || entry.occurredAt)}</TableCell>
-                            {goal.type === 'metric' && (
-                              <TableCell>
-                                <Chip
-                                  label={`${parseFloat(entry.quantity || 0).toFixed(1)} ${goal.unit || ''}`}
-                                  size="small"
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                            )}
-                            <TableCell align="right">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleEditEntry(entry)}
-                                color="primary"
-                              >
-                                <Edit fontSize="small" />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDeleteEntry(entry)}
-                                color="error"
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                <MonthlyStreakGrid
+                  entries={monthEntriesPool}
+                  monthDate={monthCursor}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  onDayClick={handleDayEntry}
+                  cadence={goal.cadence}
+                  progressPercent={monthProgressPercent}
+                  weeklyProgressByRow={weeklyProgressByRow}
+                />
 
-                    {/* Infinite scroll trigger */}
-                    <Box ref={observerTarget} sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                      {loadingMore && <CircularProgress size={24} />}
-                      {!hasMore && entries.length > 0 && (
-                        <Typography variant="body2" color="text.secondary">
-                          No more entries
-                        </Typography>
-                      )}
-                    </Box>
-                  </>
-                )}
-              </Paper>
+                <Accordion defaultExpanded={false} sx={{ boxShadow: 1 }}>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Typography variant="h6">Entry History</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    {monthEntriesLoading && entries.length === 0 ? (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                        <CircularProgress size={24} />
+                      </Box>
+                    ) : entries.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
+                        No entries yet
+                      </Typography>
+                    ) : (
+                      <>
+                        <Table>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Date & Time</TableCell>
+                              {goal.type === 'metric' && <TableCell>Quantity</TableCell>}
+                              <TableCell align="right">Actions</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {entries.map((entry) => (
+                              <TableRow key={entry.id}>
+                                <TableCell>{formatDateTime(entry.occurred_at || entry.occurredAt)}</TableCell>
+                                {goal.type === 'metric' && (
+                                  <TableCell>
+                                    <Chip
+                                      label={`${parseFloat(entry.quantity || 0).toFixed(1)} ${goal.unit || ''}`}
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                )}
+                                <TableCell align="right">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditEntry(entry)}
+                                    color="primary"
+                                  >
+                                    <Edit fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleDeleteEntry(entry)}
+                                    color="error"
+                                  >
+                                    <Delete fontSize="small" />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+
+                        {/* Infinite scroll trigger */}
+                        <Box ref={observerTarget} sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                          {loadingMore && <CircularProgress size={24} />}
+                          {!hasMore && entries.length > 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                              No more entries
+                            </Typography>
+                          )}
+                        </Box>
+                      </>
+                    )}
+                  </AccordionDetails>
+                </Accordion>
+              </>
             )}
           </Box>
         </DialogContent>
@@ -728,10 +897,11 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
       <GoalEntryDialog
         open={entryDialog.open}
-        onClose={() => setEntryDialog({ open: false, entry: null, saving: false, error: null })}
+        onClose={() => setEntryDialog({ open: false, entry: null, saving: false, error: null, initialDate: null })}
         onSave={handleSaveEntry}
         goal={goal}
         entry={entryDialog.entry}
+        initialDate={entryDialog.initialDate}
         saving={entryDialog.saving}
         error={entryDialog.error}
       />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { 
@@ -71,6 +71,7 @@ const GoalsProvider = ({ children }) => {
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const goalEntriesCacheRef = useRef({});
 
   // ******************LOAD FUNCTIONS**********************
   // Fetch goals from API
@@ -192,6 +193,40 @@ const GoalsProvider = ({ children }) => {
   }, [user, currentClub]);
 
   // ******************ENTRY OPERATIONS**********************
+  const clearGoalEntriesCache = useCallback((goalId) => {
+    if (!goalId || !goalEntriesCacheRef.current[goalId]) return;
+    delete goalEntriesCacheRef.current[goalId];
+  }, []);
+
+  const handleFetchGoalEntriesForMonth = useCallback(async (goalId, monthDate) => {
+    if (!user || !goalId || !monthDate) return [];
+
+    const date = monthDate instanceof Date ? monthDate : new Date(monthDate);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const goalCache = goalEntriesCacheRef.current[goalId] || {};
+
+    if (goalCache[monthKey]) {
+      return goalCache[monthKey];
+    }
+
+    const periodStart = new Date(date.getFullYear(), date.getMonth(), 1);
+    const periodEnd = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+
+    const entries = await getGoalEntries(user.uid, goalId, periodStart, periodEnd);
+    const sortedEntries = entries.sort((a, b) => {
+      const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+      const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+      return dateB - dateA;
+    });
+
+    goalEntriesCacheRef.current[goalId] = {
+      ...goalCache,
+      [monthKey]: sortedEntries,
+    };
+
+    return sortedEntries;
+  }, [user]);
+
   // Fetch entries for a goal (with pagination support)
   const handleFetchGoalEntries = useCallback(async (goalId, limit = 10, offset = 0, append = false, periodStart = null, periodEnd = null) => {
     if (!user || !goalId) return;
@@ -346,6 +381,7 @@ const GoalsProvider = ({ children }) => {
         return updatedGoals;
       });
 
+      clearGoalEntriesCache(goalId);
       return { entry: normalizedEntry, goal: updatedGoal };
     } catch (err) {
       console.error('Error creating entry:', err);
@@ -391,6 +427,7 @@ const GoalsProvider = ({ children }) => {
         return goal;
       }));
 
+      clearGoalEntriesCache(goalId);
       return { entry: savedEntry, goal: updatedGoal };
     } catch (err) {
       console.error('Error updating entry:', err);
@@ -436,6 +473,7 @@ const GoalsProvider = ({ children }) => {
         return goal;
       }));
 
+      clearGoalEntriesCache(goalId);
       return updatedGoalResult;
     } catch (err) {
       console.error('Error deleting entry:', err);
@@ -636,6 +674,7 @@ const GoalsProvider = ({ children }) => {
         updateEntry: handleUpdateEntry,
         deleteEntry: handleDeleteEntry,
         fetchGoalEntries: handleFetchGoalEntries,
+        fetchGoalEntriesForMonth: handleFetchGoalEntriesForMonth,
         createMilestone: handleCreateMilestone,
         deleteMilestone: handleDeleteMilestone,
         updateMilestone: handleUpdateMilestone,
