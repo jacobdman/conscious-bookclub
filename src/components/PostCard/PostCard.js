@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Typography,
-  Avatar,
   IconButton,
   TextField,
   Tooltip,
@@ -15,6 +14,7 @@ import {
   Grid,
 } from '@mui/material';
 import { Reply as ReplyIcon } from '@mui/icons-material';
+import ProfileAvatar from 'components/ProfileAvatar';
 import ReplyQuote from 'components/ReplyQuote';
 import EmojiInput from 'components/EmojiInput';
 import useFeedContext from 'contexts/Feed';
@@ -411,10 +411,10 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
       {/* Avatar - only show for first message in group */}
       <Box sx={{ flexShrink: 0, width: 40, display: 'flex', justifyContent: 'center' }}>
         {showAvatar ? (
-          <Avatar
-            src={post.author?.photoUrl}
+          <ProfileAvatar
+            user={post.author}
+            size={40}
             alt={authorName}
-            sx={{ width: 40, height: 40 }}
           />
         ) : (
           <Box sx={{ width: 40 }} />

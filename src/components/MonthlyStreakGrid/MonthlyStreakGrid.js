@@ -66,12 +66,36 @@ const MonthlyStreakGrid = ({
         <IconButton size="small" onClick={onPrevMonth} aria-label="Previous month">
           <ChevronLeft fontSize="small" />
         </IconButton>
-        <Box sx={{ flex: 1, textAlign: 'center' }}>
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
           <Typography variant="subtitle2">{monthLabel}</Typography>
           {showMonthlyPercent && (
-            <Typography variant="caption" color="text.secondary">
-              {Math.round(progressPercent)}%
-            </Typography>
+            <Box sx={{ position: 'relative', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress
+                variant="determinate"
+                value={Math.round(progressPercent)}
+                size={28}
+                thickness={3}
+                sx={{ color: getProgressColor(progressPercent) }}
+              />
+              <Box
+                sx={{
+                  position: 'absolute',
+                  width: 20,
+                  height: 20,
+                  borderRadius: '999px',
+                  border: '1px solid',
+                  borderColor: getProgressColor(progressPercent),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.6rem',
+                  color: getProgressColor(progressPercent),
+                  backgroundColor: 'background.paper',
+                }}
+              >
+                {Math.round(progressPercent)}%
+              </Box>
+            </Box>
           )}
         </Box>
         <IconButton size="small" onClick={onNextMonth} aria-label="Next month">

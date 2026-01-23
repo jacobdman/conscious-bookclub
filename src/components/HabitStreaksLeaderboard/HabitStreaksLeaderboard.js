@@ -1,18 +1,9 @@
 import React from 'react';
-import {
-  Box,
-  Typography,
-  Avatar,
-  Badge,
-} from '@mui/material';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
-
-const getRankLabel = (rank) => {
-  if (rank === 1) return '1st';
-  if (rank === 2) return '2nd';
-  if (rank === 3) return '3rd';
-  return `${rank}th`;
-};
+// UI
+import { Box, Typography } from '@mui/material';
+// Components
+import ProfileAvatar from 'components/ProfileAvatar';
 
 const HabitStreaksLeaderboard = ({ leaderboard, title, subtitle }) => {
   if (!leaderboard || leaderboard.length === 0) {
@@ -36,6 +27,8 @@ const HabitStreaksLeaderboard = ({ leaderboard, title, subtitle }) => {
           display: 'flex',
           gap: 0.7,
           overflowX: 'auto',
+          overflowY: 'visible',
+          pt: 1,
           pb: 1,
           scrollbarWidth: 'none', // Firefox
           '&::-webkit-scrollbar': {
@@ -56,37 +49,13 @@ const HabitStreaksLeaderboard = ({ leaderboard, title, subtitle }) => {
               flexShrink: 0,
             }}
           >
-            <Badge
-              badgeContent={getRankLabel(entry.rank)}
-              color="primary"
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              sx={{
-                '& .MuiBadge-badge': {
-                  fontSize: '0.7rem',
-                  minWidth: '30px',
-                  height: '20px',
-                  borderRadius: '10px',
-                },
-              }}
-            >
-              <Avatar
-                src={entry.user.photoUrl}
-                sx={{
-                  width: 64,
-                  height: 64,
-                  border: entry.rank <= 3 ? '3px solid' : 'none',
-                  borderColor:
-                    entry.rank === 1 ? 'gold' :
-                    entry.rank === 2 ? 'silver' :
-                    entry.rank === 3 ? '#CD7F32' : 'transparent',
-                }}
-              >
-                {entry.user.displayName?.charAt(0) || '?'}
-              </Avatar>
-            </Badge>
+            <ProfileAvatar
+              user={entry.user}
+              size={64}
+              rank={entry.rank}
+              showRankBadge
+              showEntryRing
+            />
             <Typography variant="caption" sx={{ mt: 1, textAlign: 'center', maxWidth: 80 }}>
               {entry.user.displayName || 'Unknown'}
             </Typography>

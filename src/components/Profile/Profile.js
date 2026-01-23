@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
-  Avatar,
   Paper,
   Divider,
   CircularProgress,
@@ -22,6 +21,7 @@ import { updateProfile as updateFirebaseProfile } from 'firebase/auth';
 import { auth } from '../../firebase';
 import NotificationSettings from './NotificationSettings';
 import Layout from 'components/Layout';
+import ProfileAvatar from 'components/ProfileAvatar';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -151,6 +151,11 @@ const Profile = () => {
   const currentDisplayName = userData?.displayName || user?.displayName || 'User';
   const currentPhotoUrl = userData?.photoUrl || user?.photoURL;
   const currentEmail = user?.email || userData?.email;
+  const avatarUser = {
+    displayName: isEditing ? displayName : currentDisplayName,
+    photoUrl: isEditing ? photoPreview : currentPhotoUrl,
+    email: currentEmail,
+  };
 
   return (
     <Layout>
@@ -180,13 +185,12 @@ const Profile = () => {
             mb: 3 
           }}>
             <Box sx={{ position: 'relative' }}>
-              <Avatar
-                src={isEditing ? photoPreview : currentPhotoUrl}
-                alt={isEditing ? displayName : currentDisplayName}
-                sx={{ width: 80, height: 80 }}
-              >
-                {(isEditing ? displayName : currentDisplayName || currentEmail || '').charAt(0).toUpperCase()}
-              </Avatar>
+              <ProfileAvatar
+                user={avatarUser}
+                size={80}
+                disableGoalModal
+                showEntryRing={false}
+              />
               {isEditing && (
                 <IconButton
                   component="label"

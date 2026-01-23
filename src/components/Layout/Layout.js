@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, CssBaseline, ThemeProvider, useMediaQuery, useTheme, Drawer } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from 'AuthContext';
+// UI
+import { Box, CssBaseline, Drawer, ThemeProvider, useMediaQuery, useTheme } from '@mui/material';
+// Context
 import useClubContext from 'contexts/Club';
-import { theme } from 'theme';
+import ClubReportingProvider from 'contexts/ClubReporting/ClubReportingProvider';
+// Components
+import BottomNav from 'components/BottomNav';
 import Header from 'components/Header';
 import NavigationContent from 'components/NavigationContent';
-import BottomNav from 'components/BottomNav';
+// Utils
+import { theme } from 'theme';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -102,79 +107,81 @@ const Layout = ({ children }) => {
 
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box
-        sx={{
-          height: '100vh',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Desktop Header - Hidden on Mobile */}
-        <Box 
-            ref={headerRef} 
-            sx={{ display: { xs: 'none', md: 'block' } }}
-        >
-          <Header 
-            user={user} 
-            onMenuClick={() => setDrawerOpen(true)} 
-            onLogout={handleLogout} 
-          />
-        </Box>
-        
-        {/* Desktop Drawer (Left) */}
-        <Drawer 
-            anchor="left" 
-            open={drawerOpen} 
-            onClose={() => setDrawerOpen(false)}
-        >
-            <NavigationContent 
-                onClose={() => setDrawerOpen(false)}
-                onLogout={handleLogout}
-                isMobile={false}
-            />
-        </Drawer>
-
-        {/* Mobile Menu Drawer (Right) */}
-        <Drawer
-            anchor="right"
-            open={mobileMenuOpen}
-            onClose={() => setMobileMenuOpen(false)}
-            PaperProps={{
-                sx: { width: '85%', maxWidth: 300 }
-            }}
-        >
-            <NavigationContent
-                onClose={() => setMobileMenuOpen(false)}
-                onLogout={handleLogout}
-                isMobile={true}
-            />
-        </Drawer>
-
-        {/* Spacer for fixed header (Desktop only) */}
-        <Box sx={{ height: `${headerHeight}px`, flexShrink: 0, display: { xs: 'none', md: 'block' } }} />
-
-        <Box 
-          component="main"
+      <ClubReportingProvider>
+        <CssBaseline />
+        <Box
           sx={{
+            height: '100vh',
+            overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            flex: 1,
-            overflow: 'auto',
-            minHeight: 0,
-            WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
-            pb: { xs: 7, md: 0 } // Add padding bottom on mobile for BottomNav
           }}
         >
-          {children}
-        </Box>
+          {/* Desktop Header - Hidden on Mobile */}
+          <Box 
+              ref={headerRef} 
+              sx={{ display: { xs: 'none', md: 'block' } }}
+          >
+            <Header 
+              user={user} 
+              onMenuClick={() => setDrawerOpen(true)} 
+              onLogout={handleLogout} 
+            />
+          </Box>
+          
+          {/* Desktop Drawer (Left) */}
+          <Drawer 
+              anchor="left" 
+              open={drawerOpen} 
+              onClose={() => setDrawerOpen(false)}
+          >
+              <NavigationContent 
+                  onClose={() => setDrawerOpen(false)}
+                  onLogout={handleLogout}
+                  isMobile={false}
+              />
+          </Drawer>
 
-        {/* Mobile Bottom Nav - Hidden on Desktop */}
-        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
-            <BottomNav onMenuClick={() => setMobileMenuOpen(true)} />
+          {/* Mobile Menu Drawer (Right) */}
+          <Drawer
+              anchor="right"
+              open={mobileMenuOpen}
+              onClose={() => setMobileMenuOpen(false)}
+              PaperProps={{
+                  sx: { width: '85%', maxWidth: 300 }
+              }}
+          >
+              <NavigationContent
+                  onClose={() => setMobileMenuOpen(false)}
+                  onLogout={handleLogout}
+                  isMobile={true}
+              />
+          </Drawer>
+
+          {/* Spacer for fixed header (Desktop only) */}
+          <Box sx={{ height: `${headerHeight}px`, flexShrink: 0, display: { xs: 'none', md: 'block' } }} />
+
+          <Box 
+            component="main"
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              overflow: 'auto',
+              minHeight: 0,
+              WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+              pb: { xs: 7, md: 0 } // Add padding bottom on mobile for BottomNav
+            }}
+          >
+            {children}
+          </Box>
+
+          {/* Mobile Bottom Nav - Hidden on Desktop */}
+          <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+              <BottomNav onMenuClick={() => setMobileMenuOpen(true)} />
+          </Box>
         </Box>
-      </Box>
+      </ClubReportingProvider>
     </ThemeProvider>
   );
 };

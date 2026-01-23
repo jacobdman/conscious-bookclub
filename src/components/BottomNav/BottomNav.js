@@ -1,8 +1,12 @@
 import React from 'react';
-import { BottomNavigation, BottomNavigationAction, Paper, Avatar } from '@mui/material';
 import { Home, Message, CheckCircle, MenuBook } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+// UI
+import { BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
+// Context
 import { useAuth } from 'AuthContext';
+// Components
+import ProfileAvatar from 'components/ProfileAvatar';
 
 const BottomNav = ({ onMenuClick }) => {
   const navigate = useNavigate();
@@ -86,10 +90,12 @@ const BottomNav = ({ onMenuClick }) => {
         <BottomNavigationAction 
             label="Menu" 
             icon={
-                <Avatar 
-                    src={user?.photoURL} 
-                    alt="Profile" 
-                    sx={{ width: 26, height: 26 }} 
+                <ProfileAvatar 
+                    user={user}
+                    size={26}
+                    alt="Profile"
+                    disableGoalModal
+                    showEntryRing={false}
                 />
             } 
         />

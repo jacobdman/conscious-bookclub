@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
-  Avatar,
   Paper,
   CircularProgress,
   Badge,
   IconButton,
 } from '@mui/material';
 import { ArrowForward } from '@mui/icons-material';
+import ProfileAvatar from 'components/ProfileAvatar';
 import useFeedContext from 'contexts/Feed';
 import EmojiInput from 'components/EmojiInput';
 import ReplyQuote from 'components/ReplyQuote';
@@ -221,13 +221,11 @@ const FeedPreview = () => {
                 {/* Avatar - only show for first message in group */}
                 <Box sx={{ flexShrink: 0, width: 32, display: 'flex', justifyContent: 'center' }}>
                   {isFirstInGroup ? (
-                    <Avatar
-                      src={post.author?.photoUrl}
+                    <ProfileAvatar
+                      user={post.author}
+                      size={32}
                       alt={authorName}
-                      sx={{ width: 32, height: 32 }}
-                    >
-                      {authorName.charAt(0).toUpperCase()}
-                    </Avatar>
+                    />
                   ) : (
                     <Box sx={{ width: 32 }} />
                   )}

@@ -218,6 +218,63 @@ export const getGoalStreakSummary = (goal, entries = []) => {
     };
   }
 
+  if (goal.cadence === 'month') {
+    const monthlyActual = {};
+    entries.forEach((entry) => {
+      const entryDate = new Date(entry.occurred_at || entry.occurredAt || 0);
+      if (Number.isNaN(entryDate.getTime())) return;
+      const { start } = getPeriodBoundaries('month', entryDate);
+      const monthKey = formatLocalDate(start);
+      const increment = goal.measure === 'sum' ? (parseFloat(entry.quantity) || 0) : 1;
+      monthlyActual[monthKey] = (monthlyActual[monthKey] || 0) + increment;
+    });
+
+    const entryDates = entries
+      .map((entry) => new Date(entry.occurred_at || entry.occurredAt || 0))
+      .filter((date) => !Number.isNaN(date.getTime()));
+    if (entryDates.length === 0) return null;
+
+    const earliest = entryDates.reduce((min, date) => (date < min ? date : min), entryDates[0]);
+    const { start: earliestMonth } = getPeriodBoundaries('month', earliest);
+    const { start: currentMonth } = getPeriodBoundaries('month', new Date());
+
+    let longest = 0;
+    let streak = 0;
+    const completedMonths = new Set();
+
+    const cursor = new Date(earliestMonth);
+    while (cursor <= currentMonth) {
+      const monthKey = formatLocalDate(cursor);
+      const actual = monthlyActual[monthKey] || 0;
+      const completed = actual >= targetValue;
+      if (completed) {
+        streak += 1;
+        completedMonths.add(monthKey);
+      } else {
+        streak = 0;
+      }
+      longest = Math.max(longest, streak);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    let currentStreak = 0;
+    const currentCursor = new Date(currentMonth);
+    if (!completedMonths.has(formatLocalDate(currentCursor))) {
+      currentCursor.setMonth(currentCursor.getMonth() - 1);
+    }
+    while (completedMonths.has(formatLocalDate(currentCursor))) {
+      currentStreak += 1;
+      currentCursor.setMonth(currentCursor.getMonth() - 1);
+    }
+
+    return {
+      currentLabel: 'Current 100% streak',
+      longestLabel: 'Longest 100% streak',
+      currentValue: `${currentStreak} month${currentStreak === 1 ? '' : 's'}`,
+      longestValue: `${longest} month${longest === 1 ? '' : 's'}`,
+    };
+  }
+
   return null;
 };
 

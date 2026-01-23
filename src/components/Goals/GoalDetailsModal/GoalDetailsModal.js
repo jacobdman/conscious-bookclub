@@ -227,7 +227,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
   const loadAllEntries = useCallback(async () => {
     if (!goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
-    if (goal.cadence !== 'day' && goal.cadence !== 'week') {
+    if (goal.cadence !== 'day' && goal.cadence !== 'week' && goal.cadence !== 'month') {
       setAllEntries([]);
       return;
     }

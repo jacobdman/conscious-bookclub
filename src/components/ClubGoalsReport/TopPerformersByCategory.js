@@ -1,5 +1,8 @@
 import React from 'react';
-import { Box, Typography, Avatar, Divider } from '@mui/material';
+// UI
+import { Box, Divider, Typography } from '@mui/material';
+// Components
+import ProfileAvatar from 'components/ProfileAvatar';
 
 const TopPerformersByCategory = ({ topPerformers }) => {
   if (!topPerformers) {
@@ -78,16 +81,11 @@ const TopPerformersByCategory = ({ topPerformers }) => {
               </Box>
               {category.value ? (
                 <>
-                  <Avatar
-                    src={category.value.user?.photoUrl}
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {category.value.user?.displayName?.charAt(0) || '?'}
-                  </Avatar>
+                  <ProfileAvatar
+                    user={category.value.user}
+                    size={32}
+                    showEntryRing
+                  />
                   <Typography
                     variant="body2"
                     sx={{

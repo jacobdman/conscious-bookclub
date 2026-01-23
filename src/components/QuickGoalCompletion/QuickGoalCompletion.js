@@ -24,6 +24,7 @@ import { ExpandMore, DeleteOutline } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
+import GoalTypeChip from 'components/GoalTypeChip';
 import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
 import { createPost } from 'services/posts/posts.service';
 import { updateUserProfile } from 'services/users/users.service';
@@ -38,8 +39,6 @@ import {
   getProgressBarValue,
   formatMilestoneDisplay,
   normalizeGoalType,
-  getGoalTypeLabel,
-  getGoalTypeColor,
   getGoalStreakValue,
 } from 'utils/goalHelpers';
 
@@ -548,12 +547,7 @@ const QuickGoalCompletion = () => {
                       </Typography>
                       {isNextIncomplete && (
                         <>
-                          <Chip
-                            label={getGoalTypeLabel(latestGoal)}
-                            color={getGoalTypeColor(latestGoal.type)}
-                            size="small"
-                            variant="outlined"
-                          />
+                          <GoalTypeChip goal={latestGoal} />
                           {isUpdating && <CircularProgress size={16} />}
                         </>
                       )}
@@ -629,12 +623,7 @@ const QuickGoalCompletion = () => {
                         </Typography>
                       )}
                     </Typography>
-                    <Chip
-                      label={getGoalTypeLabel(latestGoal)}
-                      color={getGoalTypeColor(latestGoal.type)}
-                      size="small"
-                      variant="outlined"
-                    />
+                    <GoalTypeChip goal={latestGoal} />
                     {isUpdating && <CircularProgress size={16} />}
                     {hasTodayEntry && (
                       <IconButton
@@ -703,12 +692,7 @@ const QuickGoalCompletion = () => {
                         </Typography>
                       )}
                     </Typography>
-                    <Chip
-                      label={getGoalTypeLabel(latestGoal)}
-                      color={getGoalTypeColor(latestGoal.type)}
-                      size="small"
-                      variant="outlined"
-                    />
+                    <GoalTypeChip goal={latestGoal} />
                     {isUpdating && <CircularProgress size={16} />}
                   </Box>
                 }

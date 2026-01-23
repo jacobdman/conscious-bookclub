@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   AppBar,
-  Avatar,
   IconButton,
   Toolbar,
   Typography,
@@ -14,6 +13,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate } from 'react-router-dom';
+import ProfileAvatar from 'components/ProfileAvatar';
 import useClubContext from 'contexts/Club';
 
 const Header = ({ user, onMenuClick, onLogout }) => {
@@ -70,7 +70,12 @@ const Header = ({ user, onMenuClick, onLogout }) => {
           onClick={handleAvatarClick}
           sx={{ p: 0 }}
         >
-          <Avatar src={user?.photoURL} alt={user?.displayName || user?.email} />
+          <ProfileAvatar
+            user={user}
+            size={40}
+            disableGoalModal
+            showEntryRing={false}
+          />
         </IconButton>
         <Menu
           anchorEl={anchorEl}

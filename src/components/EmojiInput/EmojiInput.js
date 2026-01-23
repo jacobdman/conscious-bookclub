@@ -1,8 +1,13 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Box, Button, Chip, Popover, Typography, Avatar, IconButton, Stack, MobileStepper } from '@mui/material';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AddReaction, ChevronLeft, ChevronRight } from '@mui/icons-material';
-import useFeedContext from 'contexts/Feed';
+// UI
+import { Box, Button, Chip, IconButton, MobileStepper, Popover, Stack, Typography } from '@mui/material';
+// Context
 import { useAuth } from 'AuthContext';
+import useFeedContext from 'contexts/Feed';
+// Components
+import ProfileAvatar from 'components/ProfileAvatar';
+// Utils
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
 
@@ -442,10 +447,11 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
                   },
                 }}
               >
-                <Avatar
-                  src={reaction.user?.photoUrl}
+                <ProfileAvatar
+                  user={reaction.user}
+                  size={24}
                   alt={reaction.user?.displayName || 'User'}
-                  sx={{ width: 24, height: 24 }}
+                  showEntryRing={false}
                 />
                 <Typography
                   variant="body2"

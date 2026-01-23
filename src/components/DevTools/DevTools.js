@@ -32,6 +32,7 @@ const DevTools = () => {
     () => [
       { label: 'Primary', value: muiTheme?.palette?.primary?.main },
       { label: 'Secondary', value: muiTheme?.palette?.secondary?.main },
+      { label: 'Accent', value: muiTheme?.palette?.accent?.main },
       { label: 'Background', value: muiTheme?.palette?.background?.default },
     ],
     [muiTheme]

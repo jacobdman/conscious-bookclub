@@ -1,22 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+// UI
 import {
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Avatar,
+  Chip,
+  CircularProgress,
+  Divider,
   List,
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Chip,
-  CircularProgress,
-  Divider,
-  Button
+  Typography,
 } from '@mui/material';
-import { getTopReaders } from 'services/books/books.service';
+// Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
+// Components
+import ProfileAvatar from 'components/ProfileAvatar';
+// Services
+import { getTopReaders } from 'services/books/books.service';
 
 const FinishedBooksLeaderboard = () => {
   const { user } = useAuth();
@@ -130,18 +134,17 @@ const FinishedBooksLeaderboard = () => {
               <React.Fragment key={userStats.id}>
                 <ListItem sx={{ px: 0 }}>
                   <ListItemAvatar>
-                    <Avatar
-                      src={userStats.photoUrl}
-                      sx={{ 
-                        width: 40, 
-                        height: 40,
-                        bgcolor: index === 0 ? 'warning.main' : 
-                                index === 1 ? 'grey.400' : 
-                                index === 2 ? 'secondary.main' : 'primary.main'
+                    <ProfileAvatar
+                      user={userStats}
+                      size={40}
+                      rank={index + 1}
+                      showEntryRing
+                      sx={{
+                        bgcolor: index === 0 ? 'warning.main' :
+                          index === 1 ? 'grey.400' :
+                          index === 2 ? 'secondary.main' : 'primary.main'
                       }}
-                    >
-                      {userStats.displayName?.charAt(0) || '?'}
-                    </Avatar>
+                    />
                   </ListItemAvatar>
                   <ListItemText
                     primary={
@@ -177,12 +180,11 @@ const FinishedBooksLeaderboard = () => {
                 <Divider sx={{ my: 1 }} />
                 <ListItem sx={{ px: 0 }}>
                   <ListItemAvatar>
-                    <Avatar
-                      src={currentUserStats.photoUrl}
-                      sx={{ width: 40, height: 40 }}
-                    >
-                      {currentUserStats.displayName?.charAt(0) || '?'}
-                    </Avatar>
+                    <ProfileAvatar
+                      user={currentUserStats}
+                      size={40}
+                      showEntryRing
+                    />
                   </ListItemAvatar>
                   <ListItemText
                     primary={

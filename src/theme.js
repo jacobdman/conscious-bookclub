@@ -11,6 +11,9 @@ export const theme = createTheme({
     success: {
       main: '#5B7D67',
     },
+    accent: {
+      main: '#D19A3E',
+    },
     warning: {
       main: '#B9895E',
     },

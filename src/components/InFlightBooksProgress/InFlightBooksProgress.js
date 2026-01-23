@@ -5,7 +5,6 @@ import {
   CardContent,
   Typography,
   LinearProgress,
-  Avatar,
   Chip,
   Grid,
   Divider,
@@ -15,6 +14,7 @@ import {
 import { getBooksProgress } from 'services/books/books.service';
 import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
+import ProfileAvatar from 'components/ProfileAvatar';
 import BookProgressRing from './BookProgressRing';
 import { parseLocalDate } from 'utils/dateHelpers';
 
@@ -292,12 +292,11 @@ const InFlightBooksProgress = () => {
                         {displayedUsers.map((userProgress, index) => (
                           <Box key={`${userProgress.userId}-${index}`} sx={{ mb: 1 }}>
                             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                              <Avatar
-                                src={userProgress.photoUrl}
-                                sx={{ width: 24, height: 24 }}
-                              >
-                                {userProgress.displayName?.charAt(0) || '?'}
-                              </Avatar>
+                              <ProfileAvatar
+                                user={userProgress}
+                                size={24}
+                                showEntryRing={false}
+                              />
                               <Typography variant="body2" sx={{ minWidth: 100 }}>
                                 {userProgress.displayName || 'Unknown User'}
                               </Typography>
