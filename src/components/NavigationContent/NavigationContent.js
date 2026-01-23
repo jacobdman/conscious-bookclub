@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   List,
@@ -27,6 +27,8 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
   const feedContext = useContext(FeedContext);
   const unreadCount = feedContext?.unreadCount || 0;
   const [appVersion, setAppVersion] = useState('');
+  const [versionTapCount, setVersionTapCount] = useState(0);
+  const versionTapTimeoutRef = useRef(null);
 
   // Fetch app version
   useEffect(() => {
@@ -90,6 +92,25 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
       if (onClose) onClose();
     } catch (err) {
       console.error('Failed to switch club:', err);
+    }
+  };
+
+  const handleVersionTap = () => {
+    const nextCount = versionTapCount + 1;
+    setVersionTapCount(nextCount);
+
+    if (versionTapTimeoutRef.current) {
+      clearTimeout(versionTapTimeoutRef.current);
+    }
+
+    versionTapTimeoutRef.current = setTimeout(() => {
+      setVersionTapCount(0);
+    }, 2000);
+
+    if (nextCount >= 15) {
+      setVersionTapCount(0);
+      navigate('/dev');
+      if (onClose) onClose();
     }
   };
 
@@ -381,8 +402,11 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
               color: 'text.secondary',
               fontSize: '0.65rem',
               mt: 1,
-              opacity: 0.6
+              opacity: 0.6,
+              cursor: 'pointer',
+              userSelect: 'none'
             }}
+            onClick={handleVersionTap}
           >
             v{appVersion}
           </Typography>

@@ -12,11 +12,11 @@ const MonthlyStreakGrid = ({
   cadence = null,
   progressPercent = null,
   weeklyProgressByRow = null,
+  streakSummary = null,
 }) => {
   const monthValue = monthDate ? new Date(monthDate) : new Date();
   const year = monthValue.getFullYear();
   const monthIndex = monthValue.getMonth();
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, monthIndex, 1).getDay();
 
   const entryDates = useMemo(() => {
@@ -52,6 +52,13 @@ const MonthlyStreakGrid = ({
 
   const showWeeklyProgress = cadence === 'week' && Array.isArray(weeklyProgressByRow);
   const showMonthlyPercent = cadence === 'month' && typeof progressPercent === 'number';
+  const getProgressColor = (value) => {
+    if (value >= 100) return 'success.main';
+    if (value >= 75) return 'primary.main';
+    if (value >= 50) return 'warning.main';
+    if (value > 0) return 'info.main';
+    return 'error.main';
+  };
 
   return (
     <Paper sx={{ p: 2, mb: 2, width: '100%' }}>
@@ -130,7 +137,12 @@ const MonthlyStreakGrid = ({
                             value={displayValue}
                             size={28}
                             thickness={3}
-                            sx={{ position: 'absolute', inset: 0, margin: 'auto' }}
+                            sx={{
+                              position: 'absolute',
+                              inset: 0,
+                              margin: 'auto',
+                              color: getProgressColor(displayValue),
+                            }}
                           />
                           <Box
                             sx={{
@@ -138,11 +150,12 @@ const MonthlyStreakGrid = ({
                               height: 22,
                               borderRadius: '999px',
                               border: '1px solid',
-                              borderColor: 'divider',
+                              borderColor: getProgressColor(displayValue),
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               backgroundColor: 'background.paper',
+                              color: getProgressColor(displayValue),
                             }}
                           >
                             {Math.round(displayValue)}%
@@ -202,6 +215,23 @@ const MonthlyStreakGrid = ({
           </Box>
         </Box>
       </Box>
+
+      {streakSummary && (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              {streakSummary.currentLabel}
+            </Typography>
+            <Typography variant="body2">{streakSummary.currentValue}</Typography>
+          </Box>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="caption" color="text.secondary">
+              {streakSummary.longestLabel}
+            </Typography>
+            <Typography variant="body2">{streakSummary.longestValue}</Typography>
+          </Box>
+        </Box>
+      )}
     </Paper>
   );
 };

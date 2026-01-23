@@ -163,6 +163,8 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const isMeetingActivity = post.text?.includes('{meeting_post}') && relatedRecord?.type === 'meeting';
   const isBookCompletionActivity = post.text?.includes('{book_completion_post}') && relatedRecord?.type === 'book';
   const isGoalCompletionActivity = post.text?.includes('{goal_completion_post}') && relatedRecord?.type === 'goal';
+  const streakMatch = post.text?.match(/\|streak:([^|]+)$/);
+  const goalStreakValue = streakMatch?.[1]?.trim() || null;
 
   const renderMeetingActivity = () => {
     const meetingData = relatedRecord?.record || {};
@@ -312,6 +314,11 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {cadenceLabel}
             {targetLabel ? ` · ${targetLabel}` : ''}
+          </Typography>
+        )}
+        {goalStreakValue && (
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            🔥 Streak: {goalStreakValue}
           </Typography>
         )}
         <Box sx={{ mt: 1 }}>

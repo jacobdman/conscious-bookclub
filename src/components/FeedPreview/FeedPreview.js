@@ -180,7 +180,12 @@ const FeedPreview = () => {
               const goal = post.relatedRecord?.record || {};
               const actorName = post.authorName || 'A member';
               const goalTitle = goal.title || 'a goal';
+              const streakMatch = post.text?.match(/\|streak:([^|]+)$/);
+              const goalStreakValue = streakMatch?.[1]?.trim();
               previewText = `🎉 ${actorName} completed ${goalTitle}`;
+              if (goalStreakValue) {
+                previewText += ` · 🔥 Streak: ${goalStreakValue}`;
+              }
             }
 
             return (

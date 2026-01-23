@@ -40,7 +40,11 @@ import {
   getProgressBarValue,
   formatDate,
   getPeriodBoundaries,
+  getGoalTargetValue,
+  getGoalStreakSummary,
+  getGoalStreakValue,
 } from 'utils/goalHelpers';
+import { formatLocalDate } from 'utils/dateHelpers';
 
 const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const { user } = useAuth();
@@ -53,6 +57,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     deleteEntry,
     fetchGoalEntries,
     fetchGoalEntriesForMonth,
+    fetchGoalEntriesAll,
     createMilestone,
     deleteMilestone,
     updateMilestone,
@@ -80,6 +85,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const [monthEntriesPool, setMonthEntriesPool] = useState([]);
   const [monthEntriesLoading, setMonthEntriesLoading] = useState(false);
   const [weekEntriesPool, setWeekEntriesPool] = useState([]);
+  const [allEntries, setAllEntries] = useState([]);
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
   const observerTarget = useRef(null);
   const initialEntriesLoaded = useRef({});
@@ -219,12 +225,28 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
   }, [goal, fetchGoalEntriesForMonth, monthCursor]);
 
+  const loadAllEntries = useCallback(async () => {
+    if (!goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
+    if (goal.cadence !== 'day' && goal.cadence !== 'week') {
+      setAllEntries([]);
+      return;
+    }
+
+    try {
+      const entries = await fetchGoalEntriesAll(goal.id);
+      setAllEntries(entries || []);
+    } catch (err) {
+      console.error('Failed to load all entries:', err);
+    }
+  }, [goal, fetchGoalEntriesAll]);
+
   useEffect(() => {
     if (!open || !goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
 
     loadMonthEntries();
     loadWeekEntriesPool();
-  }, [open, goal, monthCursor, loadMonthEntries, loadWeekEntriesPool]);
+    loadAllEntries();
+  }, [open, goal, monthCursor, loadMonthEntries, loadWeekEntriesPool, loadAllEntries]);
 
   const getCompletionLabel = (goalItem, detail = null) => {
     const baseLabel = goalItem?.title || 'this goal';
@@ -249,8 +271,13 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
 
     try {
+      const streakValue = getGoalStreakValue(shareDialog.goal, allEntries);
+      const completionText = streakValue
+        ? `{goal_completion_post}|streak:${streakValue}`
+        : '{goal_completion_post}';
+
       await createPost(currentClub.id, {
-        text: '{goal_completion_post}',
+        text: completionText,
         isActivity: true,
         isSpoiler: false,
         relatedRecordType: 'goal',
@@ -286,8 +313,27 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     setEntryDialog({ open: true, entry, saving: false, error: null, initialDate: null });
   };
 
+  const getEntryForDate = useCallback((dateValue) => {
+    if (!dateValue || !monthEntriesPool.length) return null;
+    const dateKey = formatLocalDate(dateValue);
+    return monthEntriesPool.find(entry => {
+      const entryDate = new Date(entry.occurred_at || entry.occurredAt || 0);
+      if (Number.isNaN(entryDate.getTime())) return false;
+      return formatLocalDate(entryDate) === dateKey;
+    }) || null;
+  }, [monthEntriesPool]);
+
   const handleDayEntry = (dateValue) => {
-    setEntryDialog({ open: true, entry: null, saving: false, error: null, initialDate: dateValue });
+    const entryForDay = getEntryForDate(dateValue);
+    if (entryForDay) {
+      handleDeleteEntry(entryForDay);
+      return;
+    }
+
+    const now = new Date();
+    const initialDate = new Date(dateValue);
+    initialDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    setEntryDialog({ open: true, entry: null, saving: false, error: null, initialDate });
   };
 
   const handleDeleteEntry = async (entry) => {
@@ -297,6 +343,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
       await deleteEntry(goal.id, entry.id);
       await loadMonthEntries();
       await loadWeekEntriesPool();
+      await loadAllEntries();
     } catch (err) {
       console.error('Failed to delete entry:', err);
     }
@@ -320,8 +367,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
       await loadMonthEntries();
       await loadWeekEntriesPool();
+      await loadAllEntries();
       
-      setEntryDialog({ open: false, entry: null, saving: false, error: null });
+      setEntryDialog({ open: false, entry: null, saving: false, error: null, initialDate: null });
     } catch (err) {
       setEntryDialog(prev => ({ 
         ...prev, 
@@ -539,6 +587,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const progress = goal?.progress;
   const hasProgress = progress && (goal?.type === 'habit' || goal?.type === 'metric');
 
+  const targetValue = useMemo(() => getGoalTargetValue(goal), [goal]);
+
   const getPercentForEntries = useCallback((entriesForPeriod) => {
     if (!goal || !entriesForPeriod) return null;
     if (goal.cadence !== 'week' && goal.cadence !== 'month') return null;
@@ -546,13 +596,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     const actual = goal.measure === 'sum'
       ? entriesForPeriod.reduce((acc, entry) => acc + (parseFloat(entry.quantity) || 0), 0)
       : entriesForPeriod.length;
-    const targetValue = goal.measure === 'sum'
-      ? parseFloat(goal.targetQuantity || goal.target || 0)
-      : parseFloat(goal.targetCount || goal.target || 0);
-
     if (!targetValue) return 0;
     return Math.round(Math.min((actual / targetValue) * 100, 100));
-  }, [goal]);
+  }, [goal, targetValue]);
 
   const weeklyProgressByRow = useMemo(() => {
     if (goal?.cadence !== 'week') return null;
@@ -575,6 +621,10 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const monthProgressPercent = useMemo(() => (
     goal?.cadence === 'month' ? getPercentForEntries(monthEntries) : null
   ), [goal?.cadence, getPercentForEntries, monthEntries]);
+
+  const streakSummary = useMemo(() => (
+    getGoalStreakSummary(goal, allEntries)
+  ), [goal, allEntries]);
 
   const handlePrevMonth = () => {
     setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -817,6 +867,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                   cadence={goal.cadence}
                   progressPercent={monthProgressPercent}
                   weeklyProgressByRow={weeklyProgressByRow}
+                  streakSummary={streakSummary}
                 />
 
                 <Accordion defaultExpanded={false} sx={{ boxShadow: 1 }}>

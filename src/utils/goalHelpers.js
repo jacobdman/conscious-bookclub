@@ -2,7 +2,7 @@
  * Utility functions for goal management and period calculations
  */
 
-import { formatLocalDate } from 'utils/dateHelpers';
+import { formatLocalDate, parseLocalDate } from 'utils/dateHelpers';
 
 /**
  * Normalize goal type (handle variations like 'one-time' vs 'one_time')
@@ -86,6 +86,144 @@ export const getPeriodBoundaries = (cadence, timestamp = null) => {
   }
   
   return {start, end};
+};
+
+export const getGoalTargetValue = (goal) => {
+  if (!goal) return 0;
+  if (goal.measure === 'sum') {
+    return parseFloat(goal.targetQuantity || goal.target || 0);
+  }
+  return parseFloat(goal.targetCount || goal.target || 0);
+};
+
+export const getGoalStreakSummary = (goal, entries = []) => {
+  if (!goal || !Array.isArray(entries) || entries.length === 0) {
+    return null;
+  }
+  if (goal.type !== 'habit' && goal.type !== 'metric') {
+    return null;
+  }
+
+  const targetValue = getGoalTargetValue(goal);
+  if (!targetValue) return null;
+
+  if (goal.cadence === 'day') {
+    const dailyActual = {};
+    entries.forEach((entry) => {
+      const entryDate = new Date(entry.occurred_at || entry.occurredAt || 0);
+      if (Number.isNaN(entryDate.getTime())) return;
+      const dateKey = formatLocalDate(entryDate);
+      const increment = goal.measure === 'sum' ? (parseFloat(entry.quantity) || 0) : 1;
+      dailyActual[dateKey] = (dailyActual[dateKey] || 0) + increment;
+    });
+
+    const completedDates = Object.keys(dailyActual).filter(
+      (dateKey) => dailyActual[dateKey] >= targetValue
+    );
+    if (completedDates.length === 0) return null;
+
+    const sortedDates = completedDates
+      .map((dateKey) => parseLocalDate(dateKey))
+      .filter(Boolean)
+      .sort((a, b) => a - b);
+
+    let longest = 1;
+    let streak = 1;
+    for (let i = 1; i < sortedDates.length; i += 1) {
+      const prev = sortedDates[i - 1];
+      const current = sortedDates[i];
+      const diffDays = Math.round((current - prev) / 86400000);
+      if (diffDays === 1) {
+        streak += 1;
+      } else {
+        streak = 1;
+      }
+      longest = Math.max(longest, streak);
+    }
+
+    const today = new Date();
+    const currentDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    let currentStreak = 0;
+    let cursor = currentDate;
+    const completedSet = new Set(completedDates);
+    while (completedSet.has(formatLocalDate(cursor))) {
+      currentStreak += 1;
+      const next = new Date(cursor);
+      next.setDate(next.getDate() - 1);
+      cursor = next;
+    }
+
+    return {
+      currentLabel: 'Current streak',
+      longestLabel: 'Longest streak',
+      currentValue: `${currentStreak} day${currentStreak === 1 ? '' : 's'}`,
+      longestValue: `${longest} day${longest === 1 ? '' : 's'}`,
+    };
+  }
+
+  if (goal.cadence === 'week') {
+    const weeklyActual = {};
+    entries.forEach((entry) => {
+      const entryDate = new Date(entry.occurred_at || entry.occurredAt || 0);
+      if (Number.isNaN(entryDate.getTime())) return;
+      const { start } = getPeriodBoundaries('week', entryDate);
+      const weekKey = formatLocalDate(start);
+      const increment = goal.measure === 'sum' ? (parseFloat(entry.quantity) || 0) : 1;
+      weeklyActual[weekKey] = (weeklyActual[weekKey] || 0) + increment;
+    });
+
+    const entryDates = entries
+      .map((entry) => new Date(entry.occurred_at || entry.occurredAt || 0))
+      .filter((date) => !Number.isNaN(date.getTime()));
+    if (entryDates.length === 0) return null;
+
+    const earliest = entryDates.reduce((min, date) => (date < min ? date : min), entryDates[0]);
+    const { start: earliestWeek } = getPeriodBoundaries('week', earliest);
+    const { start: currentWeek } = getPeriodBoundaries('week', new Date());
+
+    let longest = 0;
+    let streak = 0;
+    const completedWeeks = new Set();
+
+    const cursor = new Date(earliestWeek);
+    while (cursor <= currentWeek) {
+      const weekKey = formatLocalDate(cursor);
+      const actual = weeklyActual[weekKey] || 0;
+      const completed = actual >= targetValue;
+      if (completed) {
+        streak += 1;
+        completedWeeks.add(weekKey);
+      } else {
+        streak = 0;
+      }
+      longest = Math.max(longest, streak);
+      cursor.setDate(cursor.getDate() + 7);
+    }
+
+    let currentStreak = 0;
+    const currentCursor = new Date(currentWeek);
+    if (!completedWeeks.has(formatLocalDate(currentCursor))) {
+      currentCursor.setDate(currentCursor.getDate() - 7);
+    }
+    while (completedWeeks.has(formatLocalDate(currentCursor))) {
+      currentStreak += 1;
+      currentCursor.setDate(currentCursor.getDate() - 7);
+    }
+
+    return {
+      currentLabel: 'Current 100% streak',
+      longestLabel: 'Longest 100% streak',
+      currentValue: `${currentStreak} week${currentStreak === 1 ? '' : 's'}`,
+      longestValue: `${longest} week${longest === 1 ? '' : 's'}`,
+    };
+  }
+
+  return null;
+};
+
+export const getGoalStreakValue = (goal, entries = []) => {
+  const summary = getGoalStreakSummary(goal, entries);
+  return summary?.currentValue || null;
 };
 
 /**

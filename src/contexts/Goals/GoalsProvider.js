@@ -227,6 +227,29 @@ const GoalsProvider = ({ children }) => {
     return sortedEntries;
   }, [user]);
 
+  const handleFetchGoalEntriesAll = useCallback(async (goalId) => {
+    if (!user || !goalId) return [];
+
+    const goalCache = goalEntriesCacheRef.current[goalId] || {};
+    if (goalCache.all) {
+      return goalCache.all;
+    }
+
+    const entries = await getGoalEntries(user.uid, goalId);
+    const sortedEntries = entries.sort((a, b) => {
+      const dateA = new Date(a.occurred_at || a.occurredAt || 0);
+      const dateB = new Date(b.occurred_at || b.occurredAt || 0);
+      return dateB - dateA;
+    });
+
+    goalEntriesCacheRef.current[goalId] = {
+      ...goalCache,
+      all: sortedEntries,
+    };
+
+    return sortedEntries;
+  }, [user]);
+
   // Fetch entries for a goal (with pagination support)
   const handleFetchGoalEntries = useCallback(async (goalId, limit = 10, offset = 0, append = false, periodStart = null, periodEnd = null) => {
     if (!user || !goalId) return;
@@ -675,6 +698,7 @@ const GoalsProvider = ({ children }) => {
         deleteEntry: handleDeleteEntry,
         fetchGoalEntries: handleFetchGoalEntries,
         fetchGoalEntriesForMonth: handleFetchGoalEntriesForMonth,
+        fetchGoalEntriesAll: handleFetchGoalEntriesAll,
         createMilestone: handleCreateMilestone,
         deleteMilestone: handleDeleteMilestone,
         updateMilestone: handleUpdateMilestone,

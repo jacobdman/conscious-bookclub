@@ -13,6 +13,7 @@ export default React.createContext({
   deleteEntry: async () => {},
   fetchGoalEntries: async () => {},
   fetchGoalEntriesForMonth: async () => {},
+  fetchGoalEntriesAll: async () => {},
   createMilestone: async () => {},
   deleteMilestone: async () => {},
   updateMilestone: async () => {},

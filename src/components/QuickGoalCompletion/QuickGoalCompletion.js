@@ -40,6 +40,7 @@ import {
   normalizeGoalType,
   getGoalTypeLabel,
   getGoalTypeColor,
+  getGoalStreakValue,
 } from 'utils/goalHelpers';
 
 const QuickGoalCompletion = () => {
@@ -52,6 +53,7 @@ const QuickGoalCompletion = () => {
     deleteEntry,
     updateMilestone,
     fetchGoalEntries,
+    fetchGoalEntriesAll,
   } = useGoalsContext();
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState({});
@@ -125,8 +127,17 @@ const QuickGoalCompletion = () => {
     }
 
     try {
+      let streakValue = null;
+      if (shareDialog.goal.type === 'habit' || shareDialog.goal.type === 'metric') {
+        const entries = await fetchGoalEntriesAll(shareDialog.goal.id);
+        streakValue = getGoalStreakValue(shareDialog.goal, entries);
+      }
+      const completionText = streakValue
+        ? `{goal_completion_post}|streak:${streakValue}`
+        : '{goal_completion_post}';
+
       await createPost(currentClub.id, {
-        text: '{goal_completion_post}',
+        text: completionText,
         isActivity: true,
         isSpoiler: false,
         relatedRecordType: 'goal',
