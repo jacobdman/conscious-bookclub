@@ -51,6 +51,7 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
   const [loading, setLoading] = useState(false);
   const [goalsToday, setGoalsToday] = useState([]);
   const [goalsNoEntry, setGoalsNoEntry] = useState([]);
+  const [goalsCompleted, setGoalsCompleted] = useState([]);
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [monthEntries, setMonthEntries] = useState([]);
@@ -104,10 +105,14 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
       });
 
       const goalsWithTodayEntries = enrichedGoals.filter(goal => goal.entriesToday.length > 0);
-      const goalsWithoutEntries = enrichedGoals.filter(goal => goal.entriesToday.length === 0);
+      const goalsCompletedList = enrichedGoals.filter(goal => goal.completed);
+      const goalsWithoutEntries = enrichedGoals.filter(goal => (
+        goal.entriesToday.length === 0 && !goal.completed
+      ));
 
       setGoalsToday(goalsWithTodayEntries);
       setGoalsNoEntry(goalsWithoutEntries);
+      setGoalsCompleted(goalsCompletedList);
     } catch (err) {
       console.error('Error loading user goals for today:', err);
       setError('Failed to load today’s goal entries.');
@@ -322,6 +327,37 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                     ))}
                   </List>
                 )}
+
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, mt: 3 }}>
+              Completed Goals
+            </Typography>
+            {goalsCompleted.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
+                No completed goals yet.
+              </Typography>
+            ) : (
+              <List disablePadding>
+                {goalsCompleted.map((goal, index) => (
+                  <React.Fragment key={goal.id}>
+                    <ListItemButton
+                      onClick={() => setSelectedGoal(goal)}
+                      sx={{ px: 1, opacity: 0.7 }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
+                          {goal.title || 'Goal'}
+                        </Typography>
+                        <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDate(goal.completedAt || goal.completed_at)}
+                      </Typography>
+                    </ListItemButton>
+                    {index < goalsCompleted.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </List>
+            )}
               </Box>
             </Slide>
 
