@@ -8,9 +8,12 @@ import {
   Fab,
   FormControlLabel,
   Checkbox,
+  Menu,
+  MenuItem,
+  Switch,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { Send, KeyboardArrowDown, Image as ImageIcon, Close, AlternateEmail } from '@mui/icons-material';
+import { Send, KeyboardArrowDown, Image as ImageIcon, Close, AlternateEmail, Settings } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useFeedContext from 'contexts/Feed';
@@ -22,7 +25,17 @@ import { encodeMentions } from 'utils/mentionHelpers';
 const FeedSection = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
-  const { posts, loading, loadingMore, error, createPost, hasMore, loadMorePosts } = useFeedContext();
+  const {
+    posts,
+    loading,
+    loadingMore,
+    error,
+    createPost,
+    hasMore,
+    loadMorePosts,
+    showActivity,
+    setShowActivity,
+  } = useFeedContext();
   const [newPostText, setNewPostText] = useState('');
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,6 +44,7 @@ const FeedSection = () => {
   const [selectedFiles, setSelectedFiles] = useState([]); // { file, preview }
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [mentions, setMentions] = useState([]); // Track mentions in the post
+  const [settingsAnchorEl, setSettingsAnchorEl] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -296,6 +310,14 @@ const FeedSection = () => {
     }, 0);
   };
 
+  const handleOpenSettings = (event) => {
+    setSettingsAnchorEl(event.currentTarget);
+  };
+
+  const handleCloseSettings = () => {
+    setSettingsAnchorEl(null);
+  };
+
   const postsContent = useMemo(() => {
     return (
       <>
@@ -541,20 +563,38 @@ const FeedSection = () => {
             </Typography>
           )}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isSpoiler}
-                  onChange={(e) => setIsSpoiler(e.target.checked)}
-                  size="small"
-                />
-              }
-              label="Mark as spoiler"
-              sx={{ ml: 0.5 }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isSpoiler}
+                    onChange={(e) => setIsSpoiler(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Mark as spoiler"
+                sx={{ ml: 0.5 }}
+              />
+              <IconButton
+                size="small"
+                onClick={handleInsertMention}
+                disabled={isSubmitting}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: 'primary.main',
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+                title="Mention someone"
+              >
+                <AlternateEmail fontSize="small" />
+              </IconButton>
+            </Box>
+            <Box sx={{ flex: 1 }} />
             <IconButton
               size="small"
-              onClick={handleInsertMention}
+              onClick={handleOpenSettings}
               disabled={isSubmitting}
               sx={{
                 color: 'text.secondary',
@@ -563,10 +603,32 @@ const FeedSection = () => {
                   backgroundColor: 'action.hover',
                 },
               }}
-              title="Mention someone"
+              title="Feed settings"
             >
-              <AlternateEmail fontSize="small" />
+              <Settings fontSize="small" />
             </IconButton>
+            <Menu
+              anchorEl={settingsAnchorEl}
+              open={Boolean(settingsAnchorEl)}
+              onClose={handleCloseSettings}
+              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+              <MenuItem disableRipple sx={{ cursor: 'default' }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={showActivity}
+                      onChange={(e) => setShowActivity(e.target.checked)}
+                      color="primary"
+                      size="small"
+                    />
+                  }
+                  label="Show activity posts"
+                  sx={{ m: 0 }}
+                />
+              </MenuItem>
+            </Menu>
           </Box>
         </Box>
       </Paper>
