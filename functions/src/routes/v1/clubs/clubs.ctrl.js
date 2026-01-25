@@ -85,6 +85,18 @@ const resolveThemes = (themes) => {
   return normalized.length > 0 ? normalized : DEFAULT_THEMES;
 };
 
+const normalizeThemeOverrides = (themeOverrides) => {
+  if (themeOverrides === null || themeOverrides === undefined) {
+    return {};
+  }
+  if (typeof themeOverrides !== "object" || Array.isArray(themeOverrides)) {
+    const error = new Error("themeOverrides must be an object");
+    error.status = 400;
+    throw error;
+  }
+  return themeOverrides;
+};
+
 // Helper function to verify user is member of club
 const verifyMembership = async (clubId, userId) => {
   const membership = await db.ClubMember.findOne({
@@ -164,6 +176,7 @@ const getUserClubs = async (req, res, next) => {
         dashboardConfig: sanitizeDashboardConfig(membership.club.dashboardConfig),
         themesEnabled: membership.club.themesEnabled !== false,
         themes: resolveThemes(membership.club.themes),
+        themeOverrides: membership.club.themeOverrides || {},
         role: membership.role,
         createdAt: membership.club.createdAt,
       };
@@ -216,6 +229,7 @@ const getClub = async (req, res, next) => {
       dashboardConfig: sanitizeDashboardConfig(club.dashboardConfig),
       themesEnabled: club.themesEnabled !== false,
       themes: resolveThemes(club.themes),
+      themeOverrides: club.themeOverrides || {},
       role: membership.role,
       createdAt: club.createdAt,
     };
@@ -294,10 +308,17 @@ const updateClub = async (req, res, next) => {
       throw error;
     }
 
-    // Verify manage access
-    const manageAccess = await verifyManageAccess(parseInt(clubId), userId);
-    if (!manageAccess) {
-      const error = new Error("Only club owners or admins can update club settings");
+    const needsOwner = updates.themeOverrides !== undefined;
+    const accessCheck = needsOwner ?
+      await verifyOwnership(parseInt(clubId), userId) :
+      await verifyManageAccess(parseInt(clubId), userId);
+
+    if (!accessCheck) {
+      const error = new Error(
+          needsOwner ?
+          "Only club owners can update theme overrides" :
+          "Only club owners or admins can update club settings",
+      );
       error.status = 403;
       throw error;
     }
@@ -325,6 +346,9 @@ const updateClub = async (req, res, next) => {
     if (updates.themes !== undefined) {
       const sanitizedThemes = normalizeThemes(updates.themes);
       club.themes = sanitizedThemes;
+    }
+    if (updates.themeOverrides !== undefined) {
+      club.themeOverrides = normalizeThemeOverrides(updates.themeOverrides);
     }
 
     const nextThemesEnabled = club.themesEnabled !== false;

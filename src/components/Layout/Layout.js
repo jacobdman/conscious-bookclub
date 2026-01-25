@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from 'AuthContext';
 // UI
-import { Box, CssBaseline, Drawer, ThemeProvider, useMediaQuery, useTheme } from '@mui/material';
+import { Box, CssBaseline, Drawer, ThemeProvider, useMediaQuery } from '@mui/material';
 // Context
 import useClubContext from 'contexts/Club';
 import ClubReportingProvider from 'contexts/ClubReporting/ClubReportingProvider';
@@ -11,14 +11,17 @@ import BottomNav from 'components/BottomNav';
 import Header from 'components/Header';
 import NavigationContent from 'components/NavigationContent';
 // Utils
-import { theme } from 'theme';
+import { buildTheme } from 'theme';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
   const { currentClub } = useClubContext();
   const location = useLocation();
-  const muiTheme = useTheme();
-  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+  const clubTheme = useMemo(
+    () => buildTheme(currentClub?.themeOverrides || {}),
+    [currentClub?.themeOverrides],
+  );
+  const isMobile = useMediaQuery(clubTheme.breakpoints.down('md'));
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -106,7 +109,7 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={clubTheme}>
       <ClubReportingProvider>
         <CssBaseline />
         <Box

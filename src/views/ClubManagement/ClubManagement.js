@@ -26,6 +26,10 @@ import {
   FormControlLabel,
   Switch,
   Tooltip,
+  Tabs,
+  Tab,
+  Fade,
+  ButtonBase,
 } from '@mui/material';
 import {
   Delete,
@@ -58,13 +62,29 @@ import {
   getDefaultDashboardConfig,
   sanitizeDashboardConfig,
 } from 'utils/dashboardConfig';
+import { CLUB_THEME_PRESETS, getPresetForOverrides } from 'utils/clubThemePresets';
 
 const DEFAULT_THEMES = ['Classy', 'Creative', 'Curious'];
+
+const TabPanel = ({ children, value, tabId }) => (
+  <Fade in={value === tabId} timeout={250} mountOnEnter unmountOnExit>
+    <Box
+      role="tabpanel"
+      hidden={value !== tabId}
+      id={`club-manage-tabpanel-${tabId}`}
+      aria-labelledby={`club-manage-tab-${tabId}`}
+      sx={{ pt: 2 }}
+    >
+      {children}
+    </Box>
+  </Fade>
+);
 
 const ClubManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { currentClub, refreshClubs, refreshClubMembers } = useClubContext();
+  const [activeTab, setActiveTab] = useState('club');
   const [editingName, setEditingName] = useState(false);
   const [clubName, setClubName] = useState('');
   const [members, setMembers] = useState([]);
@@ -82,6 +102,9 @@ const ClubManagement = () => {
   const [themes, setThemes] = useState(DEFAULT_THEMES);
   const [savingThemes, setSavingThemes] = useState(false);
   const [themesInfoOpen, setThemesInfoOpen] = useState(false);
+  const [selectedClubThemeId, setSelectedClubThemeId] = useState(null);
+  const [clubThemeMode, setClubThemeMode] = useState('light');
+  const [savingClubTheme, setSavingClubTheme] = useState(false);
 
   const loadMembers = useCallback(async () => {
     if (!currentClub || !user) return;
@@ -109,6 +132,12 @@ const ClubManagement = () => {
       } else {
         setThemes(DEFAULT_THEMES);
       }
+      const presetMatch = getPresetForOverrides(currentClub.themeOverrides || {});
+      setSelectedClubThemeId(presetMatch?.preset?.id ?? null);
+      setClubThemeMode(
+        presetMatch?.mode ??
+          (currentClub?.themeOverrides?.palette?.mode === 'dark' ? 'dark' : 'light'),
+      );
       loadMembers();
     }
   }, [currentClub, loadMembers]);
@@ -303,8 +332,35 @@ const ClubManagement = () => {
     }
   };
 
+  const handleSaveClubTheme = async () => {
+    if (!currentClub || !user || !selectedClubThemeId) return;
+
+    const selectedPreset = CLUB_THEME_PRESETS.find((preset) => preset.id === selectedClubThemeId);
+    if (!selectedPreset) {
+      setError('Please select a valid club theme.');
+      return;
+    }
+
+    const selectedOverrides = selectedPreset.overrides?.[clubThemeMode] ?? selectedPreset.overrides?.light ?? {};
+
+    try {
+      setSavingClubTheme(true);
+      setError(null);
+      await updateClub(currentClub.id, user.uid, {
+        themeOverrides: selectedOverrides,
+      });
+      await refreshClubs();
+    } catch (err) {
+      setError('Failed to update club theme.');
+      console.error('Error updating club theme:', err);
+    } finally {
+      setSavingClubTheme(false);
+    }
+  };
+
   const isOwner = currentClub?.role === 'owner';
   const canManageClub = ['owner', 'admin'].includes(currentClub?.role);
+  const currentThemePreset = getPresetForOverrides(currentClub?.themeOverrides || {});
 
   if (!currentClub) {
     return (
@@ -337,189 +393,385 @@ const ClubManagement = () => {
           </Alert>
         )}
 
-        {/* Club Name Section */}
-        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Club Name</Typography>
-          {editingName ? (
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <TextField
-                value={clubName}
-                onChange={(e) => setClubName(e.target.value)}
-                fullWidth
-                size="small"
-              />
-              <IconButton color="primary" onClick={handleSaveName} size="small">
-                <Save />
-              </IconButton>
-              <IconButton onClick={() => {
-                setEditingName(false);
-                setClubName(currentClub.name);
-              }} size="small">
-                <Cancel />
-              </IconButton>
-            </Box>
-          ) : (
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <Typography variant="body1">{clubName}</Typography>
-              <IconButton size="small" onClick={() => setEditingName(true)}>
-                <Edit />
-              </IconButton>
-            </Box>
-          )}
-        </Paper>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+          <Tabs
+            value={activeTab}
+            onChange={(event, value) => setActiveTab(value)}
+            variant="scrollable"
+            scrollButtons="auto"
+            aria-label="Club management tabs"
+          >
+            <Tab label="Club" value="club" id="club-manage-tab-club" aria-controls="club-manage-tabpanel-club" />
+            <Tab label="Members" value="members" id="club-manage-tab-members" aria-controls="club-manage-tabpanel-members" />
+            <Tab label="Themes" value="themes" id="club-manage-tab-themes" aria-controls="club-manage-tabpanel-themes" />
+            <Tab label="Dashboard" value="dashboard" id="club-manage-tab-dashboard" aria-controls="club-manage-tabpanel-dashboard" />
+          </Tabs>
+        </Box>
 
-        {/* Invite Code Section */}
-        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Invite Code</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Share this code or URL with others to allow them to join your club. You can rotate the code at any time for security.
-          </Typography>
-          <Stack spacing={1.5}>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                Invite Code
-              </Typography>
+        <TabPanel value={activeTab} tabId="club">
+          {/* Club Name Section */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Club Name</Typography>
+            {editingName ? (
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField
-                  value={currentClub.inviteCode || ''}
+                  value={clubName}
+                  onChange={(e) => setClubName(e.target.value)}
                   fullWidth
                   size="small"
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      fontFamily: 'monospace',
-                      letterSpacing: '0.1em',
-                      fontSize: { xs: '0.875rem', md: '1rem' },
-                    },
-                  }}
                 />
-                <IconButton
-                  color={copiedCode ? 'success' : 'primary'}
-                  onClick={handleCopyInviteCode}
-                  title="Copy invite code"
-                  size="small"
-                >
-                  {copiedCode ? <Check /> : <ContentCopy />}
+                <IconButton color="primary" onClick={handleSaveName} size="small">
+                  <Save />
+                </IconButton>
+                <IconButton onClick={() => {
+                  setEditingName(false);
+                  setClubName(currentClub.name);
+                }} size="small">
+                  <Cancel />
                 </IconButton>
               </Box>
-            </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                Invite URL
-              </Typography>
+            ) : (
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <TextField
-                  value={currentClub?.inviteCode ? `${window.location.origin}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}` : ''}
-                  fullWidth
-                  size="small"
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      wordBreak: 'break-all',
-                    },
-                  }}
-                />
-                <IconButton
-                  color={copiedUrl ? 'success' : 'primary'}
-                  onClick={handleCopyInviteUrl}
-                  title="Copy invite URL"
-                  size="small"
-                >
-                  {copiedUrl ? <Check /> : <ContentCopy />}
+                <Typography variant="body1">{clubName}</Typography>
+                <IconButton size="small" onClick={() => setEditingName(true)}>
+                  <Edit />
                 </IconButton>
               </Box>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+            )}
+          </Paper>
+
+          {/* Invite Code Section */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Invite Code</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Share this code or URL with others to allow them to join your club. You can rotate the code at any time for security.
+            </Typography>
+            <Stack spacing={1.5}>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                  Invite Code
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <TextField
+                    value={currentClub.inviteCode || ''}
+                    fullWidth
+                    size="small"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input': {
+                        fontFamily: 'monospace',
+                        letterSpacing: '0.1em',
+                        fontSize: { xs: '0.875rem', md: '1rem' },
+                      },
+                    }}
+                  />
+                  <IconButton
+                    color={copiedCode ? 'success' : 'primary'}
+                    onClick={handleCopyInviteCode}
+                    title="Copy invite code"
+                    size="small"
+                  >
+                    {copiedCode ? <Check /> : <ContentCopy />}
+                  </IconButton>
+                </Box>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                  Invite URL
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <TextField
+                    value={currentClub?.inviteCode ? `${window.location.origin}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}` : ''}
+                    fullWidth
+                    size="small"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input': {
+                        fontSize: { xs: '0.75rem', md: '0.875rem' },
+                        wordBreak: 'break-all',
+                      },
+                    }}
+                  />
+                  <IconButton
+                    color={copiedUrl ? 'success' : 'primary'}
+                    onClick={handleCopyInviteUrl}
+                    title="Copy invite URL"
+                    size="small"
+                  >
+                    {copiedUrl ? <Check /> : <ContentCopy />}
+                  </IconButton>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<Refresh />}
+                  onClick={() => setRotateDialog(true)}
+                  size="small"
+                >
+                  Rotate Code
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+
+          {/* Delete Club Section */}
+          {isOwner && (
+            <Paper sx={{ p: { xs: 2, md: 3 } }}>
+              <Typography variant="h6" sx={{ mb: 1.5, color: 'error.main', fontSize: { xs: '1rem', md: '1.25rem' } }}>Danger Zone</Typography>
               <Button
                 variant="outlined"
-                startIcon={<Refresh />}
-                onClick={() => setRotateDialog(true)}
+                color="error"
+                onClick={() => setDeleteDialog(true)}
                 size="small"
               >
-                Rotate Code
+                Delete Club
+              </Button>
+            </Paper>
+          )}
+        </TabPanel>
+
+        <TabPanel value={activeTab} tabId="members">
+          {/* Members Section */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Members</Typography>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => setAddMemberDialog(true)}
+                size="small"
+              >
+                Add Member
               </Button>
             </Box>
-          </Stack>
-        </Paper>
 
-        {/* Themes Section */}
-        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-              Themes
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <List sx={{ py: 0 }}>
+                {members.map((member) => (
+                  <ListItem key={member.userId} sx={{ px: { xs: 0, md: 2 }, py: 1 }}>
+                    <ListItemText
+                      primary={member.user.displayName || member.user.email}
+                      secondary={member.user.email}
+                      primaryTypographyProps={{ fontSize: { xs: '0.875rem', md: '1rem' } }}
+                      secondaryTypographyProps={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+                    />
+                    <ListItemSecondaryAction>
+                      <FormControl size="small" sx={{ minWidth: { xs: 100, md: 120 }, mr: 1 }}>
+                        <Select
+                          value={member.role}
+                          onChange={(e) => handleUpdateRole(member.userId, e.target.value)}
+                          disabled={!isOwner}
+                        >
+                          <MenuItem value="member">Member</MenuItem>
+                          <MenuItem value="calendar-admin">Calendar Admin</MenuItem>
+                          <MenuItem value="admin">Admin</MenuItem>
+                          <MenuItem value="owner">Owner</MenuItem>
+                        </Select>
+                      </FormControl>
+                      {member.userId !== user.uid && (
+                        <IconButton
+                          edge="end"
+                          color="error"
+                          onClick={() => handleRemoveMember(member.userId)}
+                          size="small"
+                        >
+                          <Delete />
+                        </IconButton>
+                      )}
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </TabPanel>
+
+        <TabPanel value={activeTab} tabId="themes">
+          {/* Club Theme Section */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>
+              Club Theme
             </Typography>
-            <Tooltip
-              title="We recommend Classy, Creative, and Curious (self-development, fiction, psychology), but you can add as few or as many themes as you want."
-              placement="top"
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+                flexWrap: 'wrap',
+                mb: 1.5,
+              }}
             >
-              <IconButton
-                size="small"
-                aria-label="themes info"
-                onClick={() => setThemesInfoOpen(true)}
-              >
-                <InfoOutlined fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Enable themes to categorize books and filter the list by theme.
-          </Typography>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={themesEnabled}
-                onChange={(event) => setThemesEnabled(event.target.checked)}
-                disabled={savingThemes}
-              />
-            }
-            label="Enable themes"
-          />
-          {themesEnabled && (
-            <Autocomplete
-              multiple
-              freeSolo
-              clearOnEscape
-              options={[]}
-              value={themes}
-              onChange={(event, value) => setThemes(value)}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip
-                    variant="outlined"
-                    label={option}
-                    {...getTagProps({ index })}
-                    key={option}
+              <Typography variant="body2" color="text.secondary">
+                Current theme: {currentThemePreset?.preset?.name || 'Custom'} · {clubThemeMode === 'dark' ? 'Dark' : 'Light'}
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={clubThemeMode === 'dark'}
+                    onChange={(event) => setClubThemeMode(event.target.checked ? 'dark' : 'light')}
+                    disabled={!isOwner}
                   />
-                ))
-              }
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Themes"
-                  placeholder="Add a theme"
-                  size="small"
-                  sx={{ mt: 2 }}
-                />
-              )}
-            />
-          )}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 2 }}>
-            <Button
-              variant="contained"
-              startIcon={<Save />}
-              onClick={handleSaveThemes}
-              disabled={savingThemes}
-              size="small"
+                }
+                label="Dark mode"
+              />
+            </Box>
+            {!isOwner && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Only club owners can update the club theme.
+              </Typography>
+            )}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+                gap: 2,
+              }}
             >
-              {savingThemes ? 'Saving...' : 'Save Themes'}
-            </Button>
-          </Box>
-        </Paper>
+              {CLUB_THEME_PRESETS.map((preset) => {
+                const isSelected = selectedClubThemeId === preset.id;
+                const preview = preset.preview?.[clubThemeMode] || preset.preview?.light || preset.preview;
+                return (
+                  <ButtonBase
+                    key={preset.id}
+                    onClick={() => {
+                      if (isOwner) setSelectedClubThemeId(preset.id);
+                    }}
+                    disabled={!isOwner}
+                    sx={{ textAlign: 'left' }}
+                  >
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        width: '100%',
+                        borderColor: isSelected ? 'primary.main' : 'divider',
+                        boxShadow: isSelected ? 3 : 0,
+                        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+                      }}
+                    >
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        {preset.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                        {preset.description}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        {['primary', 'secondary', 'background', 'accent'].map((key) => (
+                          <Box
+                            key={key}
+                            sx={{
+                              width: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              bgcolor: preview?.[key],
+                              border: '1px solid',
+                              borderColor: 'divider',
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Paper>
+                  </ButtonBase>
+                );
+              })}
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 2 }}>
+              <Button
+                variant="contained"
+                startIcon={<Save />}
+                onClick={handleSaveClubTheme}
+                disabled={!isOwner || savingClubTheme || !selectedClubThemeId}
+                size="small"
+              >
+                {savingClubTheme ? 'Saving...' : 'Save Club Theme'}
+              </Button>
+            </Box>
+          </Paper>
+
+          {/* Themes Section */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
+                Book Themes
+              </Typography>
+              <Tooltip
+                title="We recommend Classy, Creative, and Curious (self-development, fiction, psychology), but you can add as few or as many themes as you want."
+                placement="top"
+              >
+                <IconButton
+                  size="small"
+                  aria-label="themes info"
+                  onClick={() => setThemesInfoOpen(true)}
+                >
+                  <InfoOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Enable themes to categorize books and filter the list by theme.
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={themesEnabled}
+                  onChange={(event) => setThemesEnabled(event.target.checked)}
+                  disabled={savingThemes}
+                />
+              }
+              label="Enable themes"
+            />
+            {themesEnabled && (
+              <Autocomplete
+                multiple
+                freeSolo
+                clearOnEscape
+                options={[]}
+                value={themes}
+                onChange={(event, value) => setThemes(value)}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      variant="outlined"
+                      label={option}
+                      {...getTagProps({ index })}
+                      key={option}
+                    />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Themes"
+                    placeholder="Add a theme"
+                    size="small"
+                    sx={{ mt: 2 }}
+                  />
+                )}
+              />
+            )}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 2 }}>
+              <Button
+                variant="contained"
+                startIcon={<Save />}
+                onClick={handleSaveThemes}
+                disabled={savingThemes}
+                size="small"
+              >
+                {savingThemes ? 'Saving...' : 'Save Themes'}
+              </Button>
+            </Box>
+          </Paper>
+        </TabPanel>
 
         <Dialog open={themesInfoOpen} onClose={() => setThemesInfoOpen(false)}>
           <DialogTitle sx={{ pb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>
@@ -537,155 +789,84 @@ const ClubManagement = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Dashboard Section */}
-        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Dashboard</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Re-order or disable dashboard sections. Disabled sections remain in the list but will not show on the dashboard.
-          </Typography>
-          <List sx={{ py: 0 }}>
-            {dashboardConfig.map((section, index) => {
-              const sectionMeta = DASHBOARD_SECTIONS.find(({ id }) => id === section.id);
-              if (!sectionMeta) return null;
-              const enabled = section.enabled !== false;
-
-              return (
-                <ListItem
-                  key={section.id}
-                  sx={{
-                    px: { xs: 0, md: 2 },
-                    py: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                  }}
-                >
-                  <Checkbox
-                    edge="start"
-                    checked={enabled}
-                    onChange={() => handleToggleSection(section.id)}
-                    inputProps={{ 'aria-label': `Toggle ${sectionMeta.label}` }}
-                  />
-                  <ListItemText
-                    primary={sectionMeta.label}
-                    primaryTypographyProps={{ fontSize: { xs: '0.95rem', md: '1rem' } }}
-                    secondary={sectionMeta.description}
-                  />
-                  <ListItemSecondaryAction sx={{ right: { xs: 0, md: 8 } }}>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleMoveSection(section.id, -1)}
-                      disabled={index === 0}
-                      aria-label={`Move ${sectionMeta.label} up`}
-                    >
-                      <ArrowUpward fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleMoveSection(section.id, 1)}
-                      disabled={index === dashboardConfig.length - 1}
-                      aria-label={`Move ${sectionMeta.label} down`}
-                    >
-                      <ArrowDownward fontSize="small" />
-                    </IconButton>
-                  </ListItemSecondaryAction>
-                </ListItem>
-              );
-            })}
-          </List>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 1 }}>
-            <Button
-              variant="text"
-              startIcon={<Restore />}
-              onClick={handleResetDashboard}
-              size="small"
-            >
-              Reset to Default
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<Save />}
-              onClick={handleSaveDashboard}
-              disabled={savingDashboard}
-              size="small"
-            >
-              {savingDashboard ? 'Saving...' : 'Save Dashboard'}
-            </Button>
-          </Box>
-        </Paper>
-
-        {/* Members Section */}
-        <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Members</Typography>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => setAddMemberDialog(true)}
-              size="small"
-            >
-              Add Member
-            </Button>
-          </Box>
-
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : (
+        <TabPanel value={activeTab} tabId="dashboard">
+          {/* Dashboard Section */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+            <Typography variant="h6" sx={{ mb: 1.5, fontSize: { xs: '1rem', md: '1.25rem' } }}>Dashboard</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Re-order or disable dashboard sections. Disabled sections remain in the list but will not show on the dashboard.
+            </Typography>
             <List sx={{ py: 0 }}>
-              {members.map((member) => (
-                <ListItem key={member.userId} sx={{ px: { xs: 0, md: 2 }, py: 1 }}>
-                  <ListItemText
-                    primary={member.user.displayName || member.user.email}
-                    secondary={member.user.email}
-                    primaryTypographyProps={{ fontSize: { xs: '0.875rem', md: '1rem' } }}
-                    secondaryTypographyProps={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
-                  />
-                  <ListItemSecondaryAction>
-                    <FormControl size="small" sx={{ minWidth: { xs: 100, md: 120 }, mr: 1 }}>
-                      <Select
-                        value={member.role}
-                        onChange={(e) => handleUpdateRole(member.userId, e.target.value)}
-                        disabled={!isOwner}
-                      >
-                        <MenuItem value="member">Member</MenuItem>
-                        <MenuItem value="calendar-admin">Calendar Admin</MenuItem>
-                        <MenuItem value="admin">Admin</MenuItem>
-                        <MenuItem value="owner">Owner</MenuItem>
-                      </Select>
-                    </FormControl>
-                    {member.userId !== user.uid && (
-                      <IconButton
-                        edge="end"
-                        color="error"
-                        onClick={() => handleRemoveMember(member.userId)}
-                        size="small"
-                      >
-                        <Delete />
-                      </IconButton>
-                    )}
-                  </ListItemSecondaryAction>
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </Paper>
+              {dashboardConfig.map((section, index) => {
+                const sectionMeta = DASHBOARD_SECTIONS.find(({ id }) => id === section.id);
+                if (!sectionMeta) return null;
+                const enabled = section.enabled !== false;
 
-        {/* Delete Club Section */}
-        {isOwner && (
-          <Paper sx={{ p: { xs: 2, md: 3 } }}>
-            <Typography variant="h6" sx={{ mb: 1.5, color: 'error.main', fontSize: { xs: '1rem', md: '1.25rem' } }}>Danger Zone</Typography>
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={() => setDeleteDialog(true)}
-              size="small"
-            >
-              Delete Club
-            </Button>
+                return (
+                  <ListItem
+                    key={section.id}
+                    sx={{
+                      px: { xs: 0, md: 2 },
+                      py: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <Checkbox
+                      edge="start"
+                      checked={enabled}
+                      onChange={() => handleToggleSection(section.id)}
+                      inputProps={{ 'aria-label': `Toggle ${sectionMeta.label}` }}
+                    />
+                    <ListItemText
+                      primary={sectionMeta.label}
+                      primaryTypographyProps={{ fontSize: { xs: '0.95rem', md: '1rem' } }}
+                      secondary={sectionMeta.description}
+                    />
+                    <ListItemSecondaryAction sx={{ right: { xs: 0, md: 8 } }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleMoveSection(section.id, -1)}
+                        disabled={index === 0}
+                        aria-label={`Move ${sectionMeta.label} up`}
+                      >
+                        <ArrowUpward fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleMoveSection(section.id, 1)}
+                        disabled={index === dashboardConfig.length - 1}
+                        aria-label={`Move ${sectionMeta.label} down`}
+                      >
+                        <ArrowDownward fontSize="small" />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                );
+              })}
+            </List>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 1 }}>
+              <Button
+                variant="text"
+                startIcon={<Restore />}
+                onClick={handleResetDashboard}
+                size="small"
+              >
+                Reset to Default
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<Save />}
+                onClick={handleSaveDashboard}
+                disabled={savingDashboard}
+                size="small"
+              >
+                {savingDashboard ? 'Saving...' : 'Save Dashboard'}
+              </Button>
+            </Box>
           </Paper>
-        )}
+        </TabPanel>
 
         {/* Add Member Dialog */}
         <Dialog open={addMemberDialog} onClose={() => setAddMemberDialog(false)}>

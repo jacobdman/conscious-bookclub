@@ -1,14 +1,22 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 // UI
 import { Box, CssBaseline, ThemeProvider } from '@mui/material';
+// Context
+import useClubContext from 'contexts/Club';
 // Components
 import DevTools from 'components/DevTools';
 // Utils
-import { theme } from 'theme';
+import { buildTheme } from 'theme';
 
 const Dev = () => {
+  const { currentClub } = useClubContext();
+  const clubTheme = useMemo(
+    () => buildTheme(currentClub?.themeOverrides || {}),
+    [currentClub?.themeOverrides],
+  );
+
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={clubTheme}>
       <CssBaseline />
       <Box
         sx={{

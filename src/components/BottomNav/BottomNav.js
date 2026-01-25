@@ -3,6 +3,7 @@ import { Home, Message, CheckCircle, MenuBook } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 // UI
 import { BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 // Context
 import { useAuth } from 'AuthContext';
 // Components
@@ -69,8 +70,13 @@ const BottomNav = ({ onMenuClick }) => {
         value={value}
         onChange={handleChange}
         sx={{
-            backgroundColor: 'primary.main',
+            backgroundColor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? theme.palette.background.paper
+                  : theme.palette.primary.main,
             px: 3,
+            borderTop: '1px solid',
+            borderColor: 'divider',
             '& .MuiBottomNavigationAction-root': {
                 color: 'rgba(255, 255, 255, 0.7)',
                 minWidth: 'auto',

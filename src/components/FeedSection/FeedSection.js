@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -10,6 +10,7 @@ import {
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Send, KeyboardArrowDown, Image as ImageIcon, Close } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -253,30 +254,9 @@ const FeedSection = () => {
     }
   };
 
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        flex: 1,
-        backgroundColor: 'background.default',
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    >
-      {/* Messages Feed - Scrollable */}
-      <Box
-        ref={scrollContainerRef}
-        sx={{
-          flex: 1,
-          overflowY: 'auto',
-          px: 2,
-          py: 1,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
+  const postsContent = useMemo(() => {
+    return (
+      <>
         {/* Loading More Indicator (at top) */}
         {loadingMore && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -333,6 +313,35 @@ const FeedSection = () => {
             <div ref={messagesEndRef} />
           </Box>
         )}
+      </>
+    );
+  }, [error, loading, loadingMore, posts]);
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        flex: 1,
+        backgroundColor: 'background.default',
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
+      {/* Messages Feed - Scrollable */}
+      <Box
+        ref={scrollContainerRef}
+        sx={{
+          flex: 1,
+          overflowY: 'auto',
+          px: 2,
+          py: 1,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {postsContent}
       </Box>
 
       {/* Scroll-to-bottom FAB */}
@@ -385,8 +394,8 @@ const FeedSection = () => {
               onClick={handleFileButtonClick}
               disabled={isSubmitting}
               sx={{
-                backgroundColor: 'action.hover',
-                '&:hover': { backgroundColor: 'action.selected' },
+                backgroundColor: 'action.selected',
+                '&:hover': { backgroundColor: 'action.hover' },
               }}
             >
               <ImageIcon />
@@ -404,7 +413,7 @@ const FeedSection = () => {
               size="small"
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'background.default',
+                  backgroundColor: 'background.paper',
                   borderRadius: 3,
                 },
               }}
@@ -420,7 +429,11 @@ const FeedSection = () => {
                   backgroundColor: 'primary.dark',
                 },
                 '&:disabled': {
-                  backgroundColor: 'action.disabledBackground',
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? theme.palette.action.selected
+                      : theme.palette.action.disabledBackground,
+                  color: 'action.disabled',
                 },
               }}
             >
@@ -461,9 +474,13 @@ const FeedSection = () => {
                       position: 'absolute',
                       top: 4,
                       right: 4,
-                      backgroundColor: 'rgba(0,0,0,0.5)',
-                      color: '#fff',
-                      '&:hover': { backgroundColor: 'rgba(0,0,0,0.7)' },
+                      backgroundColor: (theme) =>
+                        alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.6 : 0.45),
+                      color: 'common.white',
+                      '&:hover': {
+                        backgroundColor: (theme) =>
+                          alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.75 : 0.6),
+                      },
                     }}
                   >
                     <Close fontSize="small" />

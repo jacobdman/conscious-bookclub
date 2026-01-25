@@ -10,6 +10,7 @@ import ProfileAvatar from 'components/ProfileAvatar';
 // Utils
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
+import { alpha } from '@mui/material/styles';
 
 const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
   const { user } = useAuth();
@@ -247,13 +248,20 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
                 cursor: 'pointer',
                 height: 24,
                 fontSize: '0.75rem',
-                backgroundColor: userReacted ? 'rgba(25, 118, 210, 0.12)' : 'rgba(0, 0, 0, 0.04)',
-                border: userReacted ? '1px solid' : 'none',
+                backgroundColor: (theme) =>
+                  userReacted
+                    ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.35 : 0.12)
+                    : theme.palette.action.selected,
+                border: '1px solid',
                 borderColor: userReacted ? 'primary.main' : 'transparent',
+                color: 'text.primary',
                 touchAction: 'manipulation',
                 '&:hover': {
-                  backgroundColor: userReacted ? 'rgba(25, 118, 210, 0.2)' : 'rgba(0, 0, 0, 0.08)',
-                  color: userReacted ? 'primary.main' : 'inherit',
+                  backgroundColor: (theme) =>
+                    userReacted
+                      ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.5 : 0.2)
+                      : theme.palette.action.hover,
+                  color: userReacted ? 'primary.main' : 'text.primary',
                 },
                 transition: 'all 0.2s',
               }}
@@ -272,8 +280,10 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
               minHeight: 24,
               minWidth: 24,
               opacity: 0.6,
+              color: 'text.secondary',
               '&:hover': {
                 opacity: 1,
+                color: 'text.primary',
                 backgroundColor: 'action.hover',
               },
             }}

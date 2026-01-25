@@ -8,6 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { ArrowForward, Star, StarBorder } from '@mui/icons-material';
 // Context
 import { useAuth } from 'AuthContext';
@@ -91,9 +92,18 @@ const QuoteOfWeek = () => {
       sx={{
         p: { xs: 2, sm: 3 },
         textAlign: 'center',
-        background: 'radial-gradient(circle at 50% 40%, #fdf8f1 0%, #e9decf 100%)',
-        border: '1px solid #dfd3c3',
-        boxShadow: '0 6px 24px rgba(0,0,0,0.06)',
+        background: (theme) => {
+          const { palette } = theme;
+          if (palette.mode !== 'dark') {
+            return 'radial-gradient(circle at 50% 40%, #fdf8f1 0%, #e9decf 100%)';
+          }
+          const glow = alpha(palette.secondary.main, 0.28);
+          return `radial-gradient(circle at 50% 40%, ${glow} 0%, ${palette.background.paper} 55%, ${palette.background.default} 100%)`;
+        },
+        border: (theme) =>
+          theme.palette.mode !== 'dark' ? '1px solid #dfd3c3' : `1px solid ${theme.palette.divider}`,
+        boxShadow: (theme) =>
+          theme.palette.mode !== 'dark' ? '0 6px 24px rgba(0,0,0,0.06)' : theme.shadows[3],
       }}
     >
       <Box

@@ -66,7 +66,11 @@ function AppContent() {
         />
         <Route
           path="/dev"
-          element={<Dev />}
+          element={(
+            <ClubProvider>
+              <Dev />
+            </ClubProvider>
+          )}
         />
         <Route
           path="/login"

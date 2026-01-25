@@ -38,6 +38,12 @@ module.exports = function(sequelize, DataTypes) {
           allowNull: false,
           defaultValue: ["Classy", "Creative", "Curious"],
         },
+        themeOverrides: {
+          type: DataTypes.JSONB,
+          field: "theme_overrides",
+          allowNull: false,
+          defaultValue: {},
+        },
       },
       {
         tableName: "clubs",
