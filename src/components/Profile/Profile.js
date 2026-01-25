@@ -24,6 +24,7 @@ import { auth } from '../../firebase';
 import Layout from 'components/Layout';
 import ProfileAvatar from 'components/ProfileAvatar';
 import NotificationSettings from 'components/Settings/NotificationSettings';
+import ThemeSettings from 'components/Settings/ThemeSettings';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -306,9 +307,11 @@ const Profile = () => {
             sx={{ mb: 3 }}
           >
             <Tab label="Notifications" />
+            <Tab label="Theme" />
           </Tabs>
 
           {currentTab === 0 && <NotificationSettings />}
+          {currentTab === 1 && <ThemeSettings />}
         </Paper>
       </Box>
     </Layout>

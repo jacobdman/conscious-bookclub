@@ -12,15 +12,25 @@ import Header from 'components/Header';
 import NavigationContent from 'components/NavigationContent';
 // Utils
 import { buildTheme } from 'theme';
+import { resolveThemeOverrides } from 'utils/themeResolver';
 
 const Layout = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, userProfile, logout } = useAuth();
   const { currentClub } = useClubContext();
   const location = useLocation();
-  const clubTheme = useMemo(
-    () => buildTheme(currentClub?.themeOverrides || {}),
-    [currentClub?.themeOverrides],
-  );
+  
+  // Get user's theme override for current club or global settings
+  const userThemeOverrides = userProfile?.settings?.clubThemeOverrides || {};
+  const userClubThemeOverride =
+    userThemeOverrides[String(currentClub?.id)] || userThemeOverrides.all;
+  
+  // Build theme with resolved overrides
+  const clubTheme = useMemo(() => {
+    const baseOverrides = currentClub?.themeOverrides || {};
+    const effectiveOverrides = resolveThemeOverrides(baseOverrides, userClubThemeOverride);
+    return buildTheme(effectiveOverrides);
+  }, [currentClub?.id, currentClub?.themeOverrides, userClubThemeOverride]);
+  
   const isMobile = useMediaQuery(clubTheme.breakpoints.down('md'));
 
   const [drawerOpen, setDrawerOpen] = useState(false);
