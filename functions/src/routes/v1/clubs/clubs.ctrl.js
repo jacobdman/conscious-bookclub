@@ -277,6 +277,34 @@ const getClubMembers = async (req, res, next) => {
       order: [["role", "DESC"], ["created_at", "ASC"]], // Owners first
     });
 
+    // Get latest goal entry timestamp for each user in this club
+    // Use raw query for performance (single query with subquery)
+    const userIds = members.map((m) => m.userId);
+    let goalActivityMap = {};
+
+    if (userIds.length > 0) {
+      const goalActivityQuery = `
+        SELECT 
+          ge.user_id,
+          MAX(ge.occurred_at) as last_goal_entry_at
+        FROM goal_entry ge
+        INNER JOIN goals g ON ge.goal_id = g.id
+        WHERE ge.user_id IN (:userIds)
+          AND g.club_id = :clubId
+        GROUP BY ge.user_id
+      `;
+
+      const goalActivity = await db.sequelize.query(goalActivityQuery, {
+        replacements: {userIds, clubId: parseInt(clubId)},
+        type: db.sequelize.QueryTypes.SELECT,
+      });
+
+      // Create lookup map for fast access
+      goalActivity.forEach((row) => {
+        goalActivityMap[row.user_id] = row.last_goal_entry_at;
+      });
+    }
+
     res.json(
         members.map((member) => ({
           userId: member.userId,
@@ -288,6 +316,7 @@ const getClubMembers = async (req, res, next) => {
             photoUrl: member.user.photoUrl,
           },
           joinedAt: member.createdAt,
+          lastGoalEntryAt: goalActivityMap[member.userId] || null,
         })),
     );
   } catch (e) {

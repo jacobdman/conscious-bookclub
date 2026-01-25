@@ -5,6 +5,8 @@ export default React.createContext({
   clubGoalsByUser: {},
   loading: false,
   error: null,
+  loadingByUser: {},
   fetchUserGoals: async () => [],
   refreshClubGoals: async () => [],
+  prefetchUsersGoals: async () => {},
 });

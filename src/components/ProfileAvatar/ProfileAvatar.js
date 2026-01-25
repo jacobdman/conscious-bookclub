@@ -1,14 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useMemo } from 'react';
 // UI
 import { Avatar, Box } from '@mui/material';
 // Context
 import useClubContext from 'contexts/Club';
-import useClubReporting from 'contexts/ClubReporting';
 // Components
 import UsersGoalsModal from 'components/UsersGoalsModal';
 // Utils
-import { formatLocalDate } from 'utils/dateHelpers';
-import { getTodayEntries } from 'utils/goalHelpers';
+import { getTodayBoundaries } from 'utils/goalHelpers';
 
 const medalByRank = {
   1: '🥇',
@@ -22,8 +20,6 @@ const getRankBadgeLabel = (rank) => {
   return `${rank}th`;
 };
 
-const entryRingCache = new Map();
-
 const ProfileAvatar = ({
   user,
   size = 40,
@@ -36,9 +32,7 @@ const ProfileAvatar = ({
   onClick,
   ...props
 }) => {
-  const { currentClub } = useClubContext();
-  const { clubGoalsByUser, fetchUserGoals } = useClubReporting();
-  const [hasEntryToday, setHasEntryToday] = useState(false);
+  const { currentClub, membersGoalStatus } = useClubContext();
   const [modalOpen, setModalOpen] = useState(false);
 
   const userId = user?.uid || user?.id || user?.userId || user?.user_id;
@@ -47,43 +41,35 @@ const ProfileAvatar = ({
   const medal = rank && medalByRank[rank] ? medalByRank[rank] : null;
   const rankLabel = showRankBadge ? getRankBadgeLabel(rank) : null;
 
-  useEffect(() => {
-    if (!showEntryRing || !userId || !currentClub?.id) return;
-
-    const todayKey = formatLocalDate(new Date());
-    const cacheKey = `${currentClub.id}-${userId}-${todayKey}`;
-
-    if (entryRingCache.has(cacheKey)) {
-      setHasEntryToday(entryRingCache.get(cacheKey));
-      return;
+  // Check if user has goal entry today (computed from cached data)
+  const hasEntryToday = useMemo(() => {
+    if (!showEntryRing || !userId || !currentClub?.id) return false;
+    
+    const lastEntryAt = membersGoalStatus[userId];
+    if (!lastEntryAt) {
+      console.log(`[ProfileAvatar] No lastEntryAt for user ${userId}`);
+      return false;
     }
-
-    let isMounted = true;
-
-    const loadEntries = async () => {
-      try {
-        const cachedGoals = clubGoalsByUser[userId];
-        const goals = cachedGoals || await fetchUserGoals(userId);
-        const hasEntry = (goals || []).some((goal) => {
-          const entries = getTodayEntries(goal.entries || []);
-          return entries.length > 0;
-        });
-
-        entryRingCache.set(cacheKey, hasEntry);
-        if (isMounted) {
-          setHasEntryToday(hasEntry);
-        }
-      } catch (err) {
-        console.error('Error checking goal entries for avatar ring:', err);
-      }
-    };
-
-    loadEntries();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [showEntryRing, userId, currentClub?.id, clubGoalsByUser, fetchUserGoals]);
+    
+    // Check if lastEntryAt falls within today's boundaries (local timezone)
+    const entryDate = new Date(lastEntryAt);
+    const { start, end } = getTodayBoundaries();
+    
+    const isToday = entryDate >= start && entryDate < end;
+    
+    console.log(`[ProfileAvatar] Checking goal entry for user ${userId}:`, {
+      lastEntryAt,
+      entryDate: entryDate.toISOString(),
+      entryDateLocal: entryDate.toLocaleString(),
+      start: start.toISOString(),
+      startLocal: start.toLocaleString(),
+      end: end.toISOString(),
+      endLocal: end.toLocaleString(),
+      isToday,
+    });
+    
+    return isToday;
+  }, [showEntryRing, userId, currentClub?.id, membersGoalStatus]);
 
   const handleAvatarClick = (event) => {
     if (disableGoalModal || !userId) {

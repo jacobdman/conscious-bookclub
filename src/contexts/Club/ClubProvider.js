@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from 'AuthContext';
 import { getUserClubs, getClub, getClubMembers } from 'services/clubs/clubs.service';
 import ClubContext from './ClubContext';
@@ -11,8 +11,11 @@ const ClubProvider = ({ children }) => {
   const [currentClub, setCurrentClubState] = useState(null);
   const [userClubs, setUserClubs] = useState([]);
   const [clubMembers, setClubMembers] = useState([]);
+  const [membersGoalStatus, setMembersGoalStatus] = useState({});
+  const [membersFetchedForClub, setMembersFetchedForClub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const clubMembersRef = useRef([]);
 
   // ******************LOAD FUNCTIONS**********************
   // Fetch user's clubs
@@ -54,32 +57,75 @@ const ClubProvider = ({ children }) => {
     }
   }, [user]);
 
-  // Fetch club members
-  const refreshClubMembers = useCallback(async (clubId) => {
+  // Fetch club members (with smart caching)
+  const refreshClubMembers = useCallback(async (clubId, force = false) => {
     if (!user || !clubId) return;
 
+    // Don't refetch if we already have data for this club (unless forced)
+    if (!force && membersFetchedForClub === clubId && clubMembersRef.current.length > 0) {
+      console.log(`[ClubProvider] Skipping refetch - members already cached for club ${clubId}`);
+      return clubMembersRef.current;
+    }
+
     try {
+      console.log(`[ClubProvider] Fetching members for club ${clubId}`);
       const members = await getClubMembers(clubId, user.uid);
+      console.log(`[ClubProvider] Received ${members.length} members:`, members);
       setClubMembers(members);
+      clubMembersRef.current = members;
+      setMembersFetchedForClub(clubId);
+      
+      // Extract and cache goal status
+      const goalStatus = {};
+      members.forEach(member => {
+        console.log(`[ClubProvider] Processing member:`, {
+          userId: member.userId,
+          hasLastGoalEntryAt: !!member.lastGoalEntryAt,
+          lastGoalEntryAt: member.lastGoalEntryAt,
+        });
+        if (member.lastGoalEntryAt) {
+          goalStatus[member.userId] = member.lastGoalEntryAt;
+          console.log(`[ClubProvider] Storing goal status for user ${member.userId}:`, member.lastGoalEntryAt);
+        }
+      });
+      setMembersGoalStatus(goalStatus);
+      console.log(`[ClubProvider] Final membersGoalStatus:`, goalStatus);
+      
       return members;
     } catch (err) {
       console.error('Error fetching club members:', err);
       throw err;
     }
-  }, [user]);
+  }, [user, membersFetchedForClub]);
 
   // ******************EFFECTS/REACTIONS**********************
+  // Keep ref in sync with state
+  useEffect(() => {
+    clubMembersRef.current = clubMembers;
+  }, [clubMembers]);
+
   // Initial load
   useEffect(() => {
     refreshClubs();
   }, [refreshClubs]);
 
-  // Load club members when current club changes
+  // Reset cache when club changes
+  useEffect(() => {
+    if (currentClub && membersFetchedForClub !== currentClub.id) {
+      // Clear old data when switching clubs
+      setClubMembers([]);
+      setMembersGoalStatus({});
+    }
+  }, [currentClub, membersFetchedForClub]);
+
+  // Load club members when current club changes (only if not cached)
   useEffect(() => {
     if (currentClub && user) {
       refreshClubMembers(currentClub.id);
     } else {
       setClubMembers([]);
+      setMembersGoalStatus({});
+      setMembersFetchedForClub(null);
     }
   }, [currentClub, user, refreshClubMembers]);
 
@@ -107,6 +153,7 @@ const ClubProvider = ({ children }) => {
         currentClub,
         userClubs,
         clubMembers,
+        membersGoalStatus,
         loading,
         error,
         setCurrentClub,

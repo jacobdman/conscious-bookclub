@@ -50,6 +50,54 @@ const ClubReportingProvider = ({ children }) => {
     }
   }, [user, currentClub, clubGoalsByUser]);
 
+  const prefetchUsersGoals = useCallback(async (userIds = [], { force = false } = {}) => {
+    if (!user || !currentClub || !userIds.length) return;
+    
+    // Filter out users we already have cached (unless force=true)
+    const usersToFetch = force 
+      ? userIds 
+      : userIds.filter(userId => !clubGoalsByUser[userId]);
+      
+    if (!usersToFetch.length) return; // All cached
+    
+    try {
+      // Mark all users as loading
+      setLoadingByUser(prev => {
+        const updates = {};
+        usersToFetch.forEach(userId => updates[userId] = true);
+        return { ...prev, ...updates };
+      });
+      
+      // Fetch all in parallel
+      const results = await Promise.allSettled(
+        usersToFetch.map(userId => getGoals(userId, currentClub.id))
+      );
+      
+      // Update cache with successful results
+      const goalsByUser = {};
+      results.forEach((result, index) => {
+        const userId = usersToFetch[index];
+        if (result.status === 'fulfilled') {
+          goalsByUser[userId] = result.value;
+        } else {
+          console.error(`Failed to fetch goals for user ${userId}:`, result.reason);
+          goalsByUser[userId] = []; // Empty array on error
+        }
+      });
+      
+      setClubGoalsByUser(prev => ({ ...prev, ...goalsByUser }));
+    } catch (err) {
+      console.error('Error prefetching user goals:', err);
+    } finally {
+      // Clear loading states
+      setLoadingByUser(prev => {
+        const updates = { ...prev };
+        usersToFetch.forEach(userId => delete updates[userId]);
+        return updates;
+      });
+    }
+  }, [user, currentClub, clubGoalsByUser]);
+
   const refreshClubGoals = useCallback(async () => {
     if (!user || !currentClub) return [];
 
@@ -93,6 +141,7 @@ const ClubReportingProvider = ({ children }) => {
         loadingByUser,
         fetchUserGoals,
         refreshClubGoals,
+        prefetchUsersGoals,
       }}
     >
       {children}

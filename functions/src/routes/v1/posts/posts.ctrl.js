@@ -1,6 +1,8 @@
 const db = require("../../../../db/models/index");
 const webpush = require("web-push");
-const {MENTION_REGEX} = require("../../../utils/mentionHelpers");
+
+// Mention regex pattern: @[displayName](userId)
+const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 // Configure web-push with VAPID keys (should be in environment variables)
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
