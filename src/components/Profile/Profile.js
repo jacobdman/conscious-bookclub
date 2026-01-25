@@ -3,13 +3,15 @@ import {
   Box,
   Typography,
   Paper,
-  Divider,
   CircularProgress,
   Button,
   TextField,
   IconButton,
   Alert,
   Input,
+  Tabs,
+  Tab,
+  Divider,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -19,9 +21,9 @@ import { getUserDocument, updateUserProfile } from 'services/users/users.service
 import { uploadProfilePicture } from 'services/storage/storage.service';
 import { updateProfile as updateFirebaseProfile } from 'firebase/auth';
 import { auth } from '../../firebase';
-import NotificationSettings from './NotificationSettings';
 import Layout from 'components/Layout';
 import ProfileAvatar from 'components/ProfileAvatar';
+import NotificationSettings from 'components/Settings/NotificationSettings';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -33,6 +35,7 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [currentTab, setCurrentTab] = useState(0);
   
   // Form state
   const [displayName, setDisplayName] = useState('');
@@ -294,10 +297,18 @@ const Profile = () => {
               />
             </Box>
           )}
+        </Paper>
 
-          <Divider sx={{ my: 3 }} />
+        <Paper sx={{ p: 3 }}>
+          <Tabs
+            value={currentTab}
+            onChange={(event, newValue) => setCurrentTab(newValue)}
+            sx={{ mb: 3 }}
+          >
+            <Tab label="Notifications" />
+          </Tabs>
 
-          <NotificationSettings />
+          {currentTab === 0 && <NotificationSettings />}
         </Paper>
       </Box>
     </Layout>

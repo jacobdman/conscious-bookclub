@@ -16,10 +16,13 @@ import {
   Divider,
   Checkbox,
 } from '@mui/material';
+// Context
 import { useAuth } from 'AuthContext';
+// Components
+import NotificationPermission from 'components/NotificationPermission';
+// Services
 import { getUserDocument, updateNotificationPreferences } from 'services/users/users.service';
 import { getSubscriptionStatus, sendTestNotification, subscribeToNotifications } from 'services/notifications/notifications.service';
-import NotificationPermission from 'components/NotificationPermission';
 
 const NotificationSettings = () => {
   const { user } = useAuth();
@@ -611,4 +614,3 @@ const NotificationSettings = () => {
 };
 
 export default NotificationSettings;
-

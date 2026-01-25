@@ -61,7 +61,7 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
 
   // Mobile specific items (replacing main nav on mobile)
   const mobileProfileItems = [
-    { name: 'My Profile', path: '/profile' },
+    { name: 'My Profile & Settings', path: '/profile' },
     { name: 'Calendar', path: '/calendar' },
   ];
 
