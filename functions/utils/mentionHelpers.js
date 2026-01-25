@@ -8,9 +8,9 @@ const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /**
  * Parse mention patterns in text and extract user IDs
- * 
+ *
  * @param {string} text - The text containing mentions
- * @returns {Object} - { userIds: string[], displayText: string }
+ * @return {Object} - { userIds: string[], displayText: string }
  */
 const parseMentions = (text) => {
   if (!text) return {userIds: [], displayText: text};

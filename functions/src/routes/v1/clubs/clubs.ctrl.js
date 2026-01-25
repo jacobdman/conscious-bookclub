@@ -280,7 +280,7 @@ const getClubMembers = async (req, res, next) => {
     // Get latest goal entry timestamp for each user in this club
     // Use raw query for performance (single query with subquery)
     const userIds = members.map((m) => m.userId);
-    let goalActivityMap = {};
+    const goalActivityMap = {};
 
     if (userIds.length > 0) {
       const goalActivityQuery = `

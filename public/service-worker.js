@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 /* Service Worker file - uses service worker globals (self, caches, clients, location) */
-const CACHE_NAME = 'cbc-app-v0.3.1';
+const CACHE_NAME = 'cbc-app-v0.4.0';
 const VERSION_URL = '/version.json';
 
 // Install event - cache static assets
