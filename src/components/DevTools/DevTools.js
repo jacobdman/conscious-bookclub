@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 // Components
 import THEME_COLORS from 'components/ClubBooksTab/themeColors';
 // Utils
-import triggerHaptic from 'utils/haptics';
+import triggerHaptic, { getHapticsSupport } from 'utils/haptics';
 
 const DevTools = () => {
   const [toastState, setToastState] = useState({
@@ -24,6 +24,7 @@ const DevTools = () => {
     message: '',
     severity: 'info',
   });
+  const [hapticsResult, setHapticsResult] = useState(null);
 
   const navigate = useNavigate();
   const muiTheme = useTheme();
@@ -54,7 +55,8 @@ const DevTools = () => {
   const handleHaptic = (type) => {
     // eslint-disable-next-line no-console
     console.log(`[dev] haptics: ${type}`);
-    triggerHaptic(type);
+    const result = triggerHaptic(type);
+    setHapticsResult(result);
   };
 
   const handleRequestNotificationPermission = async () => {
@@ -205,6 +207,30 @@ const DevTools = () => {
             <Button variant="outlined" onClick={() => handleHaptic('heavy')}>
               Heavy
             </Button>
+          </Stack>
+          <Divider sx={{ my: 2 }} />
+          <Stack spacing={1}>
+            {(() => {
+              const support = getHapticsSupport();
+              return (
+                <>
+                  <Typography variant="body2" color="text.secondary">
+                    Secure context: {support.isSecureContext ? 'yes' : 'no'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Vibration API: {support.hasVibrate ? 'available' : 'missing'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    User activation: {support.hasUserActivation ? 'yes' : 'no'}
+                  </Typography>
+                </>
+              );
+            })()}
+            {hapticsResult && (
+              <Typography variant="body2" color="text.secondary">
+                Last result: {hapticsResult.didVibrate ? 'vibrated' : 'no vibration'}
+              </Typography>
+            )}
           </Stack>
         </Paper>
 
