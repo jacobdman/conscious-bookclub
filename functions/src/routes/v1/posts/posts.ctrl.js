@@ -1,5 +1,6 @@
 const db = require("../../../../db/models/index");
 const webpush = require("web-push");
+const {MENTION_REGEX} = require("../../../utils/mentionHelpers");
 
 // Configure web-push with VAPID keys (should be in environment variables)
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
@@ -373,12 +374,26 @@ const createPost = async (req, res, next) => {
     const clubIdInt = parseInt(clubId);
     const images = sanitizeImages(postData.images);
 
+    // Extract mentioned user IDs from text
+    const mentionedUserIds = [];
+    if (postData.text) {
+      let match;
+      const regex = new RegExp(MENTION_REGEX);
+      while ((match = regex.exec(postData.text)) !== null) {
+        const userId = match[2];
+        if (userId && !mentionedUserIds.includes(userId)) {
+          mentionedUserIds.push(userId);
+        }
+      }
+    }
+
     const post = await db.Post.create({
       ...postData,
       clubId: clubIdInt,
       isSpoiler: postData.isSpoiler || false,
       isActivity: postData.isActivity || false,
       images,
+      mentionedUserIds: mentionedUserIds.length > 0 ? mentionedUserIds : null,
     });
 
     // Fetch with associations for Socket.io event
@@ -406,6 +421,7 @@ const createPost = async (req, res, next) => {
         const authorName = postWithAssociations.authorName ||
             postWithAssociations.author?.displayName || "Someone";
         const isReply = !!postData.parentPostId;
+        const hasMentions = mentionedUserIds.length > 0;
         let parentPostAuthorId = null;
 
         // If this is a reply, get the parent post author ID
@@ -420,6 +436,8 @@ const createPost = async (req, res, next) => {
 
         // Collect userIds that should receive notifications (before checking room membership)
         const userIdsToNotify = [];
+        const mentionNotifications = new Set(); // Track users who should get mention notifications
+
         for (const member of clubMembers) {
           if (!member.user) continue;
 
@@ -435,7 +453,11 @@ const createPost = async (req, res, next) => {
 
           let shouldNotify = false;
 
-          if (feedSettings.mode === "all") {
+          // Check if user is mentioned (highest priority)
+          if (hasMentions && mentionedUserIds.includes(user.uid)) {
+            shouldNotify = true;
+            mentionNotifications.add(user.uid);
+          } else if (feedSettings.mode === "all") {
             // Notify for all new posts
             shouldNotify = true;
           } else if (feedSettings.mode === "mentions_replies") {
@@ -476,8 +498,21 @@ const createPost = async (req, res, next) => {
           }
 
           let shouldNotify = false;
+          let notificationTitle = "New Post";
+          let notificationBody = "";
 
-          if (feedSettings.mode === "all") {
+          // Check if user is mentioned (highest priority)
+          if (mentionNotifications.has(user.uid)) {
+            shouldNotify = true;
+            // Extract text without mention markup for notification
+            const regex = new RegExp(MENTION_REGEX);
+            const displayText = postData.text.replace(regex, "@$1");
+            const truncatedText = displayText.length > 60 ?
+              displayText.substring(0, 60) + "..." :
+              displayText;
+            notificationTitle = "Mentioned in Post";
+            notificationBody = `${authorName} has tagged you in a message: "${truncatedText}"`;
+          } else if (feedSettings.mode === "all") {
             // Notify for all new posts
             shouldNotify = true;
           } else if (feedSettings.mode === "mentions_replies") {
@@ -487,26 +522,27 @@ const createPost = async (req, res, next) => {
             }
           }
 
-          if (shouldNotify) {
-            // Get user's push subscriptions
-            const subscriptions = await db.PushSubscription.findAll({
-              where: {userId: user.uid},
-            });
-
-            // Prepare notification message
-            let notificationTitle = "New Post";
-            let notificationBody = "";
-
+          // Set default notification text for non-mention notifications
+          if (shouldNotify && !mentionNotifications.has(user.uid)) {
             if (isReply) {
               notificationTitle = "New Reply";
               notificationBody = `${authorName} replied to your post`;
             } else {
               // Truncate post text to ~50-60 characters for notification
-              const truncatedText = postData.text.length > 60 ?
-                postData.text.substring(0, 60) + "..." :
-                postData.text;
+              const regex = new RegExp(MENTION_REGEX);
+              const displayText = postData.text.replace(regex, "@$1");
+              const truncatedText = displayText.length > 60 ?
+                displayText.substring(0, 60) + "..." :
+                displayText;
               notificationBody = `${authorName}: ${truncatedText}`;
             }
+          }
+
+          if (shouldNotify) {
+            // Get user's push subscriptions
+            const subscriptions = await db.PushSubscription.findAll({
+              where: {userId: user.uid},
+            });
 
             // Send notification to all subscriptions with route data
             for (const subscription of subscriptions) {

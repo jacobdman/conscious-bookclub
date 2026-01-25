@@ -1,9 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
   IconButton,
-  TextField,
   Tooltip,
   FormControlLabel,
   Checkbox,
@@ -13,15 +12,17 @@ import {
   Stack,
   Grid,
 } from '@mui/material';
-import { Reply as ReplyIcon } from '@mui/icons-material';
+import { Reply as ReplyIcon, AlternateEmail } from '@mui/icons-material';
 import ProfileAvatar from 'components/ProfileAvatar';
 import ReplyQuote from 'components/ReplyQuote';
 import EmojiInput from 'components/EmojiInput';
+import MentionInput from 'components/MentionInput';
 import useFeedContext from 'contexts/Feed';
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
-import { formatSemanticDateTime, formatLocalTime } from 'utils/dateHelpers';
+import { formatSemanticDateTime } from 'utils/dateHelpers';
 import { formatMeetingDisplay } from 'utils/meetingTime';
+import { renderMentions, encodeMentions } from 'utils/mentionHelpers';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
   const { createReply, registerPostRef, addReaction } = useFeedContext();
@@ -36,7 +37,9 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [fullPickerOpen, setFullPickerOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(Object.keys(EMOJI_CATEGORIES)[0]);
+  const [replyMentions, setReplyMentions] = useState([]); // Track mentions in reply
   const postRef = useRef(null);
+  const replyInputRef = useRef(null);
   const longPressTimerRef = useRef(null);
   const longPressHandledRef = useRef(false);
   const pressMovedRef = useRef(false);
@@ -55,15 +58,49 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
 
     try {
       setIsSubmitting(true);
-      await createReply(post.id, { text: replyText.trim(), isSpoiler: isReplySpoiler });
+      // Encode mentions in the reply text
+      const textWithMentions = encodeMentions(replyText.trim(), replyMentions);
+      await createReply(post.id, { text: textWithMentions, isSpoiler: isReplySpoiler });
       setReplyText('');
       setIsReplySpoiler(false);
+      setReplyMentions([]);
       setShowReplyForm(false);
     } catch (err) {
       console.error('Error creating reply:', err);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleReplyMentionsChange = useCallback((newMentions) => {
+    setReplyMentions(newMentions);
+  }, []);
+
+  const handleInsertReplyMention = () => {
+    if (!replyInputRef.current) return;
+    
+    const input = replyInputRef.current;
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const textBefore = replyText.slice(0, start);
+    const textAfter = replyText.slice(end);
+    
+    // Insert @ at cursor position
+    const newText = textBefore + '@' + textAfter;
+    setReplyText(newText);
+    
+    // Focus and set cursor after @
+    setTimeout(() => {
+      if (input) {
+        const newCursorPos = start + 1;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        input.focus();
+        
+        // Trigger input event to activate mention dropdown
+        const event = new Event('input', { bubbles: true });
+        input.dispatchEvent(event);
+      }
+    }, 0);
   };
 
   useEffect(() => () => {
@@ -565,7 +602,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
               mb: 0.5,
             }}
           >
-            {post.text}
+            {renderMentions(post.text)}
           </Typography>
         )}
 
@@ -632,21 +669,22 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         {/* Reply Form */}
         {showReplyForm && (
           <Box sx={{ mt: 1.5, ml: -1, pl: 1, borderLeft: '2px solid', borderColor: 'primary.main' }}>
-            <TextField
-              fullWidth
-              multiline
-              rows={2}
-              placeholder={`Reply to ${authorName}...`}
+            <MentionInput
+              inputRef={replyInputRef}
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
+              onMentionsChange={handleReplyMentionsChange}
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleReplySubmit();
                 }
               }}
-              size="small"
+              placeholder={`Reply to ${authorName}...`}
+              multiline
+              maxRows={2}
               autoFocus
+              disabled={isSubmitting}
               sx={{
                 mb: 1,
                 '& .MuiOutlinedInput-root': {
@@ -656,25 +694,43 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
                 },
               }}
             />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isReplySpoiler}
-                  onChange={(e) => setIsReplySpoiler(e.target.checked)}
-                  size="small"
-                />
-              }
-              label="Mark as spoiler"
-              sx={{ mb: 1, ml: 0.5 }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isReplySpoiler}
+                    onChange={(e) => setIsReplySpoiler(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Mark as spoiler"
+                sx={{ ml: 0.5 }}
+              />
+              <IconButton
+                size="small"
+                onClick={handleInsertReplyMention}
+                disabled={isSubmitting}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: 'primary.main',
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+                title="Mention someone"
+              >
+                <AlternateEmail fontSize="small" />
+              </IconButton>
+            </Box>
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
               <Typography
                 variant="caption"
-                onClick={() => {
-                  setShowReplyForm(false);
-                  setReplyText('');
-                  setIsReplySpoiler(false);
-                }}
+              onClick={() => {
+                setShowReplyForm(false);
+                setReplyText('');
+                setIsReplySpoiler(false);
+                setReplyMentions([]);
+              }}
                 sx={{
                   cursor: 'pointer',
                   color: 'text.secondary',

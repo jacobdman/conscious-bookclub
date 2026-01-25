@@ -58,6 +58,12 @@ module.exports = function(sequelize, DataTypes) {
           field: "related_record_id",
           allowNull: true,
         },
+        mentionedUserIds: {
+          type: DataTypes.JSONB,
+          field: "mentioned_user_ids",
+          allowNull: true,
+          defaultValue: null,
+        },
       },
       {
         tableName: "posts",

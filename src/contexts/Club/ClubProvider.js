@@ -74,6 +74,15 @@ const ClubProvider = ({ children }) => {
     refreshClubs();
   }, [refreshClubs]);
 
+  // Load club members when current club changes
+  useEffect(() => {
+    if (currentClub && user) {
+      refreshClubMembers(currentClub.id);
+    } else {
+      setClubMembers([]);
+    }
+  }, [currentClub, user, refreshClubMembers]);
+
   // ******************SETTERS**********************
   // Set current club
   const setCurrentClub = useCallback(async (clubId) => {

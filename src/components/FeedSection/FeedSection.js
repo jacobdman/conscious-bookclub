@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Typography,
-  TextField,
   IconButton,
   CircularProgress,
   Paper,
@@ -11,12 +10,14 @@ import {
   Checkbox,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { Send, KeyboardArrowDown, Image as ImageIcon, Close } from '@mui/icons-material';
+import { Send, KeyboardArrowDown, Image as ImageIcon, Close, AlternateEmail } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useFeedContext from 'contexts/Feed';
 import PostCard from 'components/PostCard';
+import MentionInput from 'components/MentionInput';
 import { uploadPostImages } from 'services/storage';
+import { encodeMentions } from 'utils/mentionHelpers';
 
 const FeedSection = () => {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ const FeedSection = () => {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]); // { file, preview }
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [mentions, setMentions] = useState([]); // Track mentions in the post
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -232,9 +234,18 @@ const FeedSection = () => {
         );
       }
 
-      await createPost({ text: newPostText.trim(), isSpoiler, images: imageUrls });
+      // Encode mentions in the text
+      const textWithMentions = encodeMentions(newPostText.trim(), mentions);
+
+      await createPost({ 
+        text: textWithMentions, 
+        isSpoiler, 
+        images: imageUrls,
+      });
+      
       setNewPostText('');
       setIsSpoiler(false);
+      setMentions([]);
       selectedFiles.forEach(({ preview }) => URL.revokeObjectURL(preview));
       setSelectedFiles([]);
       inputRef.current?.focus();
@@ -252,6 +263,37 @@ const FeedSection = () => {
       e.preventDefault();
       handleCreatePost();
     }
+  };
+
+  const handleMentionsChange = useCallback((newMentions) => {
+    setMentions(newMentions);
+  }, []);
+
+  const handleInsertMention = () => {
+    if (!inputRef.current) return;
+    
+    const input = inputRef.current;
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const textBefore = newPostText.slice(0, start);
+    const textAfter = newPostText.slice(end);
+    
+    // Insert @ at cursor position
+    const newText = textBefore + '@' + textAfter;
+    setNewPostText(newText);
+    
+    // Focus and set cursor after @
+    setTimeout(() => {
+      if (input) {
+        const newCursorPos = start + 1;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        input.focus();
+        
+        // Trigger input event to activate mention dropdown
+        const event = new Event('input', { bubbles: true });
+        input.dispatchEvent(event);
+      }
+    }, 0);
   };
 
   const postsContent = useMemo(() => {
@@ -400,17 +442,16 @@ const FeedSection = () => {
             >
               <ImageIcon />
             </IconButton>
-            <TextField
+            <MentionInput
               inputRef={inputRef}
-              fullWidth
-              multiline
-              maxRows={4}
-              placeholder="Message..."
               value={newPostText}
               onChange={(e) => setNewPostText(e.target.value)}
+              onMentionsChange={handleMentionsChange}
               onKeyPress={handleKeyPress}
-              variant="outlined"
-              size="small"
+              placeholder="Message..."
+              multiline
+              maxRows={4}
+              disabled={isSubmitting}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   backgroundColor: 'background.paper',
@@ -499,17 +540,34 @@ const FeedSection = () => {
               Uploading images...
             </Typography>
           )}
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={isSpoiler}
-                onChange={(e) => setIsSpoiler(e.target.checked)}
-                size="small"
-              />
-            }
-            label="Mark as spoiler"
-            sx={{ ml: 0.5 }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isSpoiler}
+                  onChange={(e) => setIsSpoiler(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Mark as spoiler"
+              sx={{ ml: 0.5 }}
+            />
+            <IconButton
+              size="small"
+              onClick={handleInsertMention}
+              disabled={isSubmitting}
+              sx={{
+                color: 'text.secondary',
+                '&:hover': {
+                  color: 'primary.main',
+                  backgroundColor: 'action.hover',
+                },
+              }}
+              title="Mention someone"
+            >
+              <AlternateEmail fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
       </Paper>
               </Box>
