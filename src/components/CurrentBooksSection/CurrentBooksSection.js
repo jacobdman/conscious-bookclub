@@ -304,7 +304,7 @@ const CurrentBooksSection = ({ books }) => {
                     size="small"
                     type="number"
                     placeholder="%"
-                    value={percentInputs[book.id] || bookProgress[book.id]?.percentComplete || ''}
+                    value={percentInputs[book.id] ?? bookProgress[book.id]?.percentComplete ?? ''}
                     onChange={(e) => handlePercentChange(book.id, e.target.value)}
                     inputProps={{ min: 0, max: 100 }}
                     sx={{ width: 60 }}
