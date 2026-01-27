@@ -393,42 +393,50 @@ const FeedSection = () => {
         position: 'relative',
       }}
     >
-      {/* Messages Feed - Scrollable */}
       <Box
-        ref={scrollContainerRef}
         sx={{
           flex: 1,
-          overflowY: 'auto',
-          px: 2,
-          py: 1,
-          display: 'flex',
-          flexDirection: 'column',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        {postsContent}
-      </Box>
-
-      {/* Scroll-to-bottom FAB */}
-      {showScrollToBottom && (
-        <Fab
-          size="small"
-          color="primary"
-          onClick={scrollToBottom}
+        {/* Messages Feed - Scrollable */}
+        <Box
+          ref={scrollContainerRef}
           sx={{
-            position: 'absolute',
-            bottom: 80,
-            right: 16,
-            zIndex: 11,
-            transition: 'opacity 0.2s, transform 0.2s',
-            '&:hover': {
-              transform: 'scale(1.1)',
-            },
+            height: '100%',
+            overflowY: 'auto',
+            px: 2,
+            py: 1,
+            display: 'flex',
+            flexDirection: 'column',
           }}
-          aria-label="Scroll to bottom"
         >
-          <KeyboardArrowDown />
-        </Fab>
-      )}
+          {postsContent}
+        </Box>
+
+        {/* Scroll-to-bottom FAB */}
+        {showScrollToBottom && (
+          <Fab
+            size="small"
+            color="primary"
+            onClick={scrollToBottom}
+            sx={{
+              position: 'absolute',
+              bottom: 16,
+              right: 16,
+              zIndex: 11,
+              transition: 'opacity 0.2s, transform 0.2s',
+              '&:hover': {
+                transform: 'scale(1.1)',
+              },
+            }}
+            aria-label="Scroll to bottom"
+          >
+            <KeyboardArrowDown />
+          </Fab>
+        )}
+      </Box>
 
       {/* Input Area - Sticky at bottom */}
       <Paper
