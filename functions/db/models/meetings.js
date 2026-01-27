@@ -30,6 +30,9 @@ module.exports = function(sequelize, DataTypes) {
         notes: {
           type: DataTypes.TEXT,
         },
+        theme: {
+          type: DataTypes.STRING(255),
+        },
         clubId: {
           type: DataTypes.INTEGER,
           field: "club_id",

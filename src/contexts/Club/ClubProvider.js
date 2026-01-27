@@ -78,18 +78,11 @@ const ClubProvider = ({ children }) => {
       // Extract and cache goal status
       const goalStatus = {};
       members.forEach(member => {
-        console.log(`[ClubProvider] Processing member:`, {
-          userId: member.userId,
-          hasLastGoalEntryAt: !!member.lastGoalEntryAt,
-          lastGoalEntryAt: member.lastGoalEntryAt,
-        });
         if (member.lastGoalEntryAt) {
           goalStatus[member.userId] = member.lastGoalEntryAt;
-          console.log(`[ClubProvider] Storing goal status for user ${member.userId}:`, member.lastGoalEntryAt);
         }
       });
       setMembersGoalStatus(goalStatus);
-      console.log(`[ClubProvider] Final membersGoalStatus:`, goalStatus);
       
       return members;
     } catch (err) {

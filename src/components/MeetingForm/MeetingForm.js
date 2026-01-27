@@ -11,6 +11,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   TextField,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -45,10 +49,15 @@ const MeetingForm = ({
     location: '',
     bookId: '',
     notes: '',
+    theme: '',
     timezone: getBrowserTimezone(),
   });
 
   const timezoneOptions = useMemo(() => moment.tz.names(), []);
+  const themesEnabled = currentClub?.themesEnabled !== false;
+  const themeOptions = Array.isArray(currentClub?.themes) && currentClub?.themes.length > 0
+    ? currentClub.themes
+    : ['Classy', 'Creative', 'Curious'];
 
   const [selectedBook, setSelectedBook] = useState(null);
 
@@ -66,6 +75,7 @@ const MeetingForm = ({
           location: editingMeeting.location || '',
           bookId: editingMeeting.bookId || '',
           notes: editingMeeting.notes || '',
+          theme: editingMeeting.theme || '',
           timezone: editingMeeting.timezone || getBrowserTimezone(),
         });
         
@@ -89,6 +99,7 @@ const MeetingForm = ({
           location: '',
           bookId: '',
           notes: '',
+          theme: '',
           timezone: getBrowserTimezone(),
         });
         if (initialBook) {
@@ -129,6 +140,7 @@ const MeetingForm = ({
         location: formData.location || null,
         bookId: formData.bookId || null,
         notes: formData.notes || null,
+        theme: formData.theme || null,
         timezone: formData.timezone || getBrowserTimezone(),
       };
 
@@ -183,6 +195,27 @@ const MeetingForm = ({
                 },
               }}
             />
+            {console.log(themesEnabled)}
+
+            {themesEnabled && (
+              <FormControl fullWidth>
+                <InputLabel>Theme</InputLabel>
+                <Select
+                  value={formData.theme}
+                  label="Theme"
+                  onChange={(e) => handleInputChange('theme', e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>No theme</em>
+                  </MenuItem>
+                  {themeOptions.map((themeOption) => (
+                    <MenuItem key={themeOption} value={themeOption}>
+                      {themeOption}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
 
             <TextField
               label="Start Time (Optional)"

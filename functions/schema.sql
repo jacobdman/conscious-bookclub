@@ -31,6 +31,7 @@ CREATE TABLE meetings (
     location VARCHAR(255),
     book_id INTEGER REFERENCES books(id) ON DELETE SET NULL,
     notes TEXT,
+    theme VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

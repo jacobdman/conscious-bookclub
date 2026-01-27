@@ -95,7 +95,7 @@ const getMeetings = async (req, res, next) => {
     const bookInclude = {
       model: db.Book,
       as: "book",
-      attributes: ["id", "title", "author", "coverImage"],
+      attributes: ["id", "title", "author", "coverImage", "theme"],
     };
 
     // If userId is provided, include user's BookProgress for each book
@@ -183,6 +183,7 @@ const createMeeting = async (req, res, next) => {
       title: meetingData.title || null,
       bookId: meetingData.bookId || null,
       notes: meetingData.notes || null,
+      theme: meetingData.theme || null,
       clubId: parseInt(clubId),
       timezone,
     });
@@ -196,7 +197,9 @@ const createMeeting = async (req, res, next) => {
     }
 
     const meetingWithBook = await db.Meeting.findByPk(meeting.id, {
-      include: [{model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage"]}],
+      include: [
+        {model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage", "theme"]},
+      ],
     });
 
     await createMeetingActivityPost({
@@ -282,6 +285,9 @@ const updateMeeting = async (req, res, next) => {
     if (updates.notes !== undefined) {
       meeting.notes = updates.notes;
     }
+    if (updates.theme !== undefined) {
+      meeting.theme = updates.theme || null;
+    }
 
     await meeting.save();
 
@@ -294,7 +300,9 @@ const updateMeeting = async (req, res, next) => {
     }
 
     const meetingWithBook = await db.Meeting.findByPk(meeting.id, {
-      include: [{model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage"]}],
+      include: [
+        {model: db.Book, as: "book", attributes: ["id", "title", "author", "coverImage", "theme"]},
+      ],
     });
 
     await createMeetingActivityPost({

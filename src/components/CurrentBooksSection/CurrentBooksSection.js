@@ -116,6 +116,16 @@ const CurrentBooksSection = ({ books }) => {
     }
   };
 
+  const getDiscussionTheme = (book) => {
+    if (book?.meetingTheme) {
+      return book.meetingTheme;
+    }
+    if (Array.isArray(book?.theme)) {
+      return book.theme.length > 0 ? book.theme[0] : 'General';
+    }
+    return book?.theme || 'General';
+  };
+
   const getButtonText = (bookId) => {
     const progress = bookProgress[bookId];
     if (!progress || progress.status === 'not-started') {
@@ -251,7 +261,7 @@ const CurrentBooksSection = ({ books }) => {
                 Discussion: {formatDiscussionDate(meetingDates[book.id])}
               </Typography>
               <Typography variant="caption" display="block" gutterBottom>
-                Theme: {book.theme || 'General'}
+                Theme: {getDiscussionTheme(book)}
               </Typography>
               
               {/* Progress Status Display */}
