@@ -552,7 +552,11 @@ const createPost = async (req, res, next) => {
                   subscription.subscriptionJson,
                   notificationTitle,
                   notificationBody,
-                  {route: "/feed", type: "feed"},
+                  {
+                    route: "/feed",
+                    type: "feed",
+                    clubId: clubIdInt,
+                  },
               );
             }
           }

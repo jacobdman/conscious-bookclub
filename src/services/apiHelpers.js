@@ -15,6 +15,7 @@ const getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
+const DEFAULT_TIMEOUT_MS = 15000;
 
 // Global error notification handler (will be set by ErrorNotificationProvider)
 let globalErrorHandler = null;
@@ -25,6 +26,13 @@ export const setGlobalErrorHandler = (handler) => {
 
 // Helper function to make API calls
 export const apiCall = async (endpoint, options = {}) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  if (options.signal) {
+    options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       headers: {
@@ -32,6 +40,7 @@ export const apiCall = async (endpoint, options = {}) => {
         ...options.headers,
       },
       ...options,
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -63,6 +72,13 @@ export const apiCall = async (endpoint, options = {}) => {
 
     return response.json();
   } catch (error) {
+    if (error && error.name === 'AbortError') {
+      const errorMessage = 'Request timed out. Please check your connection.';
+      if (globalErrorHandler) {
+        globalErrorHandler(errorMessage);
+      }
+      throw new Error(errorMessage);
+    }
     // If it's already an Error with message, re-throw it
     if (error instanceof Error) {
       throw error;
@@ -73,6 +89,8 @@ export const apiCall = async (endpoint, options = {}) => {
       globalErrorHandler(errorMessage);
     }
     throw new Error(errorMessage);
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 

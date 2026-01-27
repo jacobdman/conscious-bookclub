@@ -237,6 +237,14 @@ self.addEventListener('notificationclick', (event) => {
   const notificationData = event.notification.data || {};
   const route = notificationData.route || '/';
   const baseUrl = self.location.origin;
+  const clubId = notificationData.clubId;
+  let targetRoute = route;
+
+  if (clubId && route.startsWith('/feed')) {
+    const separator = route.includes('?') ? '&' : '?';
+    targetRoute = `${route}${separator}clubId=${encodeURIComponent(clubId)}`;
+  }
+  const targetUrl = baseUrl + targetRoute;
 
   // Open or focus the app
   event.waitUntil(
@@ -246,7 +254,6 @@ self.addEventListener('notificationclick', (event) => {
           const client = clientList[i];
           if (client.url.startsWith(baseUrl) && 'focus' in client) {
             // Navigate to the route if needed
-            const targetUrl = baseUrl + route;
             if (client.url !== targetUrl && 'navigate' in client) {
               try {
                 client.navigate(targetUrl);
@@ -263,7 +270,7 @@ self.addEventListener('notificationclick', (event) => {
         }
         // Otherwise, open a new window with the route
         if (self.clients.openWindow) {
-          return self.clients.openWindow(baseUrl + route);
+          return self.clients.openWindow(targetUrl);
         }
       })
   );

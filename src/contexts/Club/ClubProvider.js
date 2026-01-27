@@ -5,6 +5,22 @@ import ClubContext from './ClubContext';
 
 const CURRENT_CLUB_STORAGE_KEY = 'currentClubId';
 
+const getClubIdFromUrl = () => {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const clubIdParam = params.get('clubId');
+  if (!clubIdParam) return null;
+  const parsedId = parseInt(clubIdParam, 10);
+  return Number.isNaN(parsedId) ? null : parsedId;
+};
+
+const clearClubIdFromUrl = () => {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete('clubId');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+};
+
 // ******************STATE VALUES**********************
 const ClubProvider = ({ children }) => {
   const { user } = useAuth();
@@ -28,13 +44,19 @@ const ClubProvider = ({ children }) => {
       const clubs = await getUserClubs(user.uid);
       setUserClubs(clubs);
 
-      // If no current club is set, use first club or stored club
+      // If no current club is set, use URL club, stored club, or first club
       const storedClubId = localStorage.getItem(CURRENT_CLUB_STORAGE_KEY);
+      const urlClubId = getClubIdFromUrl();
       let clubToSet = null;
 
-      if (storedClubId) {
+      if (urlClubId) {
+        clubToSet = clubs.find(c => c.id === urlClubId);
+        clearClubIdFromUrl();
+      }
+
+      if (!clubToSet && storedClubId) {
         // Verify stored club is still in user's clubs
-        clubToSet = clubs.find(c => c.id === parseInt(storedClubId));
+        clubToSet = clubs.find(c => c.id === parseInt(storedClubId, 10));
       }
 
       // If no valid stored club, use first club
