@@ -210,6 +210,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     const location = meetingData.location;
     const details = meetingData.notes;
     const meetingBook = meetingData.book;
+    const meetingTheme = meetingData.theme;
     const display = formatMeetingDisplay({
       date: meetingData.date,
       startTime: meetingData.startTime,
@@ -256,6 +257,11 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.25 }}>
             📚 {meetingBook.title}
             {meetingBook.author ? ` by ${meetingBook.author}` : ''}
+          </Typography>
+        )}
+        {meetingTheme && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.25 }}>
+            🎯 Theme: {meetingTheme}
           </Typography>
         )}
         {details && (

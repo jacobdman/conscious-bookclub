@@ -146,26 +146,14 @@ const FeedProvider = ({ children }) => {
         const handlePostCreated = (postData) => {
           const postId = postData.id?.toString();
           
-          console.log(`[FeedProvider] ✅ Received post:created event for post ${postId} (club: ${currentClub.id})`);
-          console.log(`[FeedProvider] Post data:`, {
-            id: postData.id,
-            text: postData.text?.substring(0, 50) + '...',
-            authorId: postData.authorId,
-            created_at: postData.created_at,
-          });
-
           if (!showActivityRef.current && postData.isActivity) {
-            console.log(`[FeedProvider] Skipping activity post ${postId} due to filter`);
             return;
           }
           
           // Check if we've already processed this post ID (prevent duplicate processing)
           if (processedPostIdsRef.current.has(postId)) {
-            console.log(`[FeedProvider] ⚠️ Ignoring duplicate post:created event for post ${postId}`);
             return; // Already processed this post, ignore duplicate event
           }
-          
-          console.log(`[FeedProvider] Processing post:created event for post ${postId}`);
           
           // Mark this post as processed
           processedPostIdsRef.current.add(postId);
@@ -214,14 +202,12 @@ const FeedProvider = ({ children }) => {
           const lastRead = lastReadTimestampRef.current;
           if (!lastRead) {
             setUnreadCount(prevCount => {
-              console.log(`[FeedProvider] Incrementing unread count (no lastRead): ${prevCount} -> ${prevCount + 1}`);
               return prevCount + 1;
             });
           } else {
             const postDate = new Date(postData.created_at);
             if (postDate > lastRead) {
               setUnreadCount(prevCount => {
-                console.log(`[FeedProvider] Incrementing unread count (post newer than lastRead): ${prevCount} -> ${prevCount + 1}`);
                 return prevCount + 1;
               });
             }
@@ -229,7 +215,6 @@ const FeedProvider = ({ children }) => {
         };
 
         const handleReactionAdded = (data) => {
-          console.log(`[FeedProvider] Received reaction:added event for post ${data.postId} (club: ${currentClub.id})`);
           setPosts(prev => prev.map(post => {
             if (post.id === data.postId) {
               return {
@@ -242,7 +227,6 @@ const FeedProvider = ({ children }) => {
         };
 
         const handleReactionRemoved = (data) => {
-          console.log(`[FeedProvider] Received reaction:removed event for post ${data.postId} (club: ${currentClub.id})`);
           setPosts(prev => prev.map(post => {
             if (post.id === data.postId) {
               return {
@@ -276,8 +260,6 @@ const FeedProvider = ({ children }) => {
         socket.on('post:created', handlePostCreated);
         socket.on('reaction:added', handleReactionAdded);
         socket.on('reaction:removed', handleReactionRemoved);
-        
-        console.log(`[FeedProvider] Event listeners registered for club ${currentClub.id}`);
         
         // Listen for reconnect events to rejoin room
         const handleReconnect = () => {

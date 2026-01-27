@@ -195,8 +195,6 @@ const MeetingForm = ({
                 },
               }}
             />
-            {console.log(themesEnabled)}
-
             {themesEnabled && (
               <FormControl fullWidth>
                 <InputLabel>Theme</InputLabel>

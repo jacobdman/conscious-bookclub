@@ -15,8 +15,6 @@ router.get("/:userId/:bookId", async (req, res) => {
 
     const progress = await dbService.getUserBookProgress(userId, bookIdInt);
 
-    console.log({progress, userId, bookId});
-
     // Return 200 with null if no progress exists (valid state, not an error)
     // 404 should only be for route not found, which Express handles automatically
     if (!progress) {

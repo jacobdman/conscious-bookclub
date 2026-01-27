@@ -85,14 +85,11 @@ const ClubProvider = ({ children }) => {
 
     // Don't refetch if we already have data for this club (unless forced)
     if (!force && membersFetchedForClub === clubId && clubMembersRef.current.length > 0) {
-      console.log(`[ClubProvider] Skipping refetch - members already cached for club ${clubId}`);
       return clubMembersRef.current;
     }
 
     try {
-      console.log(`[ClubProvider] Fetching members for club ${clubId}`);
       const members = await getClubMembers(clubId, user.uid);
-      console.log(`[ClubProvider] Received ${members.length} members:`, members);
       setClubMembers(members);
       clubMembersRef.current = members;
       setMembersFetchedForClub(clubId);

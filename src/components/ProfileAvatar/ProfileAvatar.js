@@ -47,7 +47,6 @@ const ProfileAvatar = ({
     
     const lastEntryAt = membersGoalStatus[userId];
     if (!lastEntryAt) {
-      console.log(`[ProfileAvatar] No lastEntryAt for user ${userId}`);
       return false;
     }
     
@@ -56,17 +55,6 @@ const ProfileAvatar = ({
     const { start, end } = getTodayBoundaries();
     
     const isToday = entryDate >= start && entryDate < end;
-    
-    console.log(`[ProfileAvatar] Checking goal entry for user ${userId}:`, {
-      lastEntryAt,
-      entryDate: entryDate.toISOString(),
-      entryDateLocal: entryDate.toLocaleString(),
-      start: start.toISOString(),
-      startLocal: start.toLocaleString(),
-      end: end.toISOString(),
-      endLocal: end.toLocaleString(),
-      isToday,
-    });
     
     return isToday;
   }, [showEntryRing, userId, currentClub?.id, membersGoalStatus]);
