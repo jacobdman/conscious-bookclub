@@ -1,19 +1,25 @@
 import { apiCall } from '../apiHelpers';
 
 // Books CRUD functions
-export const getBooks = async (clubId) => {
+export const getBooks = async (clubId, userId = null) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
+  if (userId) {
+    params.append('userId', userId);
+  }
   const result = await apiCall(`/v1/books?${params}`);
   return result.books || result;
 };
 
-export const getBook = async (clubId, bookId) => {
+export const getBook = async (clubId, bookId, userId = null) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
+  if (userId) {
+    params.append('userId', userId);
+  }
   return apiCall(`/v1/books/${bookId}?${params}`);
 };
 
-export const addBook = async (clubId, book) => {
-  const params = new URLSearchParams({ clubId: clubId.toString() });
+export const addBook = async (clubId, book, userId) => {
+  const params = new URLSearchParams({ clubId: clubId.toString(), userId });
   const result = await apiCall(`/v1/books?${params}`, {
     method: 'POST',
     body: JSON.stringify(book),
@@ -80,8 +86,11 @@ export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSi
   return apiCall(`/v1/books/filtered?${params}`);
 };
 
-export const getAllDiscussedBooks = async (clubId) => {
+export const getAllDiscussedBooks = async (clubId, userId = null) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
+  if (userId) {
+    params.append('userId', userId);
+  }
   return apiCall(`/v1/books/discussed?${params}`);
 };
 
@@ -120,4 +129,24 @@ export const getTopReaders = async (clubId, limit = 10) => {
     limit: limit.toString() 
   });
   return apiCall(`/v1/books/top-readers?${params}`);
+};
+
+export const likeBook = async (clubId, bookId, userId) => {
+  const params = new URLSearchParams({
+    clubId: clubId.toString(),
+    userId,
+  });
+  return apiCall(`/v1/books/${bookId}/like?${params}`, {
+    method: 'POST',
+  });
+};
+
+export const unlikeBook = async (clubId, bookId, userId) => {
+  const params = new URLSearchParams({
+    clubId: clubId.toString(),
+    userId,
+  });
+  return apiCall(`/v1/books/${bookId}/like?${params}`, {
+    method: 'DELETE',
+  });
 };

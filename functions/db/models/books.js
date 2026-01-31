@@ -42,6 +42,11 @@ module.exports = function(sequelize, DataTypes) {
           allowNull: false,
           defaultValue: false,
         },
+        uploadedBy: {
+          type: DataTypes.STRING,
+          field: "uploaded_by",
+          allowNull: false,
+        },
         clubId: {
           type: DataTypes.INTEGER,
           field: "club_id",
@@ -68,6 +73,15 @@ module.exports = function(sequelize, DataTypes) {
     Book.hasMany(models.BookProgress, {
       foreignKey: "book_id",
       as: "bookProgresses",
+    });
+    Book.hasMany(models.BookLike, {
+      foreignKey: "book_id",
+      as: "bookLikes",
+    });
+    Book.belongsTo(models.User, {
+      foreignKey: "uploaded_by",
+      targetKey: "uid",
+      as: "uploader",
     });
   };
 

@@ -8,6 +8,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Paper,
   Avatar,
   Chip,
@@ -32,7 +33,9 @@ import {
   Edit as EditIcon, 
   Search as SearchIcon, 
   FilterList as FilterListIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  ThumbUp as ThumbUpIcon,
+  ThumbUpOffAlt as ThumbUpOffAltIcon
 } from '@mui/icons-material';
 import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
@@ -41,6 +44,7 @@ import useBooksContext from 'contexts/Books';
 import Layout from 'components/Layout';
 import AddBookForm from 'components/AddBookForm';
 import MeetingForm from 'components/MeetingForm';
+import BookInfoDialog from 'components/BookInfoDialog';
 import { parseLocalDate } from 'utils/dateHelpers';
 
 const BookList = () => {
@@ -55,12 +59,15 @@ const BookList = () => {
     pagination,
     filters,
     search,
+    sort,
     setPage,
     setPageSize,
     setFilters,
     setSearch,
+    setSort,
     updateBookProgress,
     updateBook,
+    toggleBookLike,
     refreshBooks
   } = useBooksContext();
 
@@ -73,6 +80,9 @@ const BookList = () => {
   const [meetingFormOpen, setMeetingFormOpen] = useState(false);
   const [meetingFormBook, setMeetingFormBook] = useState(null);
   const [meetingFormPreviousChosen, setMeetingFormPreviousChosen] = useState(false);
+  const [selectedBookId, setSelectedBookId] = useState(null);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [loadingLikes, setLoadingLikes] = useState({});
 
   // UI Enhancement States
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -226,6 +236,11 @@ const BookList = () => {
     return new Date(date).toLocaleDateString();
   };
 
+  const formatCreatedDate = (date) => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString();
+  };
+
   const handleCloseForm = () => {
     setAddBookOpen(false);
     setEditingBook(null);
@@ -276,6 +291,39 @@ const BookList = () => {
     setEditingBook(book);
     setAddBookOpen(true);
   };
+
+  const handleRowClick = (book) => {
+    setSelectedBookId(book.id);
+    setIsInfoOpen(true);
+  };
+
+  const handleInfoClose = () => {
+    setIsInfoOpen(false);
+  };
+
+  const handleSort = (field, defaultDirection = 'asc') => {
+    if (sort.field !== field) {
+      setSort(field, defaultDirection);
+      return;
+    }
+    setSort(field, sort.direction === 'desc' ? 'asc' : 'desc');
+  };
+
+  const handleToggleLike = async (event, book) => {
+    event.stopPropagation();
+    if (!user) return;
+
+    setLoadingLikes(prev => ({ ...prev, [book.id]: true }));
+    try {
+      await toggleBookLike(book.id, !book.isLiked);
+    } catch (error) {
+      // Error handled in context
+    } finally {
+      setLoadingLikes(prev => ({ ...prev, [book.id]: false }));
+    }
+  };
+
+  const selectedBook = books.find((book) => book.id === selectedBookId) || null;
 
   if (contextLoading && books.length === 0) {
     return (
@@ -519,13 +567,54 @@ const BookList = () => {
             <TableHead>
               <TableRow sx={{ backgroundColor: 'action.hover' }}>
                 <TableCell>Cover</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell>Author</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sort.field === 'title'}
+                    direction={sort.field === 'title' ? sort.direction : 'asc'}
+                    onClick={() => handleSort('title')}
+                  >
+                    Title
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sort.field === 'author'}
+                    direction={sort.field === 'author' ? sort.direction : 'asc'}
+                    onClick={() => handleSort('author')}
+                  >
+                    Author
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sort.field === 'likes'}
+                    direction={sort.field === 'likes' ? sort.direction : 'asc'}
+                    onClick={() => handleSort('likes', 'desc')}
+                  >
+                    Likes
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell>Theme</TableCell>
                 <TableCell>Genre</TableCell>
-                <TableCell>Discussion Date</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sort.field === 'discussionDate'}
+                    direction={sort.field === 'discussionDate' ? sort.direction : 'asc'}
+                    onClick={() => handleSort('discussionDate')}
+                  >
+                    Discussion Date
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell>My Progress</TableCell>
-                <TableCell>Added</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sort.field === 'createdAt'}
+                    direction={sort.field === 'createdAt' ? sort.direction : 'desc'}
+                    onClick={() => handleSort('createdAt', 'desc')}
+                  >
+                    Added
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -533,10 +622,12 @@ const BookList = () => {
               {books.map((book) => (
                 <TableRow
                   key={book.id}
+                  onClick={() => handleRowClick(book)}
                   sx={{ 
                       '&:last-child td, &:last-child th': { border: 0 },
                       '&:hover': { backgroundColor: 'action.hover' },
-                      transition: 'background-color 0.2s'
+                      transition: 'background-color 0.2s',
+                      cursor: 'pointer'
                   }}
                 >
                   <TableCell>
@@ -561,6 +652,19 @@ const BookList = () => {
                     <Typography variant="body2" color="text.secondary">
                       {book.author}
                     </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={(event) => handleToggleLike(event, book)}
+                        color={book.isLiked ? 'primary' : 'default'}
+                        disabled={loadingLikes[book.id]}
+                      >
+                        {book.isLiked ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOffAltIcon fontSize="small" />}
+                      </IconButton>
+                      <Typography variant="body2">{book.likesCount || 0}</Typography>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
@@ -605,7 +709,10 @@ const BookList = () => {
                         <Button
                           variant="outlined"
                           size="small"
-                          onClick={() => handleProgressUpdate(book)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleProgressUpdate(book);
+                          }}
                           disabled={loadingProgress[book.id]}
                           sx={{ 
                               minWidth: 100, 
@@ -625,7 +732,10 @@ const BookList = () => {
                         <Button
                           size="small"
                           variant="outlined"
-                          onClick={() => handleChooseForReading(book)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleChooseForReading(book);
+                          }}
                           sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
                         >
                           Choose for reading
@@ -635,13 +745,16 @@ const BookList = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="caption" color="text.secondary">
-                      {formatDate(book.createdAt)}
+                      {formatCreatedDate(book.createdAt || book.created_at)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <IconButton
                       size="small"
-                      onClick={() => handleEditBook(book)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleEditBook(book);
+                      }}
                       color="default"
                     >
                       <EditIcon />
@@ -711,6 +824,12 @@ const BookList = () => {
         onClose={handleMeetingFormClose}
         onSave={handleMeetingSaved}
         initialBook={meetingFormBook}
+      />
+      <BookInfoDialog
+        open={isInfoOpen}
+        onClose={handleInfoClose}
+        book={selectedBook}
+        discussionDate={selectedBook ? meetingDates[selectedBook.id] : null}
       />
     </Layout>
   );

@@ -8,6 +8,8 @@ import {
   addBook,
   updateBook as updateBookService,
   deleteBook as deleteBookService,
+  likeBook,
+  unlikeBook,
 } from 'services/books/books.service';
 import {
   updateUserBookProgress,
@@ -47,6 +49,7 @@ const BooksProvider = ({ children }) => {
   const [pagination, setPaginationState] = useState({ page: 1, pageSize: 10 });
   const [filters, setFiltersState] = useState({ theme: 'all', status: 'all' });
   const [search, setSearchState] = useState('');
+  const [sort, setSortState] = useState({ field: 'createdAt', direction: 'desc' });
   
   // Debounce search term (500ms delay)
   const debouncedSearch = useDebounce(search, 500);
@@ -70,6 +73,11 @@ const BooksProvider = ({ children }) => {
     setPaginationState(prev => ({ ...prev, page: 1 }));
   };
 
+  const setSort = (field, direction) => {
+    setSortState({ field, direction });
+    setPaginationState(prev => ({ ...prev, page: 1 }));
+  };
+
   // ******************LOAD FUNCTIONS**********************
   const fetchBooks = useCallback(async () => {
     if (!currentClub) return;
@@ -86,10 +94,45 @@ const BooksProvider = ({ children }) => {
 
       let result;
 
+      const sortList = (list) => {
+        const directionFactor = sort.direction === 'asc' ? 1 : -1;
+        if (sort.field === 'likes') {
+          return [...list].sort((a, b) => ((a.likesCount || 0) - (b.likesCount || 0)) * directionFactor);
+        }
+        if (sort.field === 'createdAt') {
+          return [...list].sort((a, b) => {
+            const aDate = a.createdAt || a.created_at;
+            const bDate = b.createdAt || b.created_at;
+            const aTime = aDate ? new Date(aDate).getTime() : 0;
+            const bTime = bDate ? new Date(bDate).getTime() : 0;
+            return (aTime - bTime) * directionFactor;
+          });
+        }
+        if (sort.field === 'discussionDate') {
+          return [...list].sort((a, b) => {
+            const aDate = a.discussionDate || a.discussion_date;
+            const bDate = b.discussionDate || b.discussion_date;
+            const aTime = aDate ? new Date(aDate).getTime() : 0;
+            const bTime = bDate ? new Date(bDate).getTime() : 0;
+            return (aTime - bTime) * directionFactor;
+          });
+        }
+        if (sort.field === 'title' || sort.field === 'author') {
+          return [...list].sort((a, b) => {
+            const aValue = (a[sort.field] || '').toString().toLowerCase();
+            const bValue = (b[sort.field] || '').toString().toLowerCase();
+            if (aValue < bValue) return -1 * directionFactor;
+            if (aValue > bValue) return 1 * directionFactor;
+            return 0;
+          });
+        }
+        return list;
+      };
+
       // Handle 'scheduled' filter combined with other logic
       if (status === 'scheduled') {
         // Handle scheduled filter - this fetches ALL scheduled books so pagination is manual slice
-        let allScheduledBooks = await getAllDiscussedBooks(currentClub.id);
+        let allScheduledBooks = await getAllDiscussedBooks(currentClub.id, userId);
 
         // Apply theme filter in memory if needed
         if (theme !== 'all') {
@@ -111,6 +154,8 @@ const BooksProvider = ({ children }) => {
             book.author.toLowerCase().includes(lowerSearch)
           );
         }
+
+        allScheduledBooks = sortList(allScheduledBooks);
 
         const startIdx = (page - 1) * pageSize;
         const endIdx = startIdx + pageSize;
@@ -142,9 +187,9 @@ const BooksProvider = ({ children }) => {
         const readStatus = status === 'read' ? 'finished' : null;
 
         if (theme !== 'all') {
-            result = await getBooksPageFiltered(currentClub.id, theme, page, pageSize, 'createdAt', 'desc', userId, readStatus, debouncedSearch);
+            result = await getBooksPageFiltered(currentClub.id, theme, page, pageSize, sort.field, sort.direction, userId, readStatus, debouncedSearch);
         } else {
-            result = await getBooksPage(currentClub.id, page, pageSize, 'createdAt', 'desc', userId, readStatus, debouncedSearch);
+            result = await getBooksPage(currentClub.id, page, pageSize, sort.field, sort.direction, userId, readStatus, debouncedSearch);
         }
       }
 
@@ -158,7 +203,7 @@ const BooksProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentClub, user, pagination, filters, debouncedSearch]);
+  }, [currentClub, user, pagination, filters, debouncedSearch, sort]);
 
   const refreshBooks = useCallback(() => {
     fetchBooks();
@@ -173,13 +218,18 @@ const BooksProvider = ({ children }) => {
   // ******************ACTIONS**********************
   const createBook = async (bookData) => {
     if (!currentClub) throw new Error('No club selected');
+    if (!user?.uid) throw new Error('User not logged in');
 
     try {
       // 1. Make API call
-      const newBook = await addBook(currentClub.id, bookData);
+      const newBook = await addBook(currentClub.id, bookData, user.uid);
       
       // 2. Update state: Prepend to current list
-      setBooks(prev => [newBook, ...prev]);
+      setBooks(prev => [{
+        ...newBook,
+        likesCount: 0,
+        isLiked: false,
+      }, ...prev]);
       
       // Update count
       setTotalCount(prev => prev + 1);
@@ -253,6 +303,32 @@ const BooksProvider = ({ children }) => {
     }
   };
 
+  const toggleBookLike = async (bookId, shouldLike) => {
+    if (!user || !currentClub) throw new Error('User not logged in');
+
+    setBooks(prev => prev.map(book => {
+      if (book.id !== bookId) return book;
+      const likesCount = Math.max(0, (book.likesCount || 0) + (shouldLike ? 1 : -1));
+      return {
+        ...book,
+        isLiked: shouldLike,
+        likesCount,
+      };
+    }));
+
+    try {
+      if (shouldLike) {
+        await likeBook(currentClub.id, bookId, user.uid);
+      } else {
+        await unlikeBook(currentClub.id, bookId, user.uid);
+      }
+    } catch (err) {
+      console.error('Error toggling book like:', err);
+      refreshBooks();
+      throw err;
+    }
+  };
+
   // ******************EXPORTS**********************
   return (
     <BooksContext.Provider
@@ -266,18 +342,21 @@ const BooksProvider = ({ children }) => {
         pagination,
         filters,
         search,
+        sort,
 
         // Setters
         setPage,
         setPageSize,
         setFilters,
         setSearch,
+        setSort,
 
         // Actions
         createBook,
         updateBook,
         deleteBook,
         updateBookProgress,
+        toggleBookLike,
         refreshBooks,
       }}
     >

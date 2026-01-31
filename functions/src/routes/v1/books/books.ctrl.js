@@ -9,8 +9,62 @@ const mapOrderByField = (field) => {
     discussion_date: "discussion_date",
     title: "title",
     author: "author",
+    likes: "likes_count",
+    likesCount: "likes_count",
   };
   return fieldMap[field] || field;
+};
+
+const buildOrderClause = (orderByField, orderDirection) => {
+  if (orderByField === "likes_count") {
+    return [[db.sequelize.literal(
+        `(SELECT COUNT(*) FROM book_likes WHERE book_likes.book_id = "Book".id)`,
+    ), orderDirection]];
+  }
+
+  return [[orderByField, orderDirection]];
+};
+
+const verifyMembership = async (clubId, userId) => {
+  const membership = await db.ClubMember.findOne({
+    where: {clubId, userId},
+  });
+  return membership;
+};
+
+const buildLikesSummary = async (bookIds, userId) => {
+  if (!bookIds.length) {
+    return {likesByBookId: new Map(), likedBookIds: new Set()};
+  }
+
+  const likesCounts = await db.BookLike.findAll({
+    attributes: [
+      "bookId",
+      [db.sequelize.fn("COUNT", db.sequelize.col("id")), "count"],
+    ],
+    where: {bookId: bookIds},
+    group: ["book_id"],
+    raw: true,
+  });
+
+  const likesByBookId = new Map();
+  likesCounts.forEach((row) => {
+    likesByBookId.set(row.bookId, parseInt(row.count, 10));
+  });
+
+  const likedBookIds = new Set();
+  if (userId) {
+    const likedRows = await db.BookLike.findAll({
+      attributes: ["bookId"],
+      where: {bookId: bookIds, userId},
+      raw: true,
+    });
+    likedRows.forEach((row) => {
+      likedBookIds.add(row.bookId);
+    });
+  }
+
+  return {likesByBookId, likedBookIds};
 };
 
 // Helper function to get books page
@@ -51,7 +105,14 @@ const getBooksPage = async (
     };
   }
 
-  const includeOptions = [];
+  const includeOptions = [
+    {
+      model: db.User,
+      as: "uploader",
+      attributes: ["uid", "displayName"],
+      required: false,
+    },
+  ];
   if (userId) {
     const progressWhere = {userId};
     // If readStatus is 'finished', filter by status and require the association
@@ -79,7 +140,7 @@ const getBooksPage = async (
 
   const queryOptions = {
     where: whereClause,
-    order: [[orderByField, orderDirection]],
+    order: buildOrderClause(orderByField, orderDirection),
     limit: pageSize,
     offset,
   };
@@ -89,6 +150,8 @@ const getBooksPage = async (
   }
 
   const {count, rows} = await db.Book.findAndCountAll(queryOptions);
+  const bookIds = rows.map((book) => book.id);
+  const {likesByBookId, likedBookIds} = await buildLikesSummary(bookIds, userId);
 
   return {
     books: rows.map((book) => {
@@ -99,6 +162,8 @@ const getBooksPage = async (
       return {
         id: book.id,
         ...bookData,
+        likesCount: likesByBookId.get(book.id) || 0,
+        isLiked: likedBookIds.has(book.id),
       };
     }),
     totalCount: count,
@@ -176,7 +241,14 @@ const getBooksPageFiltered = async (
     }
   }
 
-  const includeOptions = [];
+  const includeOptions = [
+    {
+      model: db.User,
+      as: "uploader",
+      attributes: ["uid", "displayName"],
+      required: false,
+    },
+  ];
   if (userId) {
     const progressWhere = {userId};
     // If readStatus is 'finished', filter by status and require the association
@@ -204,7 +276,7 @@ const getBooksPageFiltered = async (
 
   const queryOptions = {
     where: whereClause,
-    order: [[orderByField, orderDirection]],
+    order: buildOrderClause(orderByField, orderDirection),
     limit: pageSize,
     offset,
   };
@@ -214,6 +286,8 @@ const getBooksPageFiltered = async (
   }
 
   const {count, rows} = await db.Book.findAndCountAll(queryOptions);
+  const bookIds = rows.map((book) => book.id);
+  const {likesByBookId, likedBookIds} = await buildLikesSummary(bookIds, userId);
 
   return {
     books: rows.map((book) => {
@@ -224,6 +298,8 @@ const getBooksPageFiltered = async (
       return {
         id: book.id,
         ...bookData,
+        likesCount: likesByBookId.get(book.id) || 0,
+        isLiked: likedBookIds.has(book.id),
       };
     }),
     totalCount: count,
@@ -268,7 +344,7 @@ const getBooks = async (req, res, next) => {
 // GET /v1/books/discussed - Get books with discussion dates
 const getDiscussedBooks = async (req, res, next) => {
   try {
-    const {clubId} = req.query;
+    const {clubId, userId} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
@@ -281,8 +357,21 @@ const getDiscussedBooks = async (req, res, next) => {
           [db.Op.ne]: null,
         },
       },
+      include: [{
+        model: db.User,
+        as: "uploader",
+        attributes: ["uid", "displayName"],
+        required: false,
+      }],
     });
-    res.json(books.map((book) => ({id: book.id, ...book.toJSON()})));
+    const bookIds = books.map((book) => book.id);
+    const {likesByBookId, likedBookIds} = await buildLikesSummary(bookIds, userId);
+    res.json(books.map((book) => ({
+      id: book.id,
+      ...book.toJSON(),
+      likesCount: likesByBookId.get(book.id) || 0,
+      isLiked: likedBookIds.has(book.id),
+    })));
   } catch (e) {
     next(e);
   }
@@ -337,6 +426,12 @@ const getBook = async (req, res, next) => {
     }
     const book = await db.Book.findOne({
       where: {id, clubId: parseInt(clubId)},
+      include: [{
+        model: db.User,
+        as: "uploader",
+        attributes: ["uid", "displayName"],
+        required: false,
+      }],
     });
 
     if (!book) {
@@ -345,7 +440,13 @@ const getBook = async (req, res, next) => {
       throw error;
     }
 
-    res.json({id: book.id, ...book.toJSON()});
+    const {likesByBookId, likedBookIds} = await buildLikesSummary([book.id], req.query.userId);
+    res.json({
+      id: book.id,
+      ...book.toJSON(),
+      likesCount: likesByBookId.get(book.id) || 0,
+      isLiked: likedBookIds.has(book.id),
+    });
   } catch (e) {
     next(e);
   }
@@ -354,9 +455,14 @@ const getBook = async (req, res, next) => {
 // POST /v1/books - Create new book
 const createBook = async (req, res, next) => {
   try {
-    const {clubId} = req.query;
+    const {clubId, userId} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!userId) {
+      const error = new Error("userId is required");
       error.status = 400;
       throw error;
     }
@@ -364,6 +470,7 @@ const createBook = async (req, res, next) => {
     const book = await db.Book.create({
       ...bookData,
       clubId: parseInt(clubId),
+      uploadedBy: userId,
       createdAt: new Date(),
     });
     res.status(201).json({id: book.id, ...book.toJSON()});
@@ -385,6 +492,8 @@ const updateBook = async (req, res, next) => {
     const updates = req.body;
     // Ensure clubId is not changed
     delete updates.clubId;
+    delete updates.uploadedBy;
+    delete updates.uploaded_by;
 
     await db.Book.update(updates, {where: {id, clubId: parseInt(clubId)}});
     const book = await db.Book.findByPk(id);
@@ -411,6 +520,126 @@ const deleteBook = async (req, res, next) => {
     }
     await db.Book.destroy({where: {id, clubId: parseInt(clubId)}});
     res.sendStatus(204);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// POST /v1/books/:id/like?clubId=...&userId=...
+const addBookLike = async (req, res, next) => {
+  try {
+    const {clubId, userId} = req.query;
+    const {id} = req.params;
+
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const numericClubId = parseInt(clubId);
+    const numericBookId = parseInt(id);
+
+    const membership = await verifyMembership(numericClubId, userId);
+    if (!membership) {
+      const error = new Error("Club not found or user is not a member");
+      error.status = 404;
+      throw error;
+    }
+
+    const book = await db.Book.findOne({
+      where: {id: numericBookId, clubId: numericClubId},
+      attributes: ["id"],
+    });
+
+    if (!book) {
+      const error = new Error("Book not found in this club");
+      error.status = 404;
+      throw error;
+    }
+
+    const [like, created] = await db.BookLike.findOrCreate({
+      where: {bookId: numericBookId, userId},
+      defaults: {bookId: numericBookId, userId},
+    });
+
+    const likesCount = await db.BookLike.count({
+      where: {bookId: numericBookId},
+    });
+
+    res.status(created ? 201 : 200).json({
+      bookId: numericBookId,
+      liked: true,
+      likesCount,
+      likeId: like.id,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// DELETE /v1/books/:id/like?clubId=...&userId=...
+const removeBookLike = async (req, res, next) => {
+  try {
+    const {clubId, userId} = req.query;
+    const {id} = req.params;
+
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const numericClubId = parseInt(clubId);
+    const numericBookId = parseInt(id);
+
+    const membership = await verifyMembership(numericClubId, userId);
+    if (!membership) {
+      const error = new Error("Club not found or user is not a member");
+      error.status = 404;
+      throw error;
+    }
+
+    const book = await db.Book.findOne({
+      where: {id: numericBookId, clubId: numericClubId},
+      attributes: ["id"],
+    });
+
+    if (!book) {
+      const error = new Error("Book not found in this club");
+      error.status = 404;
+      throw error;
+    }
+
+    const deleted = await db.BookLike.destroy({
+      where: {bookId: numericBookId, userId},
+    });
+
+    if (!deleted) {
+      const error = new Error("Like not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const likesCount = await db.BookLike.count({
+      where: {bookId: numericBookId},
+    });
+
+    res.status(200).json({
+      bookId: numericBookId,
+      liked: false,
+      likesCount,
+    });
   } catch (e) {
     next(e);
   }
@@ -762,4 +991,6 @@ module.exports = {
   deleteBook,
   getBooksProgress,
   getTopReaders,
+  addBookLike,
+  removeBookLike,
 };
