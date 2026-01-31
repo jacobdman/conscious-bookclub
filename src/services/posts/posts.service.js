@@ -35,6 +35,29 @@ export const createPost = async (clubId, post) => {
   return result;
 };
 
+export const updatePost = async (clubId, postId, userId, data) => {
+  const params = new URLSearchParams({
+    clubId: clubId.toString(),
+    userId,
+  });
+  const result = await apiCall(`/v1/posts/${postId}?${params}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  return result;
+};
+
+export const deletePost = async (clubId, postId, userId) => {
+  const params = new URLSearchParams({
+    clubId: clubId.toString(),
+    userId,
+  });
+  const result = await apiCall(`/v1/posts/${postId}?${params}`, {
+    method: 'DELETE',
+  });
+  return result;
+};
+
 // Alias for backward compatibility
 export const addPost = createPost;
 

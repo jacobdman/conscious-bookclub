@@ -7,12 +7,24 @@ import {
   FormControlLabel,
   Checkbox,
   SwipeableDrawer,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
   Divider,
   Button,
   Stack,
   Grid,
 } from '@mui/material';
-import { Reply as ReplyIcon, AlternateEmail } from '@mui/icons-material';
+import {
+  Reply as ReplyIcon,
+  AlternateEmail,
+  MoreHoriz,
+  EditOutlined,
+  DeleteOutline,
+} from '@mui/icons-material';
+import { useAuth } from 'AuthContext';
 import ProfileAvatar from 'components/ProfileAvatar';
 import ReplyQuote from 'components/ReplyQuote';
 import EmojiInput from 'components/EmojiInput';
@@ -22,13 +34,17 @@ import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
 import { formatSemanticDateTime } from 'utils/dateHelpers';
 import { formatMeetingDisplay } from 'utils/meetingTime';
-import { renderMentions, encodeMentions } from 'utils/mentionHelpers';
+import { renderMentions, encodeMentions, MENTION_REGEX } from 'utils/mentionHelpers';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
-  const { createReply, registerPostRef, addReaction } = useFeedContext();
+  const { user } = useAuth();
+  const { createReply, registerPostRef, addReaction, updatePost, deletePost } = useFeedContext();
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isReplySpoiler, setIsReplySpoiler] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [isEditSpoiler, setIsEditSpoiler] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
@@ -38,8 +54,11 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const [fullPickerOpen, setFullPickerOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(Object.keys(EMOJI_CATEGORIES)[0]);
   const [replyMentions, setReplyMentions] = useState([]); // Track mentions in reply
+  const [editMentions, setEditMentions] = useState([]); // Track mentions in edit
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const postRef = useRef(null);
   const replyInputRef = useRef(null);
+  const editInputRef = useRef(null);
   const longPressTimerRef = useRef(null);
   const longPressHandledRef = useRef(false);
   const pressMovedRef = useRef(false);
@@ -76,6 +95,10 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     setReplyMentions(newMentions);
   }, []);
 
+  const handleEditMentionsChange = useCallback((newMentions) => {
+    setEditMentions(newMentions);
+  }, []);
+
   const handleInsertReplyMention = () => {
     if (!replyInputRef.current) return;
     
@@ -103,6 +126,30 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     }, 0);
   };
 
+  const handleInsertEditMention = () => {
+    if (!editInputRef.current) return;
+
+    const input = editInputRef.current;
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const textBefore = editText.slice(0, start);
+    const textAfter = editText.slice(end);
+
+    const newText = textBefore + '@' + textAfter;
+    setEditText(newText);
+
+    setTimeout(() => {
+      if (input) {
+        const newCursorPos = start + 1;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        input.focus();
+
+        const event = new Event('input', { bubbles: true });
+        input.dispatchEvent(event);
+      }
+    }, 0);
+  };
+
   useEffect(() => () => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -111,6 +158,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
 
   const authorName = post.authorName || post.author?.displayName || 'Unknown';
   const isActivity = !!post.isActivity;
+  const isAuthor = user && (post.authorId === user.uid || post.author?.uid === user.uid);
   const showAvatar = isFirstInGroup && !isActivity;
   const { displayString: timestampLabel } = formatSemanticDateTime(post.created_at);
   const quickEmojis =
@@ -415,6 +463,103 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     );
   };
 
+  const decodeMentionsForEdit = (text = '') => {
+    if (!text) return { displayText: '', mentions: [] };
+    const regex = new RegExp(MENTION_REGEX);
+    let displayText = '';
+    const mentions = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      const before = text.slice(lastIndex, match.index);
+      displayText += before;
+
+      const displayName = match[1];
+      const userId = match[2];
+      const mentionText = `@${displayName}`;
+      const start = displayText.length;
+      displayText += mentionText;
+      const end = displayText.length;
+
+      mentions.push({ userId, displayName, start, end });
+      lastIndex = match.index + match[0].length;
+    }
+
+    displayText += text.slice(lastIndex);
+    return { displayText, mentions };
+  };
+
+  const rebuildMentionsForText = (text, mentions) => {
+    if (!text || !mentions || mentions.length === 0) return [];
+    const updatedMentions = [];
+    const lastIndexByDisplayName = {};
+
+    mentions.forEach((mention) => {
+      const token = `@${mention.displayName}`;
+      const searchStart = lastIndexByDisplayName[mention.displayName] ?? 0;
+      const start = text.indexOf(token, searchStart);
+      if (start !== -1) {
+        const end = start + token.length;
+        updatedMentions.push({
+          ...mention,
+          start,
+          end,
+        });
+        lastIndexByDisplayName[mention.displayName] = end;
+      }
+    });
+
+    return updatedMentions;
+  };
+
+  const handleStartEdit = () => {
+    const { displayText, mentions } = decodeMentionsForEdit(post.text || '');
+    setEditText(displayText);
+    setEditMentions(mentions);
+    setIsEditSpoiler(!!post.isSpoiler);
+    setShowReplyForm(false);
+    setIsEditing(true);
+    closeActions();
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditText('');
+    setEditMentions([]);
+    setIsEditSpoiler(false);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editText.trim() || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      const updatedMentions = rebuildMentionsForText(editText.trim(), editMentions);
+      const textWithMentions = encodeMentions(editText.trim(), updatedMentions);
+      await updatePost(post.id, { text: textWithMentions, isSpoiler: isEditSpoiler });
+      handleCancelEdit();
+    } catch (err) {
+      console.error('Error updating post:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (isSubmitting) return;
+    try {
+      setIsSubmitting(true);
+      await deletePost(post.id);
+      setDeleteConfirmOpen(false);
+      closeActions();
+    } catch (err) {
+      console.error('Error deleting post:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <Box
       ref={postRef}
@@ -537,7 +682,94 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         )}
 
         {/* Message Text */}
-        {isMeetingActivity ? (
+        {isEditing ? (
+          <Box sx={{ mb: 0.5 }}>
+            <MentionInput
+              inputRef={editInputRef}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onMentionsChange={handleEditMentionsChange}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleEditSubmit();
+                }
+              }}
+              placeholder="Edit your post..."
+              multiline
+              maxRows={4}
+              autoFocus
+              disabled={isSubmitting}
+              sx={{
+                mb: 1,
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'background.default',
+                  borderRadius: 2,
+                  userSelect: 'text',
+                },
+              }}
+            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isEditSpoiler}
+                    onChange={(e) => setIsEditSpoiler(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Mark as spoiler"
+                sx={{ ml: 0.5 }}
+              />
+              <IconButton
+                size="small"
+                onClick={handleInsertEditMention}
+                disabled={isSubmitting}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: 'primary.main',
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+                title="Mention someone"
+              >
+                <AlternateEmail fontSize="small" />
+              </IconButton>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <Typography
+                variant="caption"
+                onClick={handleCancelEdit}
+                sx={{
+                  cursor: 'pointer',
+                  color: 'text.secondary',
+                  '&:hover': { color: 'text.primary' },
+                }}
+              >
+                Cancel
+              </Typography>
+              <IconButton
+                size="small"
+                color="primary"
+                onClick={handleEditSubmit}
+                disabled={!editText.trim() || isSubmitting}
+                sx={{
+                  backgroundColor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                  },
+                  '&:disabled': {
+                    backgroundColor: 'action.disabledBackground',
+                  },
+                }}
+              >
+                <EditOutlined sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Box>
+          </Box>
+        ) : isMeetingActivity ? (
           renderMeetingActivity()
         ) : isBookCompletionActivity ? (
           renderBookCompletionActivity()
@@ -656,19 +888,36 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
             showAddButton={showReactions}
           />
           {hovered && (
-            <Tooltip title="Reply">
-              <IconButton
-                size="small"
-                onClick={() => setShowReplyForm(!showReplyForm)}
-                sx={{
-                  opacity: 0.7,
-                  '&:hover': { opacity: 1 },
-                  padding: '4px',
-                }}
-              >
-                <ReplyIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-            </Tooltip>
+            <>
+              <Tooltip title="Reply">
+                <IconButton
+                  size="small"
+                  onClick={() => setShowReplyForm(!showReplyForm)}
+                  sx={{
+                    opacity: 0.7,
+                    '&:hover': { opacity: 1 },
+                    padding: '4px',
+                  }}
+                >
+                  <ReplyIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              {isAuthor && (
+                <Tooltip title="More actions">
+                  <IconButton
+                    size="small"
+                    onClick={openActions}
+                    sx={{
+                      opacity: 0.7,
+                      '&:hover': { opacity: 1 },
+                      padding: '4px',
+                    }}
+                  >
+                    <MoreHoriz sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </>
           )}
         </Box>
 
@@ -819,9 +1068,61 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           >
             Reply to {authorName}
           </Button>
+          {isAuthor && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              {!isActivity && (
+                <Button
+                  fullWidth
+                  startIcon={<EditOutlined />}
+                  onClick={handleStartEdit}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Edit post
+                </Button>
+              )}
+              <Button
+                fullWidth
+                color="error"
+                startIcon={<DeleteOutline />}
+                onClick={() => {
+                  setDeleteConfirmOpen(true);
+                  closeActions();
+                }}
+                sx={{ textTransform: 'none' }}
+              >
+                Delete post
+              </Button>
+            </>
+          )}
         </Box>
         {fullPickerOpen && renderFullEmojiPicker()}
       </SwipeableDrawer>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        aria-labelledby="delete-post-dialog-title"
+        aria-describedby="delete-post-dialog-description"
+      >
+        <DialogTitle id="delete-post-dialog-title">Delete post</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-post-dialog-description">
+            This will permanently remove the post from the feed.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            disabled={isSubmitting}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

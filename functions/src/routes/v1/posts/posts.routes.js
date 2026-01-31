@@ -3,6 +3,8 @@ const {
   getPosts,
   getPost,
   createPost,
+  updatePost,
+  deletePost,
   addReaction,
   removeReaction,
   getReactions,
@@ -14,6 +16,8 @@ router
     .get("/", getPosts)
     .get("/:postId", getPost)
     .post("/", createPost)
+    .put("/:postId", updatePost)
+    .delete("/:postId", deletePost)
     .post("/:postId/reactions", addReaction)
     .delete("/:postId/reactions/:emoji", removeReaction)
     .get("/:postId/reactions", getReactions);

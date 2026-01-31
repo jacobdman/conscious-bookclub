@@ -573,6 +573,142 @@ const createPost = async (req, res, next) => {
   }
 };
 
+// PUT /v1/posts/:postId - Update post
+const updatePost = async (req, res, next) => {
+  try {
+    const {postId} = req.params;
+    const {clubId, userId} = req.query;
+
+    if (!clubId || !userId) {
+      const error = new Error("clubId and userId are required");
+      error.status = 400;
+      throw error;
+    }
+
+    const post = await db.Post.findOne({
+      where: {
+        id: parseInt(postId),
+        clubId: parseInt(clubId),
+      },
+    });
+
+    if (!post) {
+      const error = new Error("Post not found");
+      error.status = 404;
+      throw error;
+    }
+
+    if (post.authorId !== userId) {
+      const error = new Error("Not authorized to edit this post");
+      error.status = 403;
+      throw error;
+    }
+
+    if (post.isActivity) {
+      const error = new Error("Activity posts cannot be edited");
+      error.status = 400;
+      throw error;
+    }
+
+    const postData = req.body || {};
+    const updatedFields = {};
+
+    if (typeof postData.text === "string") {
+      const trimmedText = postData.text.trim();
+      if (!trimmedText) {
+        const error = new Error("text is required");
+        error.status = 400;
+        throw error;
+      }
+      updatedFields.text = trimmedText;
+
+      const mentionedUserIds = [];
+      let match;
+      const regex = new RegExp(MENTION_REGEX);
+      while ((match = regex.exec(trimmedText)) !== null) {
+        const mentionedUserId = match[2];
+        if (mentionedUserId && !mentionedUserIds.includes(mentionedUserId)) {
+          mentionedUserIds.push(mentionedUserId);
+        }
+      }
+      updatedFields.mentionedUserIds = mentionedUserIds.length > 0 ? mentionedUserIds : null;
+    }
+
+    if (typeof postData.isSpoiler === "boolean") {
+      updatedFields.isSpoiler = postData.isSpoiler;
+    }
+
+    if (postData.images) {
+      updatedFields.images = sanitizeImages(postData.images);
+    }
+
+    await post.update(updatedFields);
+
+    const postWithAssociations = await db.Post.findByPk(post.id, {include: postIncludes});
+    const serializedPost = await buildPostResponse(postWithAssociations);
+
+    await emitToClub(parseInt(clubId), "post:updated", serializedPost);
+
+    res.json(serializedPost);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// DELETE /v1/posts/:postId - Delete post
+const deletePost = async (req, res, next) => {
+  try {
+    const {postId} = req.params;
+    const {clubId, userId} = req.query;
+
+    if (!clubId || !userId) {
+      const error = new Error("clubId and userId are required");
+      error.status = 400;
+      throw error;
+    }
+
+    const post = await db.Post.findOne({
+      where: {
+        id: parseInt(postId),
+        clubId: parseInt(clubId),
+      },
+    });
+
+    if (!post) {
+      const error = new Error("Post not found");
+      error.status = 404;
+      throw error;
+    }
+
+    if (post.authorId !== userId) {
+      const error = new Error("Not authorized to delete this post");
+      error.status = 403;
+      throw error;
+    }
+
+    await db.PostReaction.destroy({
+      where: {
+        postId: parseInt(postId),
+      },
+    });
+
+    await db.Post.destroy({
+      where: {
+        id: parseInt(postId),
+        clubId: parseInt(clubId),
+      },
+    });
+
+    await emitToClub(parseInt(clubId), "post:deleted", {
+      postId: parseInt(postId),
+    });
+
+    res.sendStatus(204);
+  } catch (e) {
+    next(e);
+  }
+};
+
 // POST /v1/posts/:postId/reactions - Add reaction
 const addReaction = async (req, res, next) => {
   try {
@@ -741,6 +877,8 @@ module.exports = {
   getPosts,
   getPost,
   createPost,
+  updatePost,
+  deletePost,
   addReaction,
   removeReaction,
   getReactions,

@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
-import { getPosts, createPost as createPostService, addReaction as addReactionService, removeReaction as removeReactionService } from 'services/posts/posts.service';
+import {
+  getPosts,
+  createPost as createPostService,
+  updatePost as updatePostService,
+  deletePost as deletePostService,
+  addReaction as addReactionService,
+  removeReaction as removeReactionService,
+} from 'services/posts/posts.service';
 import { connectSocket, joinClubRoom, leaveClubRoom } from 'services/socket';
 import { getReadStatus, markAsRead as markAsReadService } from 'services/feed/feed.service';
 import { setBadge, clearBadge } from 'services/badge';
@@ -238,9 +245,33 @@ const FeedProvider = ({ children }) => {
           }));
         };
 
+        const handlePostUpdated = (postData) => {
+          if (!showActivityRef.current && postData.isActivity) {
+            return;
+          }
+          setPosts(prev => prev.map(post => {
+            if (post.id === postData.id) {
+              return postData;
+            }
+            return post;
+          }));
+        };
+
+        const handlePostDeleted = (data) => {
+          const deletedPostId = data?.postId?.toString();
+          if (!deletedPostId) return;
+          setPosts(prev => prev.filter(post => post.id?.toString() !== deletedPostId));
+        };
+
         // Remove any existing listeners first to prevent duplicates
         if (eventHandlersRef.current['post:created']) {
           socket.off('post:created', eventHandlersRef.current['post:created']);
+        }
+        if (eventHandlersRef.current['post:updated']) {
+          socket.off('post:updated', eventHandlersRef.current['post:updated']);
+        }
+        if (eventHandlersRef.current['post:deleted']) {
+          socket.off('post:deleted', eventHandlersRef.current['post:deleted']);
         }
         if (eventHandlersRef.current['reaction:added']) {
           socket.off('reaction:added', eventHandlersRef.current['reaction:added']);
@@ -252,12 +283,16 @@ const FeedProvider = ({ children }) => {
         // Store handlers for cleanup
         eventHandlersRef.current = {
           'post:created': handlePostCreated,
+          'post:updated': handlePostUpdated,
+          'post:deleted': handlePostDeleted,
           'reaction:added': handleReactionAdded,
           'reaction:removed': handleReactionRemoved,
         };
 
         // Register event listeners
         socket.on('post:created', handlePostCreated);
+        socket.on('post:updated', handlePostUpdated);
+        socket.on('post:deleted', handlePostDeleted);
         socket.on('reaction:added', handleReactionAdded);
         socket.on('reaction:removed', handleReactionRemoved);
         
@@ -434,6 +469,36 @@ const FeedProvider = ({ children }) => {
     }
   }, [user, currentClub]);
 
+  const updatePost = useCallback(async (postId, data) => {
+    if (!user || !currentClub) return;
+
+    try {
+      const updatedPost = await updatePostService(currentClub.id, postId, user.uid, data);
+      setPosts(prev => prev.map(post => post.id === postId ? updatedPost : post));
+      return updatedPost;
+    } catch (err) {
+      setError('Failed to update post');
+      console.error('Error updating post:', err);
+      throw err;
+    }
+  }, [user, currentClub]);
+
+  const deletePost = useCallback(async (postId) => {
+    if (!user || !currentClub) return;
+
+    const previousPosts = posts;
+    setPosts(prev => prev.filter(post => post.id !== postId));
+
+    try {
+      await deletePostService(currentClub.id, postId, user.uid);
+    } catch (err) {
+      setPosts(previousPosts);
+      setError('Failed to delete post');
+      console.error('Error deleting post:', err);
+      throw err;
+    }
+  }, [user, currentClub, posts]);
+
   const addReaction = useCallback(async (postId, emoji) => {
     if (!user || !currentClub) return;
 
@@ -602,6 +667,8 @@ const FeedProvider = ({ children }) => {
         loadMorePosts,
         createPost,
         createReply,
+        updatePost,
+        deletePost,
         addReaction,
         removeReaction,
         markAsRead,
