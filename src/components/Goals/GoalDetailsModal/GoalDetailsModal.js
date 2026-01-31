@@ -52,6 +52,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const { 
     goals, 
     updateGoal,
+    deleteGoal,
     createEntry,
     updateEntry,
     deleteEntry,
@@ -87,6 +88,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const [weekEntriesPool, setWeekEntriesPool] = useState([]);
   const [allEntries, setAllEntries] = useState([]);
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const observerTarget = useRef(null);
   const initialEntriesLoaded = useRef({});
   const INITIAL_LIMIT = 20;
@@ -574,6 +576,24 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
   };
 
+  const handleDeleteGoal = () => {
+    if (!goal) return;
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!user || !goal) return;
+
+    try {
+      await deleteGoal(goal.id);
+      setDeleteConfirmOpen(false);
+      onClose();
+    } catch (err) {
+      console.error('Failed to delete goal:', err);
+      setDeleteConfirmOpen(false);
+    }
+  };
+
   const formatDateTime = (dateString) => {
     if (!dateString) return 'No date';
     try {
@@ -944,6 +964,12 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
             )}
           </Box>
         </DialogContent>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 3 }}>
+          <Button onClick={handleDeleteGoal} color="error">
+            Delete Goal
+          </Button>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
       </Dialog>
 
       <GoalEntryDialog
@@ -997,6 +1023,20 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         onConfirm={handleShareConfirm}
         completionLabel={shareDialog.label}
       />
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <DialogTitle>Delete goal?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            This will permanently delete the goal and its entries. This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

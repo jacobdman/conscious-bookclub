@@ -43,6 +43,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
 
   const [newMilestone, setNewMilestone] = useState({ title: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Helper function to convert various date formats to Date object
   const parseDate = (dateValue) => {
@@ -95,6 +96,9 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         milestones: [],
         completed: false,
       });
+    }
+    if (!open) {
+      setDeleteConfirmOpen(false);
     }
   }, [editingGoal, open]);
 
@@ -191,9 +195,16 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
 
   const handleDelete = () => {
     if (editingGoal) {
-      onArchive(editingGoal.id);
-      onClose();
+      setDeleteConfirmOpen(true);
     }
+  };
+
+  const handleConfirmDelete = () => {
+    if (editingGoal) {
+      onArchive(editingGoal.id);
+    }
+    setDeleteConfirmOpen(false);
+    onClose();
   };
 
   const renderTypeFields = () => {
@@ -403,6 +414,20 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
             {snackbar.message}
           </Alert>
         </Snackbar>
+        <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+          <DialogTitle>Delete goal?</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2">
+              This will permanently delete the goal and its entries. This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button onClick={handleConfirmDelete} color="error" variant="contained">
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Dialog>
     </LocalizationProvider>
   );

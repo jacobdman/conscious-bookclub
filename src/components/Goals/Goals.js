@@ -77,7 +77,7 @@ const Goals = () => {
   };
 
   const handleDeleteGoal = async (goalId) => {
-    if (!user || !window.confirm('Are you sure you want to delete this goal?')) return;
+    if (!user) return;
 
     try {
       await deleteGoal(goalId);
