@@ -4,9 +4,9 @@ import {
   signInWithEmailAndPassword,
   updateProfile
 } from "firebase/auth";
-import { auth, googleProvider } from '../firebase';
+import { auth, appleProvider } from '../firebase';
 
-export const signInWithGoogle = () => signInWithRedirect(auth, googleProvider);
+export const signInWithApple = () => signInWithRedirect(auth, appleProvider);
 
 export const signUpWithEmail = async (email, password, displayName) => {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);

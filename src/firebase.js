@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
-  GoogleAuthProvider, 
+  GoogleAuthProvider,
+  OAuthProvider,
   getRedirectResult,
   onAuthStateChanged, 
   signOut,
@@ -23,6 +24,7 @@ const auth = getAuth(app);
 const functions = getFunctions(app);
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
+const appleProvider = new OAuthProvider('apple.com');
 
 // Connect to emulators in development
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -44,4 +46,13 @@ if (isDevelopment) {
 }
 
 // Export Firebase instances and utilities
-export { auth, onAuthStateChanged, signOut, getRedirectResult, googleProvider, functions, storage };
+export { 
+  auth, 
+  onAuthStateChanged, 
+  signOut, 
+  getRedirectResult, 
+  googleProvider, 
+  appleProvider,
+  functions, 
+  storage 
+};

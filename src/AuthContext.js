@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 import { createUserDocument } from './services/users/users.service';
+import { signInWithApple, signInWithEmail, signUpWithEmail } from './services/authService';
 
 const AuthContext = createContext();
 
@@ -31,6 +32,8 @@ export const AuthProvider = ({ children }) => {
       throw error;
     }
   };
+
+  const signInWithAppleProvider = async () => signInWithApple();
 
   const logout = async () => {
     try {
@@ -99,6 +102,9 @@ export const AuthProvider = ({ children }) => {
     setUserProfile,
     loading,
     signInWithGoogle,
+    signInWithApple: signInWithAppleProvider,
+    signInWithEmail,
+    signUpWithEmail,
     logout
   };
 
