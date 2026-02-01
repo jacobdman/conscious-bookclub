@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
   Alert,
+  Button,
+  Grid,
+  Paper,
+  TextField,
+  Typography,
 } from '@mui/material';
-import Layout from 'components/Layout';
+import SetupLayout from 'components/SetupLayout';
 import useClubContext from 'contexts/Club';
 import { useAuth } from 'AuthContext';
 import { joinClubByInviteCode } from 'services/clubs/clubs.service';
@@ -76,62 +76,83 @@ const NoClub = () => {
     }
   };
 
+  const handleCreateClub = () => {
+    navigate('/setup/create-club');
+  };
+
   return (
-    <Layout>
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh',
-          p: 3,
-        }}
+    <SetupLayout>
+      <Grid
+        container
+        spacing={3}
+        justifyContent="center"
+        alignItems="stretch"
+        sx={{ minHeight: '60vh', p: 3 }}
       >
-        <Paper sx={{ p: 4, maxWidth: 500, width: '100%' }}>
-          <Typography variant="h4" gutterBottom align="center">
-            Join a Club
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }} align="center">
-            You need to be a member of a club to access the app. Enter an invite code below to join a club.
-          </Typography>
+        <Grid item xs={12} md={6} lg={5}>
+          <Paper sx={{ p: 4, width: '100%' }}>
+            <Typography variant="h4" gutterBottom align="center">
+              Join a Club
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }} align="center">
+              You need to be a member of a club to access the app. Enter an invite code below to join a club.
+            </Typography>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-              {error}
-            </Alert>
-          )}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+                {error}
+              </Alert>
+            )}
 
-          <TextField
-            label="Invite Code"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-            fullWidth
-            sx={{ mb: 2 }}
-            placeholder="Enter club invite code"
-            disabled={loading}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                handleJoinClub();
-              }
-            }}
-          />
+            <TextField
+              label="Invite Code"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              fullWidth
+              sx={{ mb: 2 }}
+              placeholder="Enter club invite code"
+              disabled={loading}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleJoinClub();
+                }
+              }}
+            />
 
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleJoinClub}
-            disabled={loading || !inviteCode.trim()}
-            sx={{ mb: 2 }}
-          >
-            {loading ? 'Joining...' : 'Join Club'}
-          </Button>
-
-          <Typography variant="body2" color="text.secondary" align="center">
-            Don't have an invite code? Contact a club owner to get one.
-          </Typography>
-        </Paper>
-      </Box>
-    </Layout>
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={handleJoinClub}
+              disabled={loading || !inviteCode.trim()}
+              sx={{ mb: 2 }}
+            >
+              {loading ? 'Joining...' : 'Join Club'}
+            </Button>
+            <Typography variant="body2" color="text.secondary" align="center">
+              Don't have an invite code? Contact a club owner to get one.
+            </Typography>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6} lg={5}>
+          <Paper sx={{ p: 4, width: '100%' }}>
+            <Typography variant="h4" gutterBottom align="center">
+              Create a Club
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }} align="center">
+              You can create your own club to invite your friends to.
+            </Typography>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={handleCreateClub}
+              disabled={loading}
+            >
+              Create a Club
+            </Button>
+          </Paper>
+        </Grid>
+      </Grid>
+    </SetupLayout>
   );
 };
 

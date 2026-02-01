@@ -10,6 +10,28 @@ export const DASHBOARD_SECTIONS = [
 export const getDefaultDashboardConfig = () =>
   DASHBOARD_SECTIONS.map(({id}) => ({id, enabled: true}));
 
+export const getDashboardConfigForFeatures = (features = {}) => {
+  const resolved = {
+    books: true,
+    goals: true,
+    quotes: true,
+    ...features,
+  };
+
+  return getDefaultDashboardConfig().map((section) => {
+    if (section.id === 'upcomingBooks' && !resolved.books) {
+      return { ...section, enabled: false };
+    }
+    if ((section.id === 'quickGoals' || section.id === 'habitLeaderboard') && !resolved.goals) {
+      return { ...section, enabled: false };
+    }
+    if (section.id === 'quote' && !resolved.quotes) {
+      return { ...section, enabled: false };
+    }
+    return section;
+  });
+};
+
 const coerceArrayConfig = (config) => {
   if (Array.isArray(config)) return config;
 

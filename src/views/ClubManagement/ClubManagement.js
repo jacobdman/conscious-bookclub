@@ -29,7 +29,6 @@ import {
   Tabs,
   Tab,
   Fade,
-  ButtonBase,
 } from '@mui/material';
 import {
   Delete,
@@ -46,6 +45,7 @@ import {
   InfoOutlined,
 } from '@mui/icons-material';
 import Layout from 'components/Layout';
+import ClubThemePresetPicker from 'components/ClubThemePresetPicker';
 import useClubContext from 'contexts/Club';
 import { useAuth } from 'AuthContext';
 import {
@@ -630,61 +630,16 @@ const ClubManagement = () => {
                 Only club owners can update the club theme.
               </Typography>
             )}
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-                gap: 2,
+            <ClubThemePresetPicker
+              selectedPresetId={selectedClubThemeId}
+              mode={clubThemeMode}
+              onPresetChange={(presetId) => {
+                if (isOwner) setSelectedClubThemeId(presetId);
               }}
-            >
-              {CLUB_THEME_PRESETS.map((preset) => {
-                const isSelected = selectedClubThemeId === preset.id;
-                const preview = preset.preview?.[clubThemeMode] || preset.preview?.light || preset.preview;
-                return (
-                  <ButtonBase
-                    key={preset.id}
-                    onClick={() => {
-                      if (isOwner) setSelectedClubThemeId(preset.id);
-                    }}
-                    disabled={!isOwner}
-                    sx={{ textAlign: 'left' }}
-                  >
-                    <Paper
-                      variant="outlined"
-                      sx={{
-                        p: 2,
-                        width: '100%',
-                        borderColor: isSelected ? 'primary.main' : 'divider',
-                        boxShadow: isSelected ? 3 : 0,
-                        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
-                      }}
-                    >
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                        {preset.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                        {preset.description}
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                        {['primary', 'secondary', 'background', 'accent'].map((key) => (
-                          <Box
-                            key={key}
-                            sx={{
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              bgcolor: preview?.[key],
-                              border: '1px solid',
-                              borderColor: 'divider',
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    </Paper>
-                  </ButtonBase>
-                );
-              })}
-            </Box>
+              onModeChange={(nextMode) => setClubThemeMode(nextMode)}
+              disabled={!isOwner}
+              showModeToggle={false}
+            />
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, mt: 2 }}>
               <Button
                 variant="contained"

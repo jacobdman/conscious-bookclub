@@ -195,6 +195,54 @@ const getUserClubs = async (req, res, next) => {
   }
 };
 
+// POST /v1/clubs - Create club (owner)
+const createClub = async (req, res, next) => {
+  try {
+    const {userId, name} = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    if (!name || !name.trim()) {
+      const error = new Error("name is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const user = await db.User.findByPk(userId);
+    if (!user) {
+      const error = new Error("User not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const inviteCode = await generateInviteCode();
+    const club = await db.Club.create({
+      name: name.trim(),
+      inviteCode,
+    });
+
+    const member = await db.ClubMember.create({
+      clubId: club.id,
+      userId,
+      role: "owner",
+    });
+
+    res.status(201).json({
+      clubId: club.id,
+      name: club.name,
+      role: member.role,
+      inviteCode: club.inviteCode,
+      createdAt: club.createdAt,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
 // GET /v1/clubs/:clubId?userId=xxx - Get club details (verify membership)
 const getClub = async (req, res, next) => {
   try {
@@ -824,6 +872,7 @@ const linkPendingRequest = async (req, res, next) => {
 
 module.exports = {
   getUserClubs,
+  createClub,
   getClub,
   getClubMembers,
   updateClub,

@@ -18,11 +18,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import useClubContext from 'contexts/Club';
 import FeedContext from 'contexts/Feed/FeedContext';
 import { useContext } from 'react';
+// Utils
+import { getClubFeatures } from 'utils/clubFeatures';
 
 const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentClub, userClubs, setCurrentClub, loading: clubsLoading } = useClubContext();
+  const features = getClubFeatures(currentClub);
   // FeedContext may not be available if not on Feed page, so use useContext with try/catch
   const feedContext = useContext(FeedContext);
   const unreadCount = feedContext?.unreadCount || 0;
@@ -54,10 +57,10 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
     { name: 'Dashboard', path: '/' },
     { name: 'Feed', path: '/feed' },
     { name: 'Club', path: '/club' },
-    { name: 'Book List', path: '/books' },
+    { name: 'Book List', path: '/books', feature: 'books' },
     { name: 'Calendar', path: '/calendar' },
-    { name: 'Goals', path: '/goals' },
-  ];
+    { name: 'Goals', path: '/goals', feature: 'goals' },
+  ].filter((item) => !item.feature || features[item.feature]);
 
   // Mobile specific items (replacing main nav on mobile)
   const mobileProfileItems = [

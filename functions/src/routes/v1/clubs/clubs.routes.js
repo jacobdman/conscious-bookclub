@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getUserClubs,
+  createClub,
   getClub,
   getClubMembers,
   updateClub,
@@ -19,6 +20,7 @@ const router = express.Router(); // eslint-disable-line new-cap
 
 router
     .get("/", getUserClubs)
+    .post("/", createClub)
     .post("/join", joinClubByInviteCode)
     .get("/:clubId", getClub)
     .put("/:clubId", updateClub)

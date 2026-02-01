@@ -3,9 +3,11 @@ import { Home, Message, CheckCircle, MenuBook } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 // UI
 import { BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 // Context
 import { useAuth } from 'AuthContext';
+import useClubContext from 'contexts/Club';
+// Utils
+import { getClubFeatures } from 'utils/clubFeatures';
 // Components
 import ProfileAvatar from 'components/ProfileAvatar';
 
@@ -13,43 +15,24 @@ const BottomNav = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { currentClub } = useClubContext();
+  const features = getClubFeatures(currentClub);
 
-  const getValue = (path) => {
-    if (path === '/') return 0;
-    if (path === '/feed') return 1;
-    if (path === '/goals') return 2;
-    if (path === '/books') return 3;
-    return -1; // No selection for other paths
-  };
+  const navItems = [
+    { label: 'Home', icon: <Home />, path: '/' },
+    { label: 'Feed', icon: <Message />, path: '/feed' },
+    { label: 'Goals', icon: <CheckCircle />, path: '/goals', feature: 'goals' },
+    { label: 'Books', icon: <MenuBook />, path: '/books', feature: 'books' },
+  ].filter((item) => !item.feature || features[item.feature]);
 
-  const [value, setValue] = React.useState(getValue(location.pathname));
-
-  React.useEffect(() => {
-    setValue(getValue(location.pathname));
-  }, [location.pathname]);
+  const currentValue = navItems.find((item) => item.path === location.pathname)?.path || false;
 
   const handleChange = (event, newValue) => {
-    if (newValue === 4) {
+    if (newValue === 'menu') {
       // Menu/Profile action
       onMenuClick();
     } else {
-      setValue(newValue);
-      switch (newValue) {
-        case 0:
-          navigate('/');
-          break;
-        case 1:
-          navigate('/feed');
-          break;
-        case 2:
-          navigate('/goals');
-          break;
-        case 3:
-          navigate('/books');
-          break;
-        default:
-          break;
-      }
+      navigate(newValue);
     }
   };
 
@@ -67,7 +50,7 @@ const BottomNav = ({ onMenuClick }) => {
     >
       <BottomNavigation
         showLabels
-        value={value}
+        value={currentValue}
         onChange={handleChange}
         sx={{
             backgroundColor: (theme) =>
@@ -89,12 +72,12 @@ const BottomNav = ({ onMenuClick }) => {
             },
         }}
       >
-        <BottomNavigationAction label="Home" icon={<Home />} />
-        <BottomNavigationAction label="Feed" icon={<Message />} />
-        <BottomNavigationAction label="Goals" icon={<CheckCircle />} />
-        <BottomNavigationAction label="Books" icon={<MenuBook />} />
+        {navItems.map((item) => (
+          <BottomNavigationAction key={item.path} label={item.label} icon={item.icon} value={item.path} />
+        ))}
         <BottomNavigationAction 
             label="Menu" 
+            value="menu"
             icon={
                 <ProfileAvatar 
                     user={user}

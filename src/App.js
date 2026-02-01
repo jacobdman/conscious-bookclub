@@ -15,6 +15,7 @@ import Goals from './views/Goals';
 import Profile from './views/Profile';
 import Meetings from './views/Meetings';
 import NoClub from './views/NoClub';
+import ClubSetup from './views/ClubSetup';
 import Landing from './views/Landing';
 import Theory from './views/Theory';
 import Themes from './views/Themes';
@@ -22,6 +23,7 @@ import Quotes from './views/Quotes';
 import Dev from './views/Dev';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
+import FeatureGateRoute from 'components/FeatureGateRoute';
 import { CircularProgress, Box } from '@mui/material';
 
 function AppContent() {
@@ -89,6 +91,14 @@ function AppContent() {
               }
             />
             <Route
+              path="/setup/create-club"
+              element={
+                <ClubProvider>
+                  <ClubSetup />
+                </ClubProvider>
+              }
+            />
+            <Route
               path="/"
               element={
                 <ClubProvider>
@@ -123,7 +133,9 @@ function AppContent() {
               element={
                 <ClubProvider>
                   <ProtectedRoute>
-                    <ClubView />
+                    <FeatureGateRoute featureKey="books">
+                      <ClubView />
+                    </FeatureGateRoute>
                   </ProtectedRoute>
                 </ClubProvider>
               }
@@ -133,7 +145,9 @@ function AppContent() {
               element={
                 <ClubProvider>
                   <ProtectedRoute>
-                    <ClubView />
+                    <FeatureGateRoute featureKey="goals">
+                      <ClubView />
+                    </FeatureGateRoute>
                   </ProtectedRoute>
                 </ClubProvider>
               }
@@ -153,7 +167,9 @@ function AppContent() {
               element={
                 <ClubProvider>
                   <ProtectedRoute>
-                    <Books />
+                    <FeatureGateRoute featureKey="books">
+                      <Books />
+                    </FeatureGateRoute>
                   </ProtectedRoute>
                 </ClubProvider>
               }
@@ -173,7 +189,9 @@ function AppContent() {
               element={
                 <ClubProvider>
                   <ProtectedRoute>
-                    <Goals />
+                    <FeatureGateRoute featureKey="goals">
+                      <Goals />
+                    </FeatureGateRoute>
                   </ProtectedRoute>
                 </ClubProvider>
               }
@@ -203,7 +221,9 @@ function AppContent() {
               element={
                 <ClubProvider>
                   <ProtectedRoute>
-                    <Quotes />
+                    <FeatureGateRoute featureKey="quotes">
+                      <Quotes />
+                    </FeatureGateRoute>
                   </ProtectedRoute>
                 </ClubProvider>
               }

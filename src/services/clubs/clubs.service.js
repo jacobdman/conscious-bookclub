@@ -6,6 +6,11 @@ export const getUserClubs = async (userId) => {
   return apiCall(`/v1/clubs?${params}`);
 };
 
+export const createClub = async (userId, name) => apiCall('/v1/clubs', {
+  method: 'POST',
+  body: JSON.stringify({ userId, name }),
+});
+
 export const getClub = async (clubId, userId) => {
   const params = new URLSearchParams({ userId });
   return apiCall(`/v1/clubs/${clubId}?${params}`);
