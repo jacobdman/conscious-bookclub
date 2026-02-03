@@ -24,6 +24,7 @@ import Dev from './views/Dev';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
 import FeatureGateRoute from 'components/FeatureGateRoute';
+import TutorialProvider from 'contexts/Tutorial/TutorialProvider';
 import { CircularProgress, Box } from '@mui/material';
 
 function AppContent() {
@@ -242,8 +243,10 @@ function App() {
   return (
     <AuthProvider>
       <ErrorNotificationProvider>
-        <AppContent />
-        <UpdatePrompt />
+        <TutorialProvider>
+          <AppContent />
+          <UpdatePrompt />
+        </TutorialProvider>
       </ErrorNotificationProvider>
     </AuthProvider>
   );

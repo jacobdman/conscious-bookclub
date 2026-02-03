@@ -25,6 +25,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import GoalFormTour from 'components/Tours/GoalFormTour';
 
 const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null }) => {
   // Note: onArchive is kept for backward compatibility but actually deletes the goal
@@ -354,10 +355,11 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <GoalFormTour open={open} />
         <DialogTitle>
           {editingGoal ? 'Edit Goal' : 'Create New Goal'}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent data-tour="goal-form-content">
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               label="Goal Title"
@@ -367,7 +369,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
               required
             />
 
-            <FormControl fullWidth>
+            <FormControl fullWidth data-tour="goal-form-type">
               <InputLabel>Goal Type</InputLabel>
               <Select
                 value={formData.type}

@@ -28,6 +28,7 @@ import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import PersonalGoalsReport from 'components/PersonalGoalsReport';
 import Layout from 'components/Layout';
+import GoalsTour from 'components/Tours/GoalsTour';
 import { 
   getGoalTypeLabel,
   getGoalTypeColor,
@@ -145,6 +146,7 @@ const Goals = () => {
 
   return (
     <Layout>
+      <GoalsTour />
       <Box sx={{ 
         p: 3, 
         height: '100%', 
@@ -158,13 +160,19 @@ const Goals = () => {
               variant="contained"
               startIcon={<Add />}
               onClick={handleCreateGoal}
+              data-tour="goals-create"
             >
               Create Goal
             </Button>
           )}
         </Box>
 
-        <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)} sx={{ mb: 3 }}>
+        <Tabs
+          value={currentTab}
+          onChange={(e, newValue) => setCurrentTab(newValue)}
+          sx={{ mb: 3 }}
+          data-tour="goals-tabs"
+        >
           <Tab label="Goals" />
           <Tab label="Goals Report" />
         </Tabs>
@@ -176,7 +184,7 @@ const Goals = () => {
         {currentTab === 0 && (
           <>
 
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 3 }} data-tour="goals-quick">
           <QuickGoalCompletion />
         </Box>
 
@@ -198,9 +206,9 @@ const Goals = () => {
           </Alert>
         )}
 
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} data-tour="goals-table">
           <Table>
-            <TableHead>
+            <TableHead data-tour="goals-table-header">
               <TableRow>
                 <TableCell width={50}></TableCell>
                 <TableCell>Title</TableCell>

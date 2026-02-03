@@ -56,6 +56,7 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
         return (
           <Box
             key={entry.userId}
+            data-tour={index === 0 ? 'dashboard-member-profile' : undefined}
             sx={{
               display: 'flex',
               flexDirection: 'column',

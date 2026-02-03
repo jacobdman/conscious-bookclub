@@ -45,6 +45,7 @@ import Layout from 'components/Layout';
 import AddBookForm from 'components/AddBookForm';
 import MeetingForm from 'components/MeetingForm';
 import BookInfoDialog from 'components/BookInfoDialog';
+import BooksTour from 'components/Tours/BooksTour';
 import { parseLocalDate } from 'utils/dateHelpers';
 
 const BookList = () => {
@@ -349,6 +350,7 @@ const BookList = () => {
 
   return (
     <Layout>
+      <BooksTour />
       <Box sx={{ 
         p: 2, 
         height: '100%', 
@@ -372,6 +374,7 @@ const BookList = () => {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setAddBookOpen(true)}
+            data-tour="add_book_button"
             sx={{ 
               display: { xs: 'none', md: 'flex' }
             }}
@@ -398,7 +401,9 @@ const BookList = () => {
         >
             {/* Expandable Search */}
             <ClickAwayListener onClickAway={handleSearchClickAway}>
-                <Box sx={{ 
+                <Box
+                    data-tour="books-search"
+                    sx={{ 
                     display: 'flex', 
                     alignItems: 'center',
                     transition: 'all 0.3s ease',
@@ -454,6 +459,7 @@ const BookList = () => {
                     endIcon={showFilters ? <CloseIcon fontSize="small" /> : null}
                     onClick={toggleFilters}
                     color={showFilters || filters.theme !== 'all' || filters.status !== 'all' ? "primary" : "inherit"}
+                    data-tour="books-filter"
                     sx={{ 
                         textTransform: 'none',
                         borderRadius: 2
@@ -554,6 +560,7 @@ const BookList = () => {
         <TableContainer 
             component={Paper} 
             elevation={2}
+            data-tour="books-table"
             sx={{ 
                 borderRadius: 3,
                 mb: 2,
@@ -563,8 +570,8 @@ const BookList = () => {
                 overflowY: 'visible'
             }}
         >
-          <Table stickyHeader aria-label="books table">
-            <TableHead>
+          <Table aria-label="books table">
+            <TableHead data-tour="books-table-header">
               <TableRow sx={{ backgroundColor: 'action.hover' }}>
                 <TableCell>Cover</TableCell>
                 <TableCell>
@@ -619,10 +626,11 @@ const BookList = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {books.map((book) => (
+              {books.map((book, index) => (
                 <TableRow
                   key={book.id}
                   onClick={() => handleRowClick(book)}
+                  data-tour={index === 0 ? 'books-row' : undefined}
                   sx={{ 
                       '&:last-child td, &:last-child th': { border: 0 },
                       '&:hover': { backgroundColor: 'action.hover' },
@@ -660,6 +668,7 @@ const BookList = () => {
                         onClick={(event) => handleToggleLike(event, book)}
                         color={book.isLiked ? 'primary' : 'default'}
                         disabled={loadingLikes[book.id]}
+                        data-tour={index === 0 ? 'books-like' : undefined}
                       >
                         {book.isLiked ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOffAltIcon fontSize="small" />}
                       </IconButton>
@@ -801,6 +810,7 @@ const BookList = () => {
           color="primary"
           aria-label="add book"
           onClick={() => setAddBookOpen(true)}
+          data-tour="add_book_mobile_button"
           sx={{
             position: 'fixed',
             bottom: 72,

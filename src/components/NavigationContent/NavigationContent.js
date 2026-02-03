@@ -20,8 +20,9 @@ import FeedContext from 'contexts/Feed/FeedContext';
 import { useContext } from 'react';
 // Utils
 import { getClubFeatures } from 'utils/clubFeatures';
+import MenuTour from 'components/Tours/MenuTour';
 
-const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
+const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentClub, userClubs, setCurrentClub, loading: clubsLoading } = useClubContext();
@@ -117,6 +118,30 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
     }
   };
 
+  const menuTourSteps = [];
+  if (isMobile) {
+    menuTourSteps.push({
+      target: '[data-tour="menu-profile-settings"]',
+      content: 'Profile & Settings: manage notifications and personalize your theme.',
+    });
+    menuTourSteps.push({
+      target: '[data-tour="menu-calendar"]',
+      content: 'Calendar keeps track of meetings and key dates.',
+    });
+  }
+  if (clubManagementItems.some((item) => item.path === '/club/manage')) {
+    menuTourSteps.push({
+      target: '[data-tour="menu-manage-club"]',
+      content: 'Manage Club controls members, features, and club settings.',
+    });
+  }
+  if (clubManagementItems.some((item) => item.path === '/meetings')) {
+    menuTourSteps.push({
+      target: '[data-tour="menu-meetings"]',
+      content: 'Meetings lets you schedule discussions and agendas.',
+    });
+  }
+
   return (
     <Box sx={{ 
       width: isMobile ? '100%' : 250, 
@@ -125,6 +150,7 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
       flexDirection: 'column',
       p: 2 
     }} role="presentation">
+      <MenuTour open={isMobile && menuOpen} steps={menuTourSteps} />
       <Typography variant="h6" sx={{ mb: 2 }}>
           {isMobile ? 'Menu' : 'Navigation'}
       </Typography>
@@ -164,11 +190,12 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
             </Typography>
             <List sx={{ py: 0, mb: 1 }}>
                 {clubManagementItems.map((item) => (
-                <ListItem 
+                    <ListItem 
                     button 
                     key={item.name}
                     onClick={() => handleNavigation(item.path)}
                     selected={location.pathname === item.path}
+                        data-tour={item.path === '/club/manage' ? 'menu-manage-club' : 'menu-meetings'}
                     sx={{
                     borderRadius: 1,
                     mb: 0.5,
@@ -198,6 +225,7 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false }) => {
                         key={item.name}
                         onClick={() => handleNavigation(item.path)}
                         selected={location.pathname === item.path}
+                        data-tour={item.path === '/profile' ? 'menu-profile-settings' : 'menu-calendar'}
                         sx={{
                         bgcolor: location.pathname === item.path ? 'action.selected' : 'transparent',
                         borderRadius: 1,

@@ -19,10 +19,10 @@ const BottomNav = ({ onMenuClick }) => {
   const features = getClubFeatures(currentClub);
 
   const navItems = [
-    { label: 'Home', icon: <Home />, path: '/' },
-    { label: 'Feed', icon: <Message />, path: '/feed' },
-    { label: 'Goals', icon: <CheckCircle />, path: '/goals', feature: 'goals' },
-    { label: 'Books', icon: <MenuBook />, path: '/books', feature: 'books' },
+    { label: 'Home', icon: <Home />, path: '/', dataTour: 'nav-home' },
+    { label: 'Feed', icon: <Message />, path: '/feed', dataTour: 'nav-feed' },
+    { label: 'Goals', icon: <CheckCircle />, path: '/goals', feature: 'goals', dataTour: 'nav-goals' },
+    { label: 'Books', icon: <MenuBook />, path: '/books', feature: 'books', dataTour: 'nav-books' },
   ].filter((item) => !item.feature || features[item.feature]);
 
   const currentValue = navItems.find((item) => item.path === location.pathname)?.path || false;
@@ -46,6 +46,7 @@ const BottomNav = ({ onMenuClick }) => {
         zIndex: 1100,
         borderRadius: 0,
       }} 
+      data-tour="nav-container"
       elevation={3}
     >
       <BottomNavigation
@@ -73,11 +74,18 @@ const BottomNav = ({ onMenuClick }) => {
         }}
       >
         {navItems.map((item) => (
-          <BottomNavigationAction key={item.path} label={item.label} icon={item.icon} value={item.path} />
+          <BottomNavigationAction
+            key={item.path}
+            label={item.label}
+            icon={item.icon}
+            value={item.path}
+            data-tour={item.dataTour}
+          />
         ))}
         <BottomNavigationAction 
             label="Menu" 
             value="menu"
+            data-tour="nav-menu"
             icon={
                 <ProfileAvatar 
                     user={user}

@@ -14,6 +14,7 @@ import PWAInstallPrompt from 'components/PWAInstallPrompt';
 import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
 import QuoteOfWeek from 'components/QuoteOfWeek';
+import DashboardTour from 'components/Tours/DashboardTour';
 import { parseLocalDate } from 'utils/dateHelpers';
 import { sanitizeDashboardConfig, isSectionEnabled } from 'utils/dashboardConfig';
 import { useNavigate } from 'react-router-dom';
@@ -137,6 +138,7 @@ const Dashboard = () => {
     <GoalsProvider>
       <FeedProvider>
       <Layout>
+          <DashboardTour />
           <Box 
             sx={{ 
               p: 2, 
@@ -159,20 +161,31 @@ const Dashboard = () => {
                 switch (sectionId) {
                   case 'habitLeaderboard':
                     return currentClub ? (
-                      <HabitConsistencyLeaderboardWithData key={sectionId} />
+                      <Box key={sectionId} data-tour="dashboard-leaderboard">
+                        <HabitConsistencyLeaderboardWithData />
+                      </Box>
                     ) : null;
                   case 'nextMeeting':
                     return (
-                      <NextMeetingCard
-                        key={sectionId}
-                        meetings={nextMeetings}
-                        loading={meetingsLoading}
-                        error={meetingsError}
-                      />
+                      <Box key={sectionId} data-tour="dashboard-meeting">
+                        <NextMeetingCard
+                          meetings={nextMeetings}
+                          loading={meetingsLoading}
+                          error={meetingsError}
+                        />
+                      </Box>
                     );
                   case 'quickGoals':
                     return (
-                      <React.Fragment key={sectionId}>
+                      <Box
+                        key={sectionId}
+                        data-tour="dashboard-goals"
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1.5,
+                        }}
+                      >
                         <QuickGoalCompletion />
                         <Paper
                           sx={{
@@ -194,13 +207,21 @@ const Dashboard = () => {
                             View Full Goals Report
                           </Button>
                         </Paper>
-                      </React.Fragment>
+                      </Box>
                     );
                   case 'quote':
                     return <QuoteOfWeek key={sectionId} />;
                   case 'upcomingBooks':
                     return (
-                      <React.Fragment key={sectionId}>
+                      <Box
+                        key={sectionId}
+                        data-tour="dashboard-books"
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1.5,
+                        }}
+                      >
                         <CurrentBooksSection books={currentBooks} />
                         <Paper
                           sx={{
@@ -222,10 +243,14 @@ const Dashboard = () => {
                             View Full Book Report
                           </Button>
                         </Paper>
-                      </React.Fragment>
+                      </Box>
                     );
                   case 'feed':
-                    return <FeedPreview key={sectionId} />;
+                    return (
+                      <Box key={sectionId} data-tour="dashboard-feed">
+                        <FeedPreview />
+                      </Box>
+                    );
                   default:
                     return null;
                 }

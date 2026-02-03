@@ -239,7 +239,9 @@ const CurrentBooksSection = ({ books }) => {
   
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>Upcoming Book Discussions</Typography>
+      <Typography variant="h6" gutterBottom data-tour="dashboard-books-title">
+        Upcoming Book Discussions
+      </Typography>
       {books?.length === 0 && (
         <Typography variant="body2" color="text.secondary">
           No upcoming book discussions scheduled. Add discussion dates to books to see them here.

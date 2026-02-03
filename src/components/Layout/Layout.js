@@ -168,6 +168,7 @@ const Layout = ({ children }) => {
                   onClose={() => setMobileMenuOpen(false)}
                   onLogout={handleLogout}
                   isMobile={true}
+                  menuOpen={mobileMenuOpen}
               />
           </Drawer>
 
