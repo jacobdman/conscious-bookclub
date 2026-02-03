@@ -10,14 +10,16 @@ import {
   Chip,
   Button,
   Divider,
-  LinearProgress
+  LinearProgress,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import {
   ThumbUp as ThumbUpIcon,
   ThumbUpOffAlt as ThumbUpOffAltIcon
 } from '@mui/icons-material';
 
-const BookInfoDialog = ({ open, onClose, book, discussionDate }) => {
+const BookInfoDialog = ({ open, onClose, book, discussionDate, onToggleLike, isLikeLoading }) => {
   if (!book) return null;
 
   const themes = Array.isArray(book.theme) ? book.theme : (book.theme ? [book.theme] : []);
@@ -78,11 +80,23 @@ const BookInfoDialog = ({ open, onClose, book, discussionDate }) => {
               Uploaded by: {uploadedBy || 'Unknown'}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-              {isLiked ? (
-                <ThumbUpIcon fontSize="small" color="primary" />
-              ) : (
-                <ThumbUpOffAltIcon fontSize="small" color="action" />
-              )}
+              <Tooltip title={isLiked ? 'Unlike book' : 'Like book'}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={(event) => onToggleLike?.(event, book)}
+                    disabled={isLikeLoading || !onToggleLike}
+                    color={isLiked ? 'primary' : 'default'}
+                    aria-label={isLiked ? 'Unlike book' : 'Like book'}
+                  >
+                    {isLiked ? (
+                      <ThumbUpIcon fontSize="small" />
+                    ) : (
+                      <ThumbUpOffAltIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
               <Typography variant="caption" color="text.secondary">
                 {likesCount} {likesCount === 1 ? 'like' : 'likes'}
               </Typography>

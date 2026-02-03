@@ -311,7 +311,9 @@ const BookList = () => {
   };
 
   const handleToggleLike = async (event, book) => {
-    event.stopPropagation();
+    if (event?.stopPropagation) {
+      event.stopPropagation();
+    }
     if (!user) return;
 
     setLoadingLikes(prev => ({ ...prev, [book.id]: true }));
@@ -840,6 +842,8 @@ const BookList = () => {
         onClose={handleInfoClose}
         book={selectedBook}
         discussionDate={selectedBook ? meetingDates[selectedBook.id] : null}
+        onToggleLike={selectedBook ? handleToggleLike : undefined}
+        isLikeLoading={selectedBook ? loadingLikes[selectedBook.id] : false}
       />
     </Layout>
   );
