@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Box, Typography, Button, Paper } from '@mui/material';
-import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import GoalsProvider from 'contexts/Goals/GoalsProvider';
@@ -15,6 +14,7 @@ import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
 import QuoteOfWeek from 'components/QuoteOfWeek';
 import DashboardTour from 'components/Tours/DashboardTour';
+import { useMeetings } from 'hooks/useMeetings';
 import { parseLocalDate } from 'utils/dateHelpers';
 import { sanitizeDashboardConfig, isSectionEnabled } from 'utils/dashboardConfig';
 import { useNavigate } from 'react-router-dom';
@@ -23,111 +23,76 @@ import { ArrowForward } from '@mui/icons-material';
 const Dashboard = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
-  const [currentBooks, setCurrentBooks] = useState([]);
-  const [nextMeetings, setNextMeetings] = useState([]);
-  const [meetingsLoading, setMeetingsLoading] = useState(false);
-  const [meetingsError, setMeetingsError] = useState(null);
   const navigate = useNavigate();
   const dashboardConfig = useMemo(
       () => sanitizeDashboardConfig(currentClub?.dashboardConfig),
       [currentClub],
   );
 
-  const fetchBooks = useCallback(async () => {
-    try {
-      if (!user || !currentClub) {
-        return;
-      }
-      
-      // Get today's date in YYYY-MM-DD format for start_date filter
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const startDate = today.toISOString().split('T')[0];
-      
-      // Fetch meetings with user progress included and filtered by start_date
-      const meetings = await getMeetings(currentClub.id, user.uid, startDate);
-      
-      // Extract books from meetings, including progress from the meeting response
-      const bookMap = new Map();
-      
-      meetings.forEach(meeting => {
-        if (meeting.book && meeting.bookId) {
-          const bookId = meeting.book.id || meeting.bookId;
-          
-          // If we haven't seen this book yet, or this meeting is earlier, update it
-          if (!bookMap.has(bookId)) {
-            const bookData = {
-              id: bookId,
-              ...meeting.book,
-              chosenForBookclub: true, // If the book is in a meeting, it's chosen for bookclub
-              progress: meeting.book.progress || null, // Progress is nested in book.progress
-              meetingTheme: meeting.theme || null,
-            };
+  const startDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString().split('T')[0];
+  }, []);
+
+  const {
+    data: upcomingMeetings = [],
+  } = useMeetings(currentClub?.id, user?.uid, { startDate });
+
+  const {
+    data: nextMeetings = [],
+    isLoading: meetingsLoading,
+    error: meetingsError,
+  } = useMeetings(currentClub?.id, user?.uid, { startDate, limit: 3 });
+
+  const currentBooks = useMemo(() => {
+    if (!Array.isArray(upcomingMeetings) || upcomingMeetings.length === 0) {
+      return [];
+    }
+
+    const bookMap = new Map();
+
+    upcomingMeetings.forEach(meeting => {
+      if (meeting.book && meeting.bookId) {
+        const bookId = meeting.book.id || meeting.bookId;
+
+        if (!bookMap.has(bookId)) {
+          const bookData = {
+            id: bookId,
+            ...meeting.book,
+            chosenForBookclub: true,
+            progress: meeting.book.progress || null,
+            meetingTheme: meeting.theme || null,
+          };
+          bookMap.set(bookId, {
+            book: bookData,
+            meetingDate: meeting.date,
+          });
+        } else {
+          const existing = bookMap.get(bookId);
+          const meetingDate = parseLocalDate(meeting.date);
+          const existingDate = parseLocalDate(existing.meetingDate);
+          if (meetingDate < existingDate) {
             bookMap.set(bookId, {
-              book: bookData,
+              ...existing,
               meetingDate: meeting.date,
             });
-          } else {
-            const existing = bookMap.get(bookId);
-            const meetingDate = parseLocalDate(meeting.date);
-            const existingDate = parseLocalDate(existing.meetingDate);
-            if (meetingDate < existingDate) {
-              // This meeting is earlier, update the meeting date
-              bookMap.set(bookId, {
-                ...existing,
-                meetingDate: meeting.date,
-              });
-            }
           }
         }
-      });
-      
-      // Convert map to array and sort by meeting date
-      const upcomingBooks = Array.from(bookMap.values())
-        .sort((a, b) => {
-          const aDate = parseLocalDate(a.meetingDate);
-          const bDate = parseLocalDate(b.meetingDate);
-          return aDate - bDate;
-        })
-        .map(item => item.book);
-      
-      setCurrentBooks(upcomingBooks);
-    } catch (err) {
-      // Error fetching books
-    }
-  }, [user, currentClub]);
-
-  const fetchNextMeetings = useCallback(async () => {
-    try {
-      if (!user || !currentClub) {
-        return;
       }
+    });
 
-      setMeetingsLoading(true);
-      setMeetingsError(null);
+    return Array.from(bookMap.values())
+      .sort((a, b) => {
+        const aDate = parseLocalDate(a.meetingDate);
+        const bDate = parseLocalDate(b.meetingDate);
+        return aDate - bDate;
+      })
+      .map(item => item.book);
+  }, [upcomingMeetings]);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const startDate = today.toISOString().split('T')[0];
-
-      const meetings = await getMeetings(currentClub.id, user.uid, startDate, null, 3);
-      setNextMeetings(meetings);
-    } catch (err) {
-      setMeetingsError(err?.message || 'Failed to load meetings');
-      console.error('Error fetching next meetings:', err);
-      setNextMeetings([]);
-    } finally {
-      setMeetingsLoading(false);
-    }
-  }, [user, currentClub]);
-
-
-  useEffect(() => {
-    if (user) {
-      fetchBooks();
-      fetchNextMeetings();
-    }
-  }, [user, fetchBooks, fetchNextMeetings]);
+  const meetingsErrorMessage = meetingsError?.message
+    || (meetingsError ? 'Failed to load meetings' : null);
 
   // Ensure page starts at top when Dashboard loads
   useEffect(() => {
@@ -171,7 +136,7 @@ const Dashboard = () => {
                         <NextMeetingCard
                           meetings={nextMeetings}
                           loading={meetingsLoading}
-                          error={meetingsError}
+                          error={meetingsErrorMessage}
                         />
                       </Box>
                     );

@@ -1,21 +1,14 @@
-import React, { useState, useCallback, useContext, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useContext, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+// Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
-import {
-  getBooksPage,
-  getBooksPageFiltered,
-  getAllDiscussedBooks,
-  addBook,
-  updateBook as updateBookService,
-  deleteBook as deleteBookService,
-  likeBook,
-  unlikeBook,
-} from 'services/books/books.service';
-import {
-  updateUserBookProgress,
-  getUserBookProgress
-} from 'services/progress/progress.service';
 import BooksContext from './BooksContext';
+// Services
+import { likeBook, unlikeBook } from 'services/books/books.service';
+import { updateUserBookProgress } from 'services/progress/progress.service';
+// Hooks
+import { useBooks, useCreateBook, useUpdateBook, useDeleteBook } from 'hooks/useBooks';
 
 // Simple debounce hook
 const useDebounce = (value, delay) => {
@@ -38,12 +31,8 @@ const BooksProvider = ({ children }) => {
   // ******************STATE VALUES**********************
   const { user } = useAuth();
   const { currentClub } = useClubContext();
-  
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+
+  const queryClient = useQueryClient();
   
   // New state for filters and pagination
   const [pagination, setPaginationState] = useState({ page: 1, pageSize: 10 });
@@ -53,6 +42,35 @@ const BooksProvider = ({ children }) => {
   
   // Debounce search term (500ms delay)
   const debouncedSearch = useDebounce(search, 500);
+
+  const queryOptions = useMemo(() => ({
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    filters,
+    search: debouncedSearch,
+    sort,
+  }), [pagination, filters, debouncedSearch, sort]);
+
+  const booksQueryKey = useMemo(() => (
+    ['books', currentClub?.id, user?.uid, queryOptions]
+  ), [currentClub?.id, user?.uid, queryOptions]);
+
+  const {
+    data,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useBooks(currentClub?.id, user?.uid, queryOptions);
+
+  const books = data?.books || [];
+  const totalCount = data?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / pagination.pageSize);
+  const error = queryError?.message || (queryError ? 'Failed to fetch books' : null);
+  const loading = isLoading;
+
+  const createBookMutation = useCreateBook(currentClub?.id);
+  const updateBookMutation = useUpdateBook(currentClub?.id);
+  const deleteBookMutation = useDeleteBook(currentClub?.id);
 
   // ******************SETTERS FOR STATE**********************
   const setPage = (page) => {
@@ -79,141 +97,9 @@ const BooksProvider = ({ children }) => {
   };
 
   // ******************LOAD FUNCTIONS**********************
-  const fetchBooks = useCallback(async () => {
-    if (!currentClub) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { page, pageSize } = pagination;
-      const { theme, status } = filters;
-      const userId = user?.uid || null;
-      // Map 'status' filter to 'readStatus' or handle 'scheduled' logic
-      // status options: 'all', 'read' (readStatus=finished), 'scheduled' (logic)
-
-      let result;
-
-      const sortList = (list) => {
-        const directionFactor = sort.direction === 'asc' ? 1 : -1;
-        if (sort.field === 'likes') {
-          return [...list].sort((a, b) => ((a.likesCount || 0) - (b.likesCount || 0)) * directionFactor);
-        }
-        if (sort.field === 'createdAt') {
-          return [...list].sort((a, b) => {
-            const aDate = a.createdAt || a.created_at;
-            const bDate = b.createdAt || b.created_at;
-            const aTime = aDate ? new Date(aDate).getTime() : 0;
-            const bTime = bDate ? new Date(bDate).getTime() : 0;
-            return (aTime - bTime) * directionFactor;
-          });
-        }
-        if (sort.field === 'discussionDate') {
-          return [...list].sort((a, b) => {
-            const aDate = a.discussionDate || a.discussion_date;
-            const bDate = b.discussionDate || b.discussion_date;
-            const aTime = aDate ? new Date(aDate).getTime() : 0;
-            const bTime = bDate ? new Date(bDate).getTime() : 0;
-            return (aTime - bTime) * directionFactor;
-          });
-        }
-        if (sort.field === 'title' || sort.field === 'author') {
-          return [...list].sort((a, b) => {
-            const aValue = (a[sort.field] || '').toString().toLowerCase();
-            const bValue = (b[sort.field] || '').toString().toLowerCase();
-            if (aValue < bValue) return -1 * directionFactor;
-            if (aValue > bValue) return 1 * directionFactor;
-            return 0;
-          });
-        }
-        return list;
-      };
-
-      // Handle 'scheduled' filter combined with other logic
-      if (status === 'scheduled') {
-        // Handle scheduled filter - this fetches ALL scheduled books so pagination is manual slice
-        let allScheduledBooks = await getAllDiscussedBooks(currentClub.id, userId);
-
-        // Apply theme filter in memory if needed
-        if (theme !== 'all') {
-            if (theme === 'no-theme') {
-                allScheduledBooks = allScheduledBooks.filter(book => !book.theme || book.theme.length === 0);
-            } else {
-                allScheduledBooks = allScheduledBooks.filter(book => {
-                    const bookThemes = Array.isArray(book.theme) ? book.theme : [book.theme];
-                    return bookThemes.includes(theme);
-                });
-            }
-        }
-
-        // Apply search filter in memory if needed
-        if (debouncedSearch) {
-          const lowerSearch = debouncedSearch.toLowerCase();
-          allScheduledBooks = allScheduledBooks.filter(book => 
-            book.title.toLowerCase().includes(lowerSearch) || 
-            book.author.toLowerCase().includes(lowerSearch)
-          );
-        }
-
-        allScheduledBooks = sortList(allScheduledBooks);
-
-        const startIdx = (page - 1) * pageSize;
-        const endIdx = startIdx + pageSize;
-        const paginatedBooks = allScheduledBooks.slice(startIdx, endIdx);
-        
-        // Fetch progress for these books manually if user is logged in
-        if (userId && paginatedBooks.length > 0) {
-          const booksWithProgress = await Promise.all(paginatedBooks.map(async (book) => {
-            try {
-              const progress = await getUserBookProgress(userId, book.id);
-              return { ...book, progress };
-            } catch (e) {
-              return book;
-            }
-          }));
-          
-          result = {
-            books: booksWithProgress,
-            totalCount: allScheduledBooks.length
-          };
-        } else {
-          result = {
-            books: paginatedBooks,
-            totalCount: allScheduledBooks.length
-          };
-        }
-      } else {
-        // Standard API filtering for theme and read status
-        const readStatus = status === 'read' ? 'finished' : null;
-
-        if (theme !== 'all') {
-            result = await getBooksPageFiltered(currentClub.id, theme, page, pageSize, sort.field, sort.direction, userId, readStatus, debouncedSearch);
-        } else {
-            result = await getBooksPage(currentClub.id, page, pageSize, sort.field, sort.direction, userId, readStatus, debouncedSearch);
-        }
-      }
-
-      setTotalCount(result.totalCount);
-      setTotalPages(Math.ceil(result.totalCount / pageSize));
-      setBooks(result.books);
-      
-    } catch (err) {
-      console.error('Error fetching books:', err);
-      setError('Failed to fetch books');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentClub, user, pagination, filters, debouncedSearch, sort]);
-
   const refreshBooks = useCallback(() => {
-    fetchBooks();
-  }, [fetchBooks]);
-
-  // ******************EFFECTS/REACTIONS**********************
-  // Re-fetch when dependencies change
-  useEffect(() => {
-    fetchBooks();
-  }, [fetchBooks]);
+    refetch();
+  }, [refetch]);
 
   // ******************ACTIONS**********************
   const createBook = async (bookData) => {
@@ -221,19 +107,24 @@ const BooksProvider = ({ children }) => {
     if (!user?.uid) throw new Error('User not logged in');
 
     try {
-      // 1. Make API call
-      const newBook = await addBook(currentClub.id, bookData, user.uid);
-      
-      // 2. Update state: Prepend to current list
-      setBooks(prev => [{
-        ...newBook,
-        likesCount: 0,
-        isLiked: false,
-      }, ...prev]);
-      
-      // Update count
-      setTotalCount(prev => prev + 1);
-      
+      const newBook = await createBookMutation.mutateAsync({
+        bookData,
+        userId: user.uid,
+      });
+
+      queryClient.setQueryData(booksQueryKey, (old) => {
+        const existing = old || { books: [], totalCount: 0 };
+        return {
+          ...existing,
+          books: [{
+            ...newBook,
+            likesCount: 0,
+            isLiked: false,
+          }, ...(existing.books || [])],
+          totalCount: (existing.totalCount || 0) + 1,
+        };
+      });
+
       return newBook;
     } catch (err) {
       console.error('Error creating book:', err);
@@ -245,11 +136,17 @@ const BooksProvider = ({ children }) => {
     if (!currentClub) throw new Error('No club selected');
 
     try {
-      const updatedBook = await updateBookService(currentClub.id, bookId, updates);
-      
-      setBooks(prev => prev.map(book => 
-        book.id === bookId ? { ...book, ...updatedBook } : book
-      ));
+      const updatedBook = await updateBookMutation.mutateAsync({ bookId, updates });
+
+      queryClient.setQueryData(booksQueryKey, (old) => {
+        if (!old || !old.books) return old;
+        return {
+          ...old,
+          books: old.books.map(book =>
+            book.id === bookId ? { ...book, ...updatedBook } : book,
+          ),
+        };
+      });
       
       return updatedBook;
     } catch (err) {
@@ -262,10 +159,16 @@ const BooksProvider = ({ children }) => {
     if (!currentClub) throw new Error('No club selected');
 
     try {
-      await deleteBookService(currentClub.id, bookId);
-      
-      setBooks(prev => prev.filter(b => b.id !== bookId));
-      setTotalCount(prev => prev - 1);
+      await deleteBookMutation.mutateAsync(bookId);
+
+      queryClient.setQueryData(booksQueryKey, (old) => {
+        if (!old || !old.books) return old;
+        return {
+          ...old,
+          books: old.books.filter(book => book.id !== bookId),
+          totalCount: Math.max(0, (old.totalCount || 0) - 1),
+        };
+      });
     } catch (err) {
       console.error('Error deleting book:', err);
       throw err;
@@ -276,21 +179,26 @@ const BooksProvider = ({ children }) => {
     if (!user) throw new Error('User not logged in');
     
     // Optimistic update
-    setBooks(prev => prev.map(book => {
-      if (book.id === bookId) {
-        // Merge existing progress with updates
-        const currentProgress = book.progress || {};
-        return {
-          ...book,
-          progress: {
-            ...currentProgress,
-            ...progressData,
-            updatedAt: new Date().toISOString()
+    queryClient.setQueryData(booksQueryKey, (old) => {
+      if (!old || !old.books) return old;
+      return {
+        ...old,
+        books: old.books.map(book => {
+          if (book.id === bookId) {
+            const currentProgress = book.progress || {};
+            return {
+              ...book,
+              progress: {
+                ...currentProgress,
+                ...progressData,
+                updatedAt: new Date().toISOString(),
+              },
+            };
           }
-        };
-      }
-      return book;
-    }));
+          return book;
+        }),
+      };
+    });
 
     try {
       await updateUserBookProgress(user.uid, bookId, progressData);
@@ -306,15 +214,21 @@ const BooksProvider = ({ children }) => {
   const toggleBookLike = async (bookId, shouldLike) => {
     if (!user || !currentClub) throw new Error('User not logged in');
 
-    setBooks(prev => prev.map(book => {
-      if (book.id !== bookId) return book;
-      const likesCount = Math.max(0, (book.likesCount || 0) + (shouldLike ? 1 : -1));
+    queryClient.setQueryData(booksQueryKey, (old) => {
+      if (!old || !old.books) return old;
       return {
-        ...book,
-        isLiked: shouldLike,
-        likesCount,
+        ...old,
+        books: old.books.map(book => {
+          if (book.id !== bookId) return book;
+          const likesCount = Math.max(0, (book.likesCount || 0) + (shouldLike ? 1 : -1));
+          return {
+            ...book,
+            isLiked: shouldLike,
+            likesCount,
+          };
+        }),
       };
-    }));
+    });
 
     try {
       if (shouldLike) {

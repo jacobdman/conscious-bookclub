@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotification';
 import ClubProvider from './contexts/Club/ClubProvider';
@@ -26,6 +27,7 @@ import UpdatePrompt from 'components/UpdatePrompt';
 import FeatureGateRoute from 'components/FeatureGateRoute';
 import TutorialProvider from 'contexts/Tutorial/TutorialProvider';
 import { CircularProgress, Box } from '@mui/material';
+import { queryClient } from './queryClient';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -69,11 +71,7 @@ function AppContent() {
         />
         <Route
           path="/dev"
-          element={(
-            <ClubProvider>
-              <Dev />
-            </ClubProvider>
-          )}
+          element={<Dev />}
         />
         <Route
           path="/login"
@@ -86,147 +84,119 @@ function AppContent() {
             <Route
               path="/join-club"
               element={
-                <ClubProvider>
-                  <NoClub />
-                </ClubProvider>
+                <NoClub />
               }
             />
             <Route
               path="/setup/create-club"
               element={
-                <ClubProvider>
-                  <ClubSetup />
-                </ClubProvider>
+                <ClubSetup />
               }
             />
             <Route
               path="/"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/feed"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <Feed />
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <Feed />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/club"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <ClubView />
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <ClubView />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/club/books"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <FeatureGateRoute featureKey="books">
-                      <ClubView />
-                    </FeatureGateRoute>
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <FeatureGateRoute featureKey="books">
+                    <ClubView />
+                  </FeatureGateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/club/goals"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <FeatureGateRoute featureKey="goals">
-                      <ClubView />
-                    </FeatureGateRoute>
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <FeatureGateRoute featureKey="goals">
+                    <ClubView />
+                  </FeatureGateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/club/manage"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <ClubManagement />
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <ClubManagement />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/books"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <FeatureGateRoute featureKey="books">
-                      <Books />
-                    </FeatureGateRoute>
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <FeatureGateRoute featureKey="books">
+                    <Books />
+                  </FeatureGateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/calendar"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <Calendar />
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <Calendar />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/goals"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <FeatureGateRoute featureKey="goals">
-                      <Goals />
-                    </FeatureGateRoute>
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <FeatureGateRoute featureKey="goals">
+                    <Goals />
+                  </FeatureGateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/profile"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/meetings"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <Meetings />
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <Meetings />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/quotes"
               element={
-                <ClubProvider>
-                  <ProtectedRoute>
-                    <FeatureGateRoute featureKey="quotes">
-                      <Quotes />
-                    </FeatureGateRoute>
-                  </ProtectedRoute>
-                </ClubProvider>
+                <ProtectedRoute>
+                  <FeatureGateRoute featureKey="quotes">
+                    <Quotes />
+                  </FeatureGateRoute>
+                </ProtectedRoute>
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -243,10 +213,14 @@ function App() {
   return (
     <AuthProvider>
       <ErrorNotificationProvider>
-        <TutorialProvider>
-          <AppContent />
-          <UpdatePrompt />
-        </TutorialProvider>
+        <QueryClientProvider client={queryClient}>
+          <TutorialProvider>
+            <ClubProvider>
+              <AppContent />
+            </ClubProvider>
+            <UpdatePrompt />
+          </TutorialProvider>
+        </QueryClientProvider>
       </ErrorNotificationProvider>
     </AuthProvider>
   );

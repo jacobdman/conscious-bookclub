@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+// Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
+import GoalsContext from './GoalsContext';
+// Services
 import { 
-  getGoals, 
   addGoal, 
   updateGoal, 
   deleteGoal,
@@ -15,8 +17,10 @@ import {
   deleteMilestone,
   updateMilestone,
 } from 'services/goals/goals.service';
+// Hooks
+import { useGoals } from 'hooks/useGoals';
+// Utils
 import { normalizeGoalType } from 'utils/goalHelpers';
-import GoalsContext from './GoalsContext';
 
 // Helper function to normalize goal data
 const normalizeGoal = (goalData, docId = null, preserveEntries = false) => {
@@ -73,29 +77,25 @@ const GoalsProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const goalEntriesCacheRef = useRef({});
 
+  const {
+    data: goalsData,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useGoals(user?.uid, currentClub?.id);
+
   // ******************LOAD FUNCTIONS**********************
   // Fetch goals from API
-  const refreshGoals = useCallback(async (options = {}) => {
+  const refreshGoals = useCallback(async () => {
     if (!user || !currentClub) return;
 
     try {
       setLoading(true);
       setError(null);
-      const goals = await getGoals(user.uid, currentClub.id, options);
-      const goalsData = goals.map(goal => {
-        const normalized = normalizeGoal(goal, goal.id);
-        // Goals now include today's entries from API for habit/metric goals
-        // Initialize entriesPagination if entries are present
-        if (normalized.entries && normalized.entries.length > 0 && !normalized.entriesPagination) {
-          normalized.entriesPagination = {
-            hasMore: false, // Today's entries are a limited set
-            offset: normalized.entries.length,
-            limit: 10
-          };
-        }
-        return normalized;
-      });
-      setGoals(goalsData);
+      const result = await refetch();
+      if (result?.data) {
+        setGoals(result.data);
+      }
     } catch (err) {
       setError('Failed to fetch goals');
       console.error('Error fetching goals:', err);
@@ -105,10 +105,21 @@ const GoalsProvider = ({ children }) => {
   }, [user, currentClub]);
 
   // ******************EFFECTS/REACTIONS**********************
-  // Initial load
   useEffect(() => {
-    refreshGoals();
-  }, [refreshGoals]);
+    if (goalsData) {
+      setGoals(goalsData);
+    }
+  }, [goalsData]);
+
+  useEffect(() => {
+    setLoading(isLoading);
+  }, [isLoading]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError('Failed to fetch goals');
+    }
+  }, [queryError]);
 
   // ******************SETTERS**********************
   // Add a new goal
