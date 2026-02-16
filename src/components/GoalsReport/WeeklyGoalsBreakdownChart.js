@@ -19,6 +19,7 @@ const HeatmapView = ({ weeklyBreakdown }) => {
           goalMap.set(goal.goalId, {
             goalId: goal.goalId,
             title: goal.title,
+            createdAt: goal.createdAt,
           });
         }
       });
@@ -82,30 +83,53 @@ const HeatmapView = ({ weeklyBreakdown }) => {
     );
   }
 
+  const gridMinWidth = `calc(var(--label-width) + ${goalLabels.length} * (var(--cell-size) + var(--cell-gap)))`;
+
   return (
     <Box sx={{ width: '100%', overflowX: 'auto' }}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          minWidth: gridMinWidth,
+          width: 'max-content',
+          alignItems: 'flex-start',
+          mx: 'auto',
+          '--cell-size': 'clamp(50px, 4vw, 60px)',
+          '--label-width': 'clamp(60px, 8vw, 110px)',
+          '--cell-gap': 'clamp(3px, 0.6vw, 6px)',
+        }}
+      >
         {/* Goal labels header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-          <Typography
-            variant="caption"
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1, justifyContent: 'flex-start' }}>
+          <Box
             sx={{
-              minWidth: 120,
-              textAlign: 'right',
+              minWidth: 'var(--label-width)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: 'var(--cell-size)',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: '6px',
+              backgroundColor: 'background.paper',
               fontSize: '0.75rem',
               fontWeight: 600,
-              pr: 1,
+              color: 'text.primary',
             }}
           >
-            Week
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 0.3 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600 }}>
+              Week
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 'var(--cell-gap)' }}>
             {goalLabels.map((goal) => (
               <Typography
                 key={goal.goalId}
                 variant="caption"
                 sx={{
-                  width: 35,
+                  width: 'var(--cell-size)',
                   textAlign: 'center',
                   fontSize: '0.7rem',
                   color: 'text.secondary',
@@ -121,48 +145,75 @@ const HeatmapView = ({ weeklyBreakdown }) => {
 
         {/* Week rows */}
         {heatmapData.map((week, weekIndex) => (
-          <Box key={weekIndex} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                minWidth: 120,
-                textAlign: 'right',
-                fontSize: '0.75rem',
-                pr: 1,
-              }}
+          <Box
+            key={weekIndex}
+            sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-start' }}
+          >
+            <Box
               title={week.weekLabelFull}
+              sx={{
+                minWidth: 'var(--label-width)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 'var(--cell-size)',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: '6px',
+                backgroundColor: 'background.paper',
+                fontSize: '0.75rem',
+                color: 'text.primary',
+              }}
             >
-              {week.weekLabel}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 0.3 }}>
+              <Typography variant="caption">{week.weekLabel}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 'var(--cell-gap)' }}>
               {goalLabels.map((goal) => {
                 const completionData = week.goalData[goal.goalId];
-                const color = getColor(completionData);
-                const tooltipTitle = completionData
-                  ? `${goal.title} - ${week.weekLabelFull}: ${completionData.completionPercentage.toFixed(1)}% ${completionData.completed ? '✓ Completed' : '✗ Missed'}`
-                  : `${goal.title} - ${week.weekLabelFull}: No data`;
+                const goalCreatedAt = goal.createdAt ? new Date(goal.createdAt) : null;
+                const weekEnd = new Date(week.weekEnd);
+                const isInactive = goalCreatedAt && weekEnd <= goalCreatedAt;
+                const color = isInactive ? '#e0e0e0' : getColor(completionData);
+                const tooltipTitle = isInactive
+                  ? `${goal.title} - ${week.weekLabelFull}: N/A (not active yet)`
+                  : completionData
+                    ? `${goal.title} - ${week.weekLabelFull}: ${completionData.completionPercentage.toFixed(1)}% ${completionData.completed ? '✓ Completed' : '✗ Missed'}`
+                    : `${goal.title} - ${week.weekLabelFull}: No data`;
 
                 return (
                   <MUITooltip key={goal.goalId} title={tooltipTitle} arrow>
                     <Box
                       sx={{
-                        width: 35,
-                        height: 35,
+                        width: 'var(--cell-size)',
+                        height: 'var(--cell-size)',
                         backgroundColor: color,
                         borderRadius: '4px',
-                        cursor: 'pointer',
+                        cursor: isInactive ? 'default' : 'pointer',
                         border: '1px solid',
                         borderColor: 'divider',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        '&:hover': {
-                          opacity: 0.8,
-                          transform: 'scale(1.1)',
-                        },
+                        ...(isInactive ? {} : {
+                          '&:hover': {
+                            opacity: 0.8,
+                            transform: 'scale(1.05)',
+                          },
+                        }),
                       }}
                     >
-                      {completionData && (
+                      {isInactive ? (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: '0.65rem',
+                            color: 'text.secondary',
+                            fontWeight: 600,
+                          }}
+                        >
+                          N/A
+                        </Typography>
+                      ) : completionData ? (
                         <Typography
                           variant="caption"
                           sx={{
@@ -173,7 +224,7 @@ const HeatmapView = ({ weeklyBreakdown }) => {
                         >
                           {completionData.completed ? '✓' : Math.round(completionData.completionPercentage)}
                         </Typography>
-                      )}
+                      ) : null}
                     </Box>
                   </MUITooltip>
                 );
@@ -185,6 +236,10 @@ const HeatmapView = ({ weeklyBreakdown }) => {
 
       {/* Legend */}
       <Box sx={{ display: 'flex', gap: 2, mt: 3, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Box sx={{ width: 20, height: 20, backgroundColor: '#e0e0e0', borderRadius: '4px', border: '1px solid #ddd' }} />
+          <Typography variant="caption">N/A (not active yet)</Typography>
+        </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Box sx={{ width: 20, height: 20, backgroundColor: '#00C49F', borderRadius: '4px', border: '1px solid #ddd' }} />
           <Typography variant="caption">Completed (100%)</Typography>

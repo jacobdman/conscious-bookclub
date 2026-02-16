@@ -134,6 +134,7 @@ const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate = null, e
         weekGoals.push({
           goalId: goal.id,
           title: goal.title,
+          createdAt: goal.created_at || goal.createdAt,
           type: goal.type,
           measure: goal.measure,
           targetCount: goal.targetCount,

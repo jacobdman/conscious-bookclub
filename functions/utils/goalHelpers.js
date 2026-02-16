@@ -97,6 +97,79 @@ const calculateHabitWeight = (habitPosition) => {
   return 1 / Math.log2(habitPosition + 1);
 };
 
+// Clamp report start date to goal creation date
+const getGoalStartDate = (goal, reportStartDate = null) => {
+  const createdAtRaw = goal?.created_at || goal?.createdAt || null;
+  const createdAt = createdAtRaw ? new Date(createdAtRaw) : null;
+  const hasValidCreatedAt = createdAt instanceof Date && !Number.isNaN(createdAt.valueOf());
+
+  if (reportStartDate && hasValidCreatedAt) {
+    return reportStartDate > createdAt ? reportStartDate : createdAt;
+  }
+
+  if (reportStartDate) {
+    return reportStartDate;
+  }
+
+  if (hasValidCreatedAt) {
+    return createdAt;
+  }
+
+  return new Date(0);
+};
+
+// Count fully completed periods before a goal's creation within the report window
+const getImplicitSuccessCount = (
+    cadence,
+    reportStartDate,
+    goalStartDate,
+    effectiveEndDate,
+    timezone = null,
+    now = new Date(),
+) => {
+  if (!cadence || !reportStartDate || !goalStartDate) {
+    return 0;
+  }
+
+  const cutoffEnd = [goalStartDate, effectiveEndDate, now]
+      .filter(Boolean)
+      .reduce((min, date) => (date < min ? date : min));
+
+  if (cutoffEnd <= reportStartDate) {
+    return 0;
+  }
+
+  let currentBoundaries = getPeriodBoundaries(cadence, goalStartDate, timezone);
+  currentBoundaries = getPreviousPeriodBoundaries(
+      cadence,
+      currentBoundaries.start,
+      timezone,
+  );
+
+  let implicitCount = 0;
+  let safety = 0;
+  while (currentBoundaries.end > reportStartDate) {
+    if (
+      currentBoundaries.end <= cutoffEnd &&
+      currentBoundaries.end > reportStartDate &&
+      currentBoundaries.start < goalStartDate
+    ) {
+      implicitCount++;
+    }
+
+    currentBoundaries = getPreviousPeriodBoundaries(
+        cadence,
+        currentBoundaries.start,
+        timezone,
+    );
+
+    safety++;
+    if (safety > 200) break;
+  }
+
+  return implicitCount;
+};
+
 // Calculate consistency score for a habit goal over date range
 // includeStreak: if true, calculates streak (consecutive completed periods
 // from most recent)
@@ -117,12 +190,21 @@ const calculateHabitConsistency = async (
 
   // If end date is in the future, use current period as end
   const effectiveEndDate = endDate && endDate < new Date() ? endDate : new Date();
+  const goalStartDate = getGoalStartDate(goal, startDate);
+  const implicitSuccessCount = getImplicitSuccessCount(
+      goal.cadence,
+      startDate || new Date(0),
+      goalStartDate,
+      effectiveEndDate,
+      timezone,
+      new Date(),
+  );
 
   // Start from current period and go back until we're before startDate
   let periodIndex = 0;
-  while (currentBoundaries.start >= (startDate || new Date(0))) {
+  while (currentBoundaries.start >= goalStartDate) {
     // Only include periods that overlap with the date range
-    if (currentBoundaries.end > (startDate || new Date(0)) &&
+    if (currentBoundaries.end > goalStartDate &&
         currentBoundaries.start <= effectiveEndDate) {
       const entries = await getGoalEntries(
           userId,
@@ -155,7 +237,7 @@ const calculateHabitConsistency = async (
     if (periodIndex > 100) break;
   }
 
-  if (periods.length === 0) {
+  if (periods.length === 0 && implicitSuccessCount === 0) {
     return {
       consistencyRate: 0,
       streak: includeStreak ? 0 : undefined,
@@ -163,8 +245,9 @@ const calculateHabitConsistency = async (
     };
   }
 
-  const completedCount = periods.filter((p) => p.completed).length;
-  const consistencyRate = (completedCount / periods.length) * 100;
+  const completedCount = periods.filter((p) => p.completed).length + implicitSuccessCount;
+  const totalPeriods = periods.length + implicitSuccessCount;
+  const consistencyRate = totalPeriods > 0 ? (completedCount / totalPeriods) * 100 : 0;
 
   const result = {
     consistencyRate,
@@ -192,6 +275,8 @@ module.exports = {
   getPeriodBoundaries,
   getPreviousPeriodBoundaries,
   calculateHabitWeight,
+  getGoalStartDate,
+  getImplicitSuccessCount,
   calculateHabitConsistency,
 };
 

@@ -4,6 +4,8 @@ const {
   getPeriodBoundaries,
   getPreviousPeriodBoundaries,
   calculateHabitWeight,
+  getGoalStartDate,
+  getImplicitSuccessCount,
 } = require("../../../utils/goalHelpers");
 const {Op} = db;
 
@@ -146,12 +148,13 @@ const getLeaderboardReport = async (
     // Prefetch habit entries once per goal for the full effective range
     const habitEntries = await Promise.all(
         habitGoals.map(async (goal) => {
+          const goalStartDate = getGoalStartDate(goal, effectiveStartDate);
           const entries = await db.GoalEntry.findAll({
             where: {
               goalId: goal.id,
               userId: memberUserId,
               occurredAt: {
-                [Op.gte]: effectiveStartDate,
+                [Op.gte]: goalStartDate,
                 [Op.lt]: effectiveEndDate,
               },
             },
@@ -177,6 +180,15 @@ const getLeaderboardReport = async (
           }
 
           const periods = [];
+          const goalStartDate = getGoalStartDate(goal, effectiveStartDate);
+          const implicitSuccessCount = getImplicitSuccessCount(
+              goal.cadence,
+              effectiveStartDate,
+              goalStartDate,
+              effectiveEndDate,
+              memberTimezone,
+              now,
+          );
           let currentBoundaries = getPeriodBoundaries(
               goal.cadence,
               effectiveEndDate,
@@ -194,12 +206,12 @@ const getLeaderboardReport = async (
           }
 
           let periodIndex = 0;
-          while (currentBoundaries.start >= (effectiveStartDate || new Date(0))) {
+          while (currentBoundaries.start >= goalStartDate) {
           // Only include periods that:
           // 1. Overlap with the date range
           // 2. Are fully complete (end <= effectiveEndDate && end <= now)
             if (
-              currentBoundaries.end > (effectiveStartDate || new Date(0)) &&
+              currentBoundaries.end > goalStartDate &&
             currentBoundaries.start <= effectiveEndDate &&
             currentBoundaries.end <= effectiveEndDate &&
             currentBoundaries.end <= now
@@ -239,9 +251,10 @@ const getLeaderboardReport = async (
           // Calculate consistency rate (only from completed periods)
           let consistencyRate = 0;
           let streak = 0;
-          if (periods.length > 0) {
-            const completedCount = periods.filter((p) => p.completed).length;
-            consistencyRate = (completedCount / periods.length) * 100;
+          const completedCount = periods.filter((p) => p.completed).length + implicitSuccessCount;
+          const totalPeriods = periods.length + implicitSuccessCount;
+          if (totalPeriods > 0) {
+            consistencyRate = (completedCount / totalPeriods) * 100;
 
             // Calculate streak (consecutive completed periods from most recent)
             for (const period of periods) {
@@ -252,7 +265,6 @@ const getLeaderboardReport = async (
               }
             }
           }
-
           return {
             goal,
             consistencyRate,

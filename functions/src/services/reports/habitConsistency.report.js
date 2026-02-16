@@ -4,6 +4,8 @@ const {
   getPeriodBoundaries,
   getPreviousPeriodBoundaries,
   calculateHabitWeight,
+  getGoalStartDate,
+  getImplicitSuccessCount,
 } = require("../../../utils/goalHelpers");
 
 /**
@@ -91,18 +93,26 @@ const getHabitConsistencyReport = async (userId, clubId, startDate = null, endDa
 
         const periods = [];
         let currentBoundaries = getPeriodBoundaries(goal.cadence);
+        const goalStartDate = getGoalStartDate(goal, effectiveStartDate);
         const now = new Date();
-
+        const implicitSuccessCount = getImplicitSuccessCount(
+            goal.cadence,
+            effectiveStartDate,
+            goalStartDate,
+            effectiveEndDate,
+            null,
+            now,
+        );
         // Start from current period and go back until we're before startDate
         // CRITICAL: Exclude the current/incomplete period
         // Only include periods where end <= now (fully completed periods)
         let periodIndex = 0;
-        while (currentBoundaries.start >= (effectiveStartDate || new Date(0))) {
+        while (currentBoundaries.start >= goalStartDate) {
         // Only include periods that:
         // 1. Overlap with the date range
         // 2. Are fully complete (end <= now) - EXCLUDE in-progress periods
           if (
-            currentBoundaries.end > (effectiveStartDate || new Date(0)) &&
+            currentBoundaries.end > goalStartDate &&
           currentBoundaries.start <= effectiveEndDate &&
           currentBoundaries.end <= now // EXCLUDE incomplete periods
           ) {
@@ -141,11 +151,11 @@ const getHabitConsistencyReport = async (userId, clubId, startDate = null, endDa
 
         // Calculate consistency rate (only from completed periods)
         let consistencyRate = 0;
-        if (periods.length > 0) {
-          const completedCount = periods.filter((p) => p.completed).length;
-          consistencyRate = (completedCount / periods.length) * 100;
+        const completedCount = periods.filter((p) => p.completed).length + implicitSuccessCount;
+        const totalPeriods = periods.length + implicitSuccessCount;
+        if (totalPeriods > 0) {
+          consistencyRate = (completedCount / totalPeriods) * 100;
         }
-
         return {
           goal,
           consistencyRate,
