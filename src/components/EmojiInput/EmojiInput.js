@@ -20,10 +20,10 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
   const [selectedEmoji, setSelectedEmoji] = useState(null);
   const [selectedEmojiIndex, setSelectedEmojiIndex] = useState(0);
   const longPressTimer = useRef(null);
-  const touchStartTime = useRef(null);
-  const touchHandledRef = useRef(false); // Track if touch event already handled the click
   const longPressTriggeredRef = useRef(false);
+  const gestureHandledRef = useRef(false); // Single source of truth: pointer path handled this gesture (suppress click)
   const swipeStartXRef = useRef(null);
+  const LONG_PRESS_MS = 450;
 
   // Group reactions by emoji
   const reactionsByEmoji = reactions.reduce((acc, reaction) => {
@@ -64,14 +64,15 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
     setSelectedEmoji(nextEmoji);
   };
 
-  const handleViewerTouchStart = (event) => {
-    if (!event.touches?.length) return;
-    swipeStartXRef.current = event.touches[0].clientX;
+  const handleViewerPointerDown = (event) => {
+    if (event.pointerType !== 'touch') return;
+    swipeStartXRef.current = event.clientX;
   };
 
-  const handleViewerTouchEnd = (event) => {
-    if (swipeStartXRef.current === null || !event.changedTouches?.length) return;
-    const deltaX = event.changedTouches[0].clientX - swipeStartXRef.current;
+  const handleViewerPointerUp = (event) => {
+    if (event.pointerType !== 'touch') return;
+    if (swipeStartXRef.current === null) return;
+    const deltaX = event.clientX - swipeStartXRef.current;
     swipeStartXRef.current = null;
     const threshold = 30;
     if (Math.abs(deltaX) < threshold) return;
@@ -110,36 +111,31 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
     }
   };
 
-  const handleReactionClick = async (emoji, event) => {
-    // If touch event already handled this (mobile quick tap), ignore click
-    if (touchHandledRef.current) {
-      touchHandledRef.current = false; // Reset for next interaction
-      return;
-    }
-    if (longPressTriggeredRef.current) {
-      longPressTriggeredRef.current = false;
-      return;
-    }
-
-    // Close user list if open (from hover on desktop)
-    if (userListOpen) {
-      handleUserListClose();
-      // Continue to toggle reaction after closing user list
-    }
-
+  const toggleReaction = async (emoji, { haptic = true } = {}) => {
     const userReaction = reactionsByEmoji[emoji]?.find(r => r.userId === user?.uid);
     if (userReaction) {
-      // User already reacted, remove it
       await removeReaction(postId, emoji);
     } else {
-      // Check if user has reached the limit
       if (userReactionCount >= maxReactions) {
         alert(`You can only add ${maxReactions} reactions per post. Remove one to add another.`);
         return;
       }
-      // User hasn't reacted, add it
       await addReaction(postId, emoji);
     }
+    if (haptic) {
+      triggerHaptic('light');
+    }
+  };
+
+  const handleReactionClick = async (emoji, event) => {
+    if (gestureHandledRef.current) {
+      gestureHandledRef.current = false;
+      return;
+    }
+    if (userListOpen) {
+      handleUserListClose();
+    }
+    await toggleReaction(emoji, { haptic: true });
   };
 
   const handleReactionMouseEnter = (event, emoji) => {
@@ -150,51 +146,42 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
     closeUserList();
   };
 
-  const handleReactionTouchStart = (event, emoji) => {
-    event.preventDefault(); // prevent native long-press context menu
-    touchStartTime.current = Date.now();
-    touchHandledRef.current = false; // Reset flag
-    longPressTriggeredRef.current = false;
+  const cancelLongPress = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
+  };
+
+  const handleReactionPointerDown = (event, emoji) => {
+    if (event.pointerType !== 'touch') return;
+    event.preventDefault();
+    gestureHandledRef.current = false;
+    longPressTriggeredRef.current = false;
+    cancelLongPress();
+    const anchor = event.currentTarget;
     longPressTimer.current = setTimeout(() => {
-      openUserList(emoji, event.currentTarget, { withHaptics: true });
-      touchHandledRef.current = true; // Mark as handled (long press)
+      longPressTimer.current = null;
+      openUserList(emoji, anchor, { withHaptics: true });
       longPressTriggeredRef.current = true;
-      // Prevent click event from firing after long press
-      event.preventDefault();
-    }, 450); // shorter than native context menu threshold
+      gestureHandledRef.current = true;
+    }, LONG_PRESS_MS);
   };
 
-  const handleReactionTouchEnd = (event, emoji) => {
-    const touchDuration = Date.now() - (touchStartTime.current || 0);
-    
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+  const handleReactionPointerUp = (event, emoji) => {
+    if (event.pointerType !== 'touch') return;
+    cancelLongPress();
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
     }
-    
-    // If it was a quick tap (not long press), toggle the reaction
-    if (!longPressTriggeredRef.current && touchDuration < 450) {
-      closeUserList();
-      touchHandledRef.current = true; // Mark as handled to prevent click event
-      // Trigger the reaction toggle for quick tap
-      handleReactionClick(emoji, event);
-    } else {
-      // It was a long press, prevent the click
-      touchHandledRef.current = true; // Already handled by long press
-      event.preventDefault();
-    }
+    gestureHandledRef.current = true;
+    toggleReaction(emoji, { haptic: true });
+  };
+
+  const handleReactionPointerCancel = () => {
+    if (longPressTimer.current) cancelLongPress();
     longPressTriggeredRef.current = false;
-  };
-
-  const handleReactionTouchCancel = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    closeUserList();
   };
 
   const handleUserListClose = () => {
@@ -233,12 +220,13 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
               }}
               onMouseEnter={(e) => handleReactionMouseEnter(e, emoji)}
               onMouseLeave={handleReactionMouseLeave}
-              onTouchStart={(e) => {
+              onPointerDown={(e) => {
                 e.stopPropagation();
-                handleReactionTouchStart(e, emoji);
+                handleReactionPointerDown(e, emoji);
               }}
-              onTouchEnd={(e) => handleReactionTouchEnd(e, emoji)}
-              onTouchCancel={handleReactionTouchCancel}
+              onPointerUp={(e) => handleReactionPointerUp(e, emoji)}
+              onPointerCancel={handleReactionPointerCancel}
+              onPointerLeave={handleReactionPointerCancel}
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -362,7 +350,7 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
         </Box>
       </Popover>
 
-      {/* User List Popover - Slack style */}
+      {/* User List Popover - Slack style; swipe handlers on content only to avoid backdrop close/reopen loops */}
       <Popover
         open={userListOpen}
         anchorEl={userListAnchor}
@@ -386,10 +374,13 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
           },
         }}
-        onTouchStart={handleViewerTouchStart}
-        onTouchEnd={handleViewerTouchEnd}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box
+          sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}
+          onPointerDown={handleViewerPointerDown}
+          onPointerUp={handleViewerPointerUp}
+          onPointerLeave={() => { swipeStartXRef.current = null; }}
+        >
           {emojiKeys.length > 1 && (
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1 }}>
               <IconButton size="small" onClick={() => goToEmojiIndex(selectedEmojiIndex - 1)}>
