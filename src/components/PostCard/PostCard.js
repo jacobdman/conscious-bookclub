@@ -56,6 +56,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const [replyMentions, setReplyMentions] = useState([]); // Track mentions in reply
   const [editMentions, setEditMentions] = useState([]); // Track mentions in edit
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [fullscreenImageUrl, setFullscreenImageUrl] = useState(null);
   const postRef = useRef(null);
   const replyInputRef = useRef(null);
   const editInputRef = useRef(null);
@@ -188,6 +189,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const handlePointerDown = (e) => {
     if (e.pointerType !== 'touch') return;
     if (e.target.closest('[data-emoji-reaction]')) return;
+    if (e.target.closest('[data-post-image]')) return;
     pressMovedRef.current = false;
     longPressHandledRef.current = false;
     cancelLongPress();
@@ -224,11 +226,23 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     if (longPressHandledRef.current) {
       return;
     }
+    if (e.target.closest('[data-post-image]')) {
+      return;
+    }
     // On mobile/touch devices, toggle reactions on tap
     // Only toggle if clicking on the message itself, not on reactions
     if ('ontouchstart' in window && !e.target.closest('[data-emoji-reaction]')) {
       setShowReactions(prev => !prev);
     }
+  };
+
+  const handleImageOpen = (e, imageUrl) => {
+    e.stopPropagation();
+    setFullscreenImageUrl(imageUrl);
+  };
+
+  const handleImagePointerEvent = (e) => {
+    e.stopPropagation();
   };
 
   const handleQuickEmoji = async (emoji) => {
@@ -859,6 +873,12 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
                   component="img"
                   src={url}
                   alt={`Post image ${index + 1}`}
+                  onClick={(e) => handleImageOpen(e, url)}
+                  onPointerDown={handleImagePointerEvent}
+                  onPointerMove={handleImagePointerEvent}
+                  onPointerUp={handleImagePointerEvent}
+                  onPointerCancel={handleImagePointerEvent}
+                  data-post-image
                   sx={{
                     width: '100%',
                     height: '100%',
@@ -869,6 +889,11 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
                     border: '1px solid',
                     borderColor: 'divider',
                     backgroundColor: 'background.default',
+                    cursor: 'zoom-in',
+                    userSelect: 'auto',
+                    WebkitUserSelect: 'auto',
+                    WebkitTouchCallout: 'default',
+                    touchAction: 'auto',
                   }}
                 />
               ))}
@@ -1122,6 +1147,43 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
             Delete
           </Button>
         </DialogActions>
+      </Dialog>
+      <Dialog
+        open={Boolean(fullscreenImageUrl)}
+        onClose={() => setFullscreenImageUrl(null)}
+        fullScreen
+        aria-label="Fullscreen image"
+      >
+        {fullscreenImageUrl && (
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'common.black',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              p: 2,
+            }}
+            onClick={() => setFullscreenImageUrl(null)}
+          >
+            <Box
+              component="img"
+              src={fullscreenImageUrl}
+              alt="Fullscreen post"
+              onClick={(event) => event.stopPropagation()}
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain',
+                userSelect: 'auto',
+                WebkitUserSelect: 'auto',
+                WebkitTouchCallout: 'default',
+                touchAction: 'auto',
+              }}
+            />
+          </Box>
+        )}
       </Dialog>
     </Box>
   );
