@@ -35,15 +35,21 @@ const Dashboard = () => {
     return today.toISOString().split('T')[0];
   }, []);
 
-  const {
-    data: upcomingMeetings = [],
-  } = useMeetings(currentClub?.id, user?.uid, { startDate });
+  const { data: allMeetings = [], isLoading: meetingsLoading, error: meetingsError } = useMeetings(
+    currentClub?.id,
+    user?.uid,
+    {},
+  );
 
-  const {
-    data: nextMeetings = [],
-    isLoading: meetingsLoading,
-    error: meetingsError,
-  } = useMeetings(currentClub?.id, user?.uid, { startDate, limit: 3 });
+  const upcomingMeetings = useMemo(() => {
+    if (!Array.isArray(allMeetings) || !startDate) return [];
+    return allMeetings.filter(meeting => meeting.date >= startDate);
+  }, [allMeetings, startDate]);
+
+  const nextMeetings = useMemo(
+    () => (Array.isArray(upcomingMeetings) ? upcomingMeetings.slice(0, 3) : []),
+    [upcomingMeetings],
+  );
 
   const currentBooks = useMemo(() => {
     if (!Array.isArray(upcomingMeetings) || upcomingMeetings.length === 0) {

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotification';
 import ClubProvider from './contexts/Club/ClubProvider';
@@ -27,7 +28,7 @@ import UpdatePrompt from 'components/UpdatePrompt';
 import FeatureGateRoute from 'components/FeatureGateRoute';
 import TutorialProvider from 'contexts/Tutorial/TutorialProvider';
 import { CircularProgress, Box } from '@mui/material';
-import { queryClient } from './queryClient';
+import { queryClient, persistOptions } from './queryClient';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -209,18 +210,26 @@ function AppContent() {
   );
 }
 
+const QueryProvider = persistOptions
+  ? ({ children }) => (
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        {children}
+      </PersistQueryClientProvider>
+    )
+  : ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+
 function App() {
   return (
     <AuthProvider>
       <ErrorNotificationProvider>
-        <QueryClientProvider client={queryClient}>
+        <QueryProvider>
           <TutorialProvider>
             <ClubProvider>
               <AppContent />
             </ClubProvider>
             <UpdatePrompt />
           </TutorialProvider>
-        </QueryClientProvider>
+        </QueryProvider>
       </ErrorNotificationProvider>
     </AuthProvider>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -12,34 +12,44 @@ import {
   Button
 } from '@mui/material';
 import { getBooksProgress } from 'services/books/books.service';
-import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
+import { useMeetings } from 'hooks/useMeetings';
 import ProfileAvatar from 'components/ProfileAvatar';
 import BookProgressRing from './BookProgressRing';
 import { parseLocalDate } from 'utils/dateHelpers';
+import { useAuth } from 'AuthContext';
 
 const InFlightBooksProgress = () => {
+  const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [booksData, setBooksData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userPages, setUserPages] = useState({}); // Track current page per book
   const [hasMoreUsers, setHasMoreUsers] = useState({}); // Track if more users available per book
-  const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
 
+  const { data: meetingsList = [] } = useMeetings(currentClub?.id, user?.uid, {});
   const parseMeetingDate = useCallback((dateValue) => {
     if (!dateValue) return null;
-
-    // Handle date-only strings as local dates to avoid UTC shifting a day backward
     if (typeof dateValue === 'string') {
       const dateOnlyMatch = /^(\d{4}-\d{2}-\d{2})$/.exec(dateValue);
-      if (dateOnlyMatch) {
-        return parseLocalDate(dateOnlyMatch[1]);
-      }
+      if (dateOnlyMatch) return parseLocalDate(dateOnlyMatch[1]);
     }
-
     const parsed = new Date(dateValue);
     return isNaN(parsed) ? null : parsed;
   }, []);
+  const meetingDates = useMemo(() => {
+    const datesMap = {};
+    (meetingsList || []).forEach(meeting => {
+      if (meeting.bookId) {
+        const meetingDate = parseMeetingDate(meeting.date);
+        if (!meetingDate) return;
+        if (!datesMap[meeting.bookId] || meetingDate < parseMeetingDate(datesMap[meeting.bookId])) {
+          datesMap[meeting.bookId] = meeting.date;
+        }
+      }
+    });
+    return datesMap;
+  }, [meetingsList, parseMeetingDate]);
 
   useEffect(() => {
     const fetchBooksProgress = async () => {
@@ -82,32 +92,6 @@ const InFlightBooksProgress = () => {
 
     fetchBooksProgress();
   }, [currentClub]);
-
-  useEffect(() => {
-    const loadMeetings = async () => {
-      if (!currentClub) return;
-      
-      try {
-        const meetings = await getMeetings(currentClub.id);
-        // Create a map of bookId -> earliest meeting date
-        const datesMap = {};
-        meetings.forEach(meeting => {
-          if (meeting.bookId) {
-            const meetingDate = parseMeetingDate(meeting.date);
-            if (!meetingDate) return;
-            if (!datesMap[meeting.bookId] || meetingDate < datesMap[meeting.bookId]) {
-              datesMap[meeting.bookId] = meetingDate;
-            }
-          }
-        });
-        setMeetingDates(datesMap);
-      } catch (error) {
-        console.error('Error loading meetings:', error);
-      }
-    };
-
-    loadMeetings();
-  }, [currentClub, parseMeetingDate]);
 
   const formatDiscussionDate = (date) => {
     if (!date) return 'No date set';

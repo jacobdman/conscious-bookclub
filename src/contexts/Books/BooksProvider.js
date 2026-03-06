@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 // Context
 import { useAuth } from 'AuthContext';
@@ -9,6 +9,41 @@ import { likeBook, unlikeBook } from 'services/books/books.service';
 import { updateUserBookProgress } from 'services/progress/progress.service';
 // Hooks
 import { useBooks, useCreateBook, useUpdateBook, useDeleteBook } from 'hooks/useBooks';
+
+const BOOKS_VIEW_STORAGE_KEY_PREFIX = 'books-view';
+
+const getStoredBooksViewState = (clubId) => {
+  if (typeof window === 'undefined' || !clubId) return null;
+  try {
+    const raw = sessionStorage.getItem(`${BOOKS_VIEW_STORAGE_KEY_PREFIX}-${clubId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      pagination: parsed.pagination && typeof parsed.pagination.page === 'number' && parsed.pagination.page >= 1
+        ? { page: parsed.pagination.page, pageSize: Number(parsed.pagination.pageSize) || 10 }
+        : { page: 1, pageSize: 10 },
+      filters: parsed.filters && typeof parsed.filters === 'object'
+        ? { theme: String(parsed.filters.theme ?? 'all'), status: String(parsed.filters.status ?? 'all') }
+        : { theme: 'all', status: 'all' },
+      search: typeof parsed.search === 'string' ? parsed.search : '',
+      sort: parsed.sort && typeof parsed.sort === 'object'
+        ? { field: String(parsed.sort.field ?? 'createdAt'), direction: String(parsed.sort.direction ?? 'desc') }
+        : { field: 'createdAt', direction: 'desc' },
+    };
+  } catch {
+    return null;
+  }
+};
+
+const setStoredBooksViewState = (clubId, state) => {
+  if (typeof window === 'undefined' || !clubId || !state) return;
+  try {
+    sessionStorage.setItem(`${BOOKS_VIEW_STORAGE_KEY_PREFIX}-${clubId}`, JSON.stringify(state));
+  } catch {
+    // ignore quota or parse errors
+  }
+};
 
 // Simple debounce hook
 const useDebounce = (value, delay) => {
@@ -33,13 +68,40 @@ const BooksProvider = ({ children }) => {
   const { currentClub } = useClubContext();
 
   const queryClient = useQueryClient();
-  
-  // New state for filters and pagination
+  const lastRestoredClubIdRef = useRef(null);
+
+  // New state for filters and pagination (restored from sessionStorage when club is set)
   const [pagination, setPaginationState] = useState({ page: 1, pageSize: 10 });
   const [filters, setFiltersState] = useState({ theme: 'all', status: 'all' });
   const [search, setSearchState] = useState('');
   const [sort, setSortState] = useState({ field: 'createdAt', direction: 'desc' });
-  
+
+  // Restore books view state from sessionStorage when mounting with a club (e.g. after switching back from Feed)
+  useEffect(() => {
+    const clubId = currentClub?.id;
+    if (!clubId || lastRestoredClubIdRef.current === clubId) return;
+    lastRestoredClubIdRef.current = clubId;
+    const stored = getStoredBooksViewState(clubId);
+    if (stored) {
+      setPaginationState(stored.pagination);
+      setFiltersState(stored.filters);
+      setSearchState(stored.search);
+      setSortState(stored.sort);
+    }
+  }, [currentClub?.id]);
+
+  // Persist books view state to sessionStorage when it changes (so we can restore when user returns to Books tab)
+  useEffect(() => {
+    const clubId = currentClub?.id;
+    if (!clubId) return;
+    setStoredBooksViewState(clubId, {
+      pagination,
+      filters,
+      search,
+      sort,
+    });
+  }, [currentClub?.id, pagination, filters, search, sort]);
+
   // Debounce search term (500ms delay)
   const debouncedSearch = useDebounce(search, 500);
 

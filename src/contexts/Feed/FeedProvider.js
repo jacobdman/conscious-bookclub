@@ -10,16 +10,16 @@ import {
   removeReaction as removeReactionService,
 } from 'services/posts/posts.service';
 import { connectSocket, joinClubRoom, leaveClubRoom } from 'services/socket';
-import { getReadStatus, markAsRead as markAsReadService } from 'services/feed/feed.service';
+import { markAsRead as markAsReadService } from 'services/feed/feed.service';
 import { setBadge, clearBadge } from 'services/badge';
 import FeedContext from './FeedContext';
+import { useFeedInitial } from 'hooks/useFeed';
 
 // ******************STATE VALUES**********************
 const FeedProvider = ({ children }) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [lastReadTimestamp, setLastReadTimestamp] = useState(null);
@@ -31,62 +31,49 @@ const FeedProvider = ({ children }) => {
   const lastReadTimestampRef = useRef(null);
   const showActivityRef = useRef(true);
 
-  // ******************LOAD FUNCTIONS**********************
-  const fetchPosts = useCallback(async () => {
-    if (!currentClub || !user) return;
+  const {
+    data: feedData,
+    isLoading: loading,
+    error: queryError,
+    refetch: refetchFeed,
+  } = useFeedInitial(currentClub?.id, user?.uid, {
+    limit: 25,
+    includeActivity: showActivity,
+  });
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Fetch initial 25 posts and read status in parallel
-      const [postsResponse, readStatusData] = await Promise.all([
-        getPosts(currentClub.id, { limit: 25, includeActivity: showActivity }),
-        getReadStatus(currentClub.id, user.uid).catch(() => ({ lastReadAt: null })),
-      ]);
-      
-      // Handle both old format (array) and new format (object with posts, hasMore)
-      const postsData = Array.isArray(postsResponse) ? postsResponse : (postsResponse.posts || []);
-      const hasMorePosts = Array.isArray(postsResponse) ? false : (postsResponse.hasMore || false);
-      const nextBeforeId = Array.isArray(postsResponse) ? null : (postsResponse.nextBeforeId || null);
-      
-      // Ensure postsData is always an array
-      setPosts(Array.isArray(postsData) ? postsData : []);
-      setHasMore(hasMorePosts);
-      setOldestPostId(nextBeforeId);
-      
-      // Update last read timestamp from API
-      const lastReadAt = readStatusData?.lastReadAt 
-        ? new Date(readStatusData.lastReadAt) 
-        : null;
-      setLastReadTimestamp(lastReadAt);
-      
-      // Try to get from localStorage cache as fallback
-      const cacheKey = `feedLastRead_${currentClub.id}_${user.uid}`;
-      const cachedTimestamp = localStorage.getItem(cacheKey);
-      if (cachedTimestamp && (!lastReadAt || new Date(cachedTimestamp) > lastReadAt)) {
-        setLastReadTimestamp(new Date(cachedTimestamp));
-      }
-      
-      // Calculate unread count
-      const lastRead = lastReadAt || (cachedTimestamp ? new Date(cachedTimestamp) : null);
-      if (lastRead) {
-        const unread = postsData.filter(post => {
-          const postDate = new Date(post.created_at);
-          return postDate > lastRead;
-        }).length;
-        setUnreadCount(unread);
-      } else {
-        // If never read, all posts are unread
-        setUnreadCount(postsData.length);
-      }
-    } catch (err) {
-      setError('Failed to fetch posts');
-      console.error('Error fetching posts:', err);
-    } finally {
-      setLoading(false);
+  const fetchPosts = useCallback(() => {
+    refetchFeed();
+  }, [refetchFeed]);
+
+  // Sync query data to state so rest of provider (load more, mutations, socket) works
+  useEffect(() => {
+    if (!feedData) return;
+    const postsData = feedData.posts || [];
+    setPosts(Array.isArray(postsData) ? postsData : []);
+    setHasMore(feedData.hasMore ?? false);
+    setOldestPostId(feedData.nextBeforeId ?? null);
+    const lastReadAt = feedData.readStatus?.lastReadAt
+      ? new Date(feedData.readStatus.lastReadAt)
+      : null;
+    setLastReadTimestamp(lastReadAt);
+    const cacheKey = currentClub && user ? `feedLastRead_${currentClub.id}_${user.uid}` : null;
+    const cachedTimestamp = cacheKey ? localStorage.getItem(cacheKey) : null;
+    const lastRead = lastReadAt || (cachedTimestamp ? new Date(cachedTimestamp) : null);
+    if (lastRead) {
+      const unread = postsData.filter(post => new Date(post.created_at) > lastRead).length;
+      setUnreadCount(unread);
+    } else {
+      setUnreadCount(postsData.length);
     }
-  }, [currentClub, user, showActivity]);
+  }, [feedData, currentClub, user]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError('Failed to fetch posts');
+    } else {
+      setError(null);
+    }
+  }, [queryError]);
 
   // Load more posts (older posts) when scrolling to top
   const loadMorePosts = useCallback(async () => {
@@ -337,18 +324,15 @@ const FeedProvider = ({ children }) => {
     };
   }, [user, currentClub]); // Removed lastReadTimestamp from dependencies
 
-  // Initial load and reset when club changes
+  // Reset state when club or user changes (query key changes so feed data will update)
   useEffect(() => {
-    // Reset state when club changes
     setPosts([]);
     setLastReadTimestamp(null);
     setUnreadCount(0);
     setError(null);
     setHasMore(false);
     setOldestPostId(null);
-    // Fetch posts for new club
-    fetchPosts();
-  }, [fetchPosts]);
+  }, [currentClub?.id, user?.uid]);
 
   // ******************SETTERS**********************
   const createPost = useCallback(async (postData) => {

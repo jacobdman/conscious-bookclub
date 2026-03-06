@@ -1,48 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Alert, AlertTitle, IconButton, Box, Button } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
-import { getSubscriptionStatus, subscribeToNotifications } from 'services/notifications/notifications.service';
+import { subscribeToNotifications } from 'services/notifications/notifications.service';
+import { useSubscriptionStatus } from 'hooks/useSubscriptionStatus';
+import { useQueryClient } from '@tanstack/react-query';
 
 const NotificationPrompt = () => {
   const { user } = useAuth();
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [hasSubscription, setHasSubscription] = useState(false);
-  const [checking, setChecking] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: subscriptions, isLoading: checking } = useSubscriptionStatus(user?.uid);
+  const hasSubscription = !!(subscriptions && subscriptions.length > 0);
+  const dismissedFromStorage = typeof window !== 'undefined' ? localStorage.getItem('notification-prompt-dismissed') : null;
+  const [promptDismissed, setPromptDismissed] = useState(false);
+  const showPrompt = !hasSubscription && !dismissedFromStorage && !promptDismissed;
+
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState(null);
 
-  const checkSubscription = useCallback(async () => {
-    if (!user) {
-      setChecking(false);
-      return;
-    }
-
-    try {
-      const subscriptions = await getSubscriptionStatus(user.uid);
-      const subscribed = subscriptions && subscriptions.length > 0;
-      setHasSubscription(subscribed);
-      
-      // Check if already dismissed
-      const dismissed = localStorage.getItem('notification-prompt-dismissed');
-      
-      // Only show if not subscribed and not dismissed
-      if (!subscribed && !dismissed) {
-        setShowPrompt(true);
-      }
-    } catch (err) {
-      console.error('Error checking subscription status:', err);
-    } finally {
-      setChecking(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    checkSubscription();
-  }, [checkSubscription]);
-
   const handleDismiss = () => {
-    setShowPrompt(false);
+    setPromptDismissed(true);
     localStorage.setItem('notification-prompt-dismissed', 'true');
   };
 
@@ -93,8 +70,7 @@ const NotificationPrompt = () => {
       // Send subscription to backend
       if (user) {
         await subscribeToNotifications(user.uid, subscription.toJSON());
-        setShowPrompt(false);
-        setHasSubscription(true);
+        queryClient.invalidateQueries({ queryKey: ['subscription', user.uid] });
         // Don't mark as dismissed if they subscribed - they might want to see it again if they unsubscribe
       }
     } catch (err) {

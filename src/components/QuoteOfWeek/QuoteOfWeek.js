@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -14,7 +14,10 @@ import { ArrowForward, Star, StarBorder } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 // Services
-import { getFeaturedQuote, likeQuote, unlikeQuote } from 'services/quotes/quotes.service';
+import { likeQuote, unlikeQuote } from 'services/quotes/quotes.service';
+// Hooks
+import { useQueryClient } from '@tanstack/react-query';
+import { useFeaturedQuote } from 'hooks/useFeaturedQuote';
 // Utils
 import { useNavigate } from 'react-router-dom';
 
@@ -23,10 +26,12 @@ const QuoteOfWeek = () => {
   const { currentClub } = useClubContext();
   const navigate = useNavigate();
 
-  const [quoteData, setQuoteData] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [liking, setLiking] = useState(false);
-  const [error, setError] = useState(null);
+
+  const queryClient = useQueryClient();
+  const { data: response, isLoading: loading, error } = useFeaturedQuote(user?.uid, currentClub?.id);
+  const quoteData = response?.quote ?? null;
+  const errorMessage = error?.message || (error ? 'Unable to load quote of the week' : null);
 
   const fallbackQuotes = [
     {
@@ -45,25 +50,6 @@ const QuoteOfWeek = () => {
   const fallbackQuote =
     fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
 
-  const loadFeaturedQuote = useCallback(async () => {
-    if (!user || !currentClub) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await getFeaturedQuote(user.uid, currentClub.id);
-      setQuoteData(response.quote);
-    } catch (err) {
-      setError('Unable to load quote of the week');
-      console.error('Error loading featured quote', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, currentClub]);
-
-  useEffect(() => {
-    loadFeaturedQuote();
-  }, [loadFeaturedQuote]);
-
   const displayQuote = quoteData || fallbackQuote;
   const usingFallback = !quoteData;
   const likesCount = quoteData?.likesCount ?? 0;
@@ -72,14 +58,20 @@ const QuoteOfWeek = () => {
     if (!user || !currentClub || !quoteData?.id) return;
     setLiking(true);
     try {
-      const response = quoteData.isLiked
+      const likeResponse = quoteData.isLiked
         ? await unlikeQuote(user.uid, currentClub.id, quoteData.id)
         : await likeQuote(user.uid, currentClub.id, quoteData.id);
-      setQuoteData((prev) => ({
-        ...prev,
-        isLiked: response?.liked ?? !prev?.isLiked,
-        likesCount: response?.likesCount ?? prev?.likesCount ?? 0,
-      }));
+      queryClient.setQueryData(
+        ['featured', 'quote', user.uid, currentClub.id],
+        (old) => ({
+          ...old,
+          quote: {
+            ...quoteData,
+            isLiked: likeResponse?.liked ?? !quoteData?.isLiked,
+            likesCount: likeResponse?.likesCount ?? quoteData?.likesCount ?? 0,
+          },
+        }),
+      );
     } catch (err) {
       console.error('Error updating quote star', err);
     } finally {
@@ -133,9 +125,9 @@ const QuoteOfWeek = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
           <CircularProgress size={24} />
         </Box>
-      ) : error ? (
+      ) : errorMessage ? (
         <Typography color="error" variant="body2">
-          {error}
+          {errorMessage}
         </Typography>
       ) : displayQuote ? (
         <Box sx={{ maxWidth: 640, mx: 'auto' }}>
