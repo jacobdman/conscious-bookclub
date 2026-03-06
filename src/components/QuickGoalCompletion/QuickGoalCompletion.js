@@ -59,15 +59,23 @@ const QuickGoalCompletion = () => {
   const [quantityDialog, setQuantityDialog] = useState({ open: false, goal: null, quantity: '' });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
+  const [visibleCount, setVisibleCount] = useState(5);
   const longPressTimeoutRef = useRef(null);
   const longPressTriggeredRef = useRef(false);
 
-  // Get filtered and sorted goals whenever allGoals changes
-  const filteredGoals = useMemo(() => {
+  // Full filtered and sorted list (no limit)
+  const allSortedGoals = useMemo(() => {
     const filtered = filterGoalsForQuickCompletion(allGoals);
-    const sorted = sortGoalsByPriority(filtered);
-    return sorted.slice(0, 5); // Limit to top 5
+    return sortGoalsByPriority(filtered);
   }, [allGoals]);
+
+  // Goals to display: first N, incrementing by 5 when "Load more" is clicked
+  const filteredGoals = useMemo(() => allSortedGoals.slice(0, visibleCount), [allSortedGoals, visibleCount]);
+  const hasMore = visibleCount < allSortedGoals.length;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => Math.min(prev + 5, allSortedGoals.length));
+  };
 
   // Goals now include today's entries by default from the API, so no need to fetch them separately
   useEffect(() => {
@@ -702,6 +710,16 @@ const QuickGoalCompletion = () => {
             </Box>
           );
         })}
+        {hasMore && (
+          <Button
+            variant="text"
+            size="small"
+            onClick={handleLoadMore}
+            sx={{ alignSelf: 'center', mt: 0.5, fontSize: '0.75rem', minWidth: 0 }}
+          >
+            Load more
+          </Button>
+        )}
       </Box>
     );
   };

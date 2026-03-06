@@ -333,34 +333,59 @@ export const isTodayOrOverdue = (date) => {
   return checkDate <= today;
 };
 
+/** Cadence order for quick completion: smaller cadences first (day → week → month → quarter) */
+const CADENCE_RANK = { day: 0, week: 1, month: 2, quarter: 3 };
+
+/**
+ * Get cadence rank for sorting (lower = higher priority). Unknown cadence sorts last.
+ * @param {Object} goal - Goal object
+ * @returns {number} - Cadence rank
+ */
+const getCadenceRank = (goal) => {
+  const c = goal?.cadence;
+  if (!c || CADENCE_RANK[c] === undefined) return 99;
+  return CADENCE_RANK[c];
+};
+
 /**
  * Sort goals by priority for quick completion view
- * Priority order: due one-time → milestones → metrics → habits
+ * Priority: due one-time → milestones → cadence-based (day, week, month, quarter) → other
+ * Within cadence-based, smaller cadence first; then metric before habit; then newest first.
  * @param {Array} goals - Array of goal objects
  * @returns {Array} - Sorted goals array
  */
 export const sortGoalsByPriority = (goals) => {
   return goals.sort((a, b) => {
-    // Normalize types
     const aType = normalizeGoalType(a.type);
     const bType = normalizeGoalType(b.type);
 
-    const getPriority = (goal, goalType) => {
-      if (goalType === 'one_time') {
-        return goal.dueAt || goal.due_at ? 0 : 4;
-      }
-      if (goalType === 'milestone') return 1;
-      if (goalType === 'metric') return 2;
-      if (goalType === 'habit') return 3;
+    const isOneTimeDue = (goal, type) => type === 'one_time' && (goal.dueAt || goal.due_at);
+    const isMilestone = (type) => type === 'milestone';
+    const isCadenceBased = (type) => type === 'habit' || type === 'metric';
+
+    if (isOneTimeDue(a, aType) && !isOneTimeDue(b, bType)) return -1;
+    if (!isOneTimeDue(a, aType) && isOneTimeDue(b, bType)) return 1;
+    if (isMilestone(aType) && !isMilestone(bType)) return -1;
+    if (!isMilestone(aType) && isMilestone(bType)) return 1;
+
+    if (isCadenceBased(aType) && isCadenceBased(bType)) {
+      const cadenceA = getCadenceRank(a);
+      const cadenceB = getCadenceRank(b);
+      if (cadenceA !== cadenceB) return cadenceA - cadenceB;
+      const typeSub = (g, t) => (t === 'metric' ? 0 : 1);
+      if (typeSub(a, aType) !== typeSub(b, bType)) return typeSub(a, aType) - typeSub(b, bType);
+      return new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0);
+    }
+
+    const fallbackPriority = (goal, type) => {
+      if (type === 'one_time') return 4;
+      if (type === 'metric') return 2;
+      if (type === 'habit') return 3;
       return 4;
     };
-
-    const aPriority = getPriority(a, aType);
-    const bPriority = getPriority(b, bType);
-
+    const aPriority = fallbackPriority(a, aType);
+    const bPriority = fallbackPriority(b, bType);
     if (aPriority !== bPriority) return aPriority - bPriority;
-    
-    // Finally, sort by creation date (newest first)
     return new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0);
   });
 };
