@@ -1,5 +1,10 @@
 const db = require("../../../../db/models/index");
-const {emitToClub, postIncludes, buildPostResponse} = require("../posts/posts.ctrl");
+const {
+  emitToClub,
+  postIncludes,
+  buildPostResponse,
+  sendFeedNotificationsForPost,
+} = require("../posts/posts.ctrl");
 
 // GET /v1/progress/:userId/:bookId - Get user's progress for a book
 const getUserBookProgress = async (req, res, next) => {
@@ -100,6 +105,15 @@ const updateUserBookProgress = async (req, res, next) => {
           const serializedPost = await buildPostResponse(postWithAssociations);
 
           await emitToClub(clubIdInt, "post:created", serializedPost);
+
+          await sendFeedNotificationsForPost(serializedPost, clubIdInt, userId, {
+            postData: {
+              text: "{book_completion_post}",
+              isActivity: true,
+              authorId: userId,
+              parentPostId: null,
+            },
+          });
         }
       } catch (err) {
         console.error("Failed to create activity post for finished book:", err);

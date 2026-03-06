@@ -277,6 +277,135 @@ const checkUsersInRoom = async (clubId, userIds) => {
   }
 };
 
+// Activity post tokens used for completion feed items
+const BOOK_COMPLETION_TOKEN = "{book_completion_post}";
+const GOAL_COMPLETION_TOKEN = "{goal_completion_post}";
+
+/**
+ * Send feed push notifications for a new post. Reused by createPost and by
+ * progress.ctrl when creating book-completion activity posts.
+ * @param {Object} post - Serialized post (with author, authorName, etc.)
+ * @param {number} clubIdInt - Club id
+ * @param {string} authorId - Post author uid
+ * @param {Object} options - { postData, mentionedUserIds, parentPostAuthorId }
+ */
+const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options = {}) => {
+  const {postData = {}, mentionedUserIds = [], parentPostAuthorId = null} = options;
+  if (!vapidPublicKey || !vapidPrivateKey) return;
+
+  try {
+    const clubMembers = await db.ClubMember.findAll({
+      where: {clubId: clubIdInt},
+      include: [{model: db.User, as: "user"}],
+    });
+
+    const authorName = post.authorName || post.author?.displayName || "Someone";
+    const isReply = !!postData.parentPostId;
+    const hasMentions = mentionedUserIds.length > 0;
+    const text = postData.text || "";
+    const isActivityCompletion =
+      postData.isActivity &&
+      (text.includes(BOOK_COMPLETION_TOKEN) || text.includes(GOAL_COMPLETION_TOKEN));
+
+    const userIdsToNotify = [];
+    const mentionNotifications = new Set();
+
+    for (const member of clubMembers) {
+      if (!member.user) continue;
+      const user = member.user;
+      const settings = user.notificationSettings || {};
+      const feedSettings = settings.feed || {};
+      if (!feedSettings.enabled) continue;
+      if (user.uid === authorId) continue;
+
+      let shouldNotify = false;
+      if (hasMentions && mentionedUserIds.includes(user.uid)) {
+        shouldNotify = true;
+        mentionNotifications.add(user.uid);
+      } else if (isActivityCompletion) {
+        shouldNotify = true;
+      } else if (feedSettings.mode === "all") {
+        shouldNotify = true;
+      } else if (feedSettings.mode === "mentions_replies") {
+        if (isReply && parentPostAuthorId === user.uid) shouldNotify = true;
+      }
+
+      if (shouldNotify) userIdsToNotify.push(user.uid);
+    }
+
+    const usersInRoom = await checkUsersInRoom(clubIdInt, userIdsToNotify);
+
+    for (const member of clubMembers) {
+      if (!member.user) continue;
+      const user = member.user;
+      const settings = user.notificationSettings || {};
+      const feedSettings = settings.feed || {};
+      if (!feedSettings.enabled) continue;
+      if (user.uid === authorId) continue;
+      if (usersInRoom.has(user.uid)) {
+        console.log(`Skipping notification for user ${user.uid} - actively viewing feed`);
+        continue;
+      }
+
+      let shouldNotify = false;
+      let notificationTitle = "New Post";
+      let notificationBody = "";
+
+      if (mentionNotifications.has(user.uid)) {
+        shouldNotify = true;
+        const regex = new RegExp(MENTION_REGEX);
+        const displayText = (postData.text || "").replace(regex, "@$1");
+        const truncatedText =
+          displayText.length > 60 ? displayText.substring(0, 60) + "..." : displayText;
+        notificationTitle = "Mentioned in Post";
+        notificationBody = `${authorName} has tagged you in a message: "${truncatedText}"`;
+      } else if (isActivityCompletion) {
+        shouldNotify = true;
+        if (text.includes(BOOK_COMPLETION_TOKEN)) {
+          notificationTitle = "Book completed";
+          notificationBody = `${authorName} completed a book`;
+        } else {
+          notificationTitle = "Goal completed";
+          notificationBody = `${authorName} completed a goal`;
+        }
+      } else if (feedSettings.mode === "all") {
+        shouldNotify = true;
+      } else if (feedSettings.mode === "mentions_replies") {
+        if (isReply && parentPostAuthorId === user.uid) shouldNotify = true;
+      }
+
+      if (shouldNotify && !mentionNotifications.has(user.uid) && !isActivityCompletion) {
+        if (isReply) {
+          notificationTitle = "New Reply";
+          notificationBody = `${authorName} replied to your post`;
+        } else {
+          const regex = new RegExp(MENTION_REGEX);
+          const displayText = (postData.text || "").replace(regex, "@$1");
+          const truncatedText =
+            displayText.length > 60 ? displayText.substring(0, 60) + "..." : displayText;
+          notificationBody = `${authorName}: ${truncatedText}`;
+        }
+      }
+
+      if (shouldNotify) {
+        const subscriptions = await db.PushSubscription.findAll({
+          where: {userId: user.uid},
+        });
+        for (const subscription of subscriptions) {
+          await sendPushNotification(
+              subscription.subscriptionJson,
+              notificationTitle,
+              notificationBody,
+              {route: "/feed", type: "feed", clubId: clubIdInt},
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error sending feed notifications:", error);
+  }
+};
+
 // GET /v1/posts - Get posts with pagination
 const getPosts = async (req, res, next) => {
   try {
@@ -405,167 +534,19 @@ const createPost = async (req, res, next) => {
     // Emit Socket.io event via Cloud Run service
     await emitToClub(clubIdInt, "post:created", serializedPost);
 
-    // Send feed notifications based on user preferences
-    // This is non-blocking - don't fail the request if notifications fail
-    if (vapidPublicKey && vapidPrivateKey) {
-      try {
-        // Get all club members
-        const clubMembers = await db.ClubMember.findAll({
-          where: {clubId: clubIdInt},
-          include: [
-            {
-              model: db.User,
-              as: "user",
-            },
-          ],
-        });
-
-        const authorName = postWithAssociations.authorName ||
-            postWithAssociations.author?.displayName || "Someone";
-        const isReply = !!postData.parentPostId;
-        const hasMentions = mentionedUserIds.length > 0;
-        let parentPostAuthorId = null;
-
-        // If this is a reply, get the parent post author ID
-        if (isReply && postData.parentPostId) {
-          const parentPost = await db.Post.findByPk(postData.parentPostId, {
-            attributes: ["authorId"],
-          });
-          if (parentPost) {
-            parentPostAuthorId = parentPost.authorId;
-          }
-        }
-
-        // Collect userIds that should receive notifications (before checking room membership)
-        const userIdsToNotify = [];
-        const mentionNotifications = new Set(); // Track users who should get mention notifications
-
-        for (const member of clubMembers) {
-          if (!member.user) continue;
-
-          const user = member.user;
-          const settings = user.notificationSettings || {};
-          const feedSettings = settings.feed || {};
-
-          // Skip if feed notifications are not enabled
-          if (!feedSettings.enabled) continue;
-
-          // Skip the post author (don't notify yourself)
-          if (user.uid === postData.authorId) continue;
-
-          let shouldNotify = false;
-
-          // Check if user is mentioned (highest priority)
-          if (hasMentions && mentionedUserIds.includes(user.uid)) {
-            shouldNotify = true;
-            mentionNotifications.add(user.uid);
-          } else if (feedSettings.mode === "all") {
-            // Notify for all new posts
-            shouldNotify = true;
-          } else if (feedSettings.mode === "mentions_replies") {
-            // Only notify for replies to this user's posts
-            if (isReply && parentPostAuthorId === user.uid) {
-              shouldNotify = true;
-            }
-          }
-
-          if (shouldNotify) {
-            userIdsToNotify.push(user.uid);
-          }
-        }
-
-        // Check which users are actively viewing the feed (in socket room)
-        // Skip notifications for users who are already seeing updates in real-time
-        const usersInRoom = await checkUsersInRoom(clubIdInt, userIdsToNotify);
-
-        // Send notifications to members who have feed notifications enabled
-        // and are not actively viewing the feed
-        for (const member of clubMembers) {
-          if (!member.user) continue;
-
-          const user = member.user;
-          const settings = user.notificationSettings || {};
-          const feedSettings = settings.feed || {};
-
-          // Skip if feed notifications are not enabled
-          if (!feedSettings.enabled) continue;
-
-          // Skip the post author (don't notify yourself)
-          if (user.uid === postData.authorId) continue;
-
-          // Skip if user is actively viewing the feed (already receiving real-time updates)
-          if (usersInRoom.has(user.uid)) {
-            console.log(`Skipping notification for user ${user.uid} - actively viewing feed`);
-            continue;
-          }
-
-          let shouldNotify = false;
-          let notificationTitle = "New Post";
-          let notificationBody = "";
-
-          // Check if user is mentioned (highest priority)
-          if (mentionNotifications.has(user.uid)) {
-            shouldNotify = true;
-            // Extract text without mention markup for notification
-            const regex = new RegExp(MENTION_REGEX);
-            const displayText = postData.text.replace(regex, "@$1");
-            const truncatedText = displayText.length > 60 ?
-              displayText.substring(0, 60) + "..." :
-              displayText;
-            notificationTitle = "Mentioned in Post";
-            notificationBody = `${authorName} has tagged you in a message: "${truncatedText}"`;
-          } else if (feedSettings.mode === "all") {
-            // Notify for all new posts
-            shouldNotify = true;
-          } else if (feedSettings.mode === "mentions_replies") {
-            // Only notify for replies to this user's posts
-            if (isReply && parentPostAuthorId === user.uid) {
-              shouldNotify = true;
-            }
-          }
-
-          // Set default notification text for non-mention notifications
-          if (shouldNotify && !mentionNotifications.has(user.uid)) {
-            if (isReply) {
-              notificationTitle = "New Reply";
-              notificationBody = `${authorName} replied to your post`;
-            } else {
-              // Truncate post text to ~50-60 characters for notification
-              const regex = new RegExp(MENTION_REGEX);
-              const displayText = postData.text.replace(regex, "@$1");
-              const truncatedText = displayText.length > 60 ?
-                displayText.substring(0, 60) + "..." :
-                displayText;
-              notificationBody = `${authorName}: ${truncatedText}`;
-            }
-          }
-
-          if (shouldNotify) {
-            // Get user's push subscriptions
-            const subscriptions = await db.PushSubscription.findAll({
-              where: {userId: user.uid},
-            });
-
-            // Send notification to all subscriptions with route data
-            for (const subscription of subscriptions) {
-              await sendPushNotification(
-                  subscription.subscriptionJson,
-                  notificationTitle,
-                  notificationBody,
-                  {
-                    route: "/feed",
-                    type: "feed",
-                    clubId: clubIdInt,
-                  },
-              );
-            }
-          }
-        }
-      } catch (error) {
-        // Log error but don't fail the request
-        console.error("Error sending feed notifications:", error);
-      }
+    // Send feed notifications (non-blocking)
+    let parentPostAuthorId = null;
+    if (postData.parentPostId) {
+      const parentPost = await db.Post.findByPk(postData.parentPostId, {
+        attributes: ["authorId"],
+      });
+      if (parentPost) parentPostAuthorId = parentPost.authorId;
     }
+    await sendFeedNotificationsForPost(serializedPost, clubIdInt, postData.authorId, {
+      postData,
+      mentionedUserIds,
+      parentPostAuthorId,
+    });
 
     res.status(201).json(serializedPost);
   } catch (e) {
@@ -885,5 +866,6 @@ module.exports = {
   emitToClub,
   postIncludes,
   buildPostResponse,
+  sendFeedNotificationsForPost,
 };
 

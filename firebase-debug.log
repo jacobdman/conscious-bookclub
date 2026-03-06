@@ -1744,3 +1744,910 @@ Issues? Report them at https://github.com/firebase/firebase-tools/issues and att
 [debug] [2026-03-06T14:35:04.400Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"Finishing up request with event=finish"}}
 [debug] [2026-03-06T14:35:04.400Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"Finishing up request with event=close"}}
 [debug] [2026-03-06T14:35:04.400Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-03-06T14:43:22.689Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:43:23.693Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:43:24.341Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:43:24.341Z] Building nodejs source
+[debug] [2026-03-06T14:43:24.341Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:43:24.343Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:43:24.344Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8434
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+
+[debug] [2026-03-06T14:43:24.770Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-pool] Shutting down IDLE worker (us-central1-api) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-api)"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-us-central1-api-41fb68ba-1dfa-48f5-b229-6d918249be0b]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-41fb68ba-1dfa-48f5-b229-6d918249be0b]: FINISHING"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-pool] Shutting down IDLE worker (us-central1-api) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-api)"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-us-central1-api-df7a14dc-dfdf-4a89-9047-3d55a038757d]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-df7a14dc-dfdf-4a89-9047-3d55a038757d]: FINISHING"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-pool] Shutting down IDLE worker (us-central1-api) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-api)"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-us-central1-api-5b97249c-63b2-42fc-8612-7fcc9edcea7f]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-5b97249c-63b2-42fc-8612-7fcc9edcea7f]: FINISHING"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-pool] Shutting down IDLE worker (us-central1-api) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-api)"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-us-central1-api-ad7cd21c-12d8-4162-b388-fdcb83cd94ab]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-ad7cd21c-12d8-4162-b388-fdcb83cd94ab]: FINISHING"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-pool] Shutting down IDLE worker (us-central1-api) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-api)"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-us-central1-api-f1dd23fb-3cbf-4b0f-97dd-ca4645475f80]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-f1dd23fb-3cbf-4b0f-97dd-ca4645475f80]: FINISHING"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-pool] Shutting down IDLE worker (us-central1-api) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-api)"}}
+[debug] [2026-03-06T14:43:34.786Z] [worker-us-central1-api-3f9a7643-f4e1-46b7-9734-64ab82a96acf]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-3f9a7643-f4e1-46b7-9734-64ab82a96acf]: FINISHING"}}
+[debug] [2026-03-06T14:43:34.813Z] [worker-us-central1-api-5b97249c-63b2-42fc-8612-7fcc9edcea7f]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-5b97249c-63b2-42fc-8612-7fcc9edcea7f]: exited"}}
+[debug] [2026-03-06T14:43:34.813Z] [worker-us-central1-api-5b97249c-63b2-42fc-8612-7fcc9edcea7f]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-5b97249c-63b2-42fc-8612-7fcc9edcea7f]: FINISHED"}}
+[debug] [2026-03-06T14:43:34.814Z] [worker-us-central1-api-ad7cd21c-12d8-4162-b388-fdcb83cd94ab]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-ad7cd21c-12d8-4162-b388-fdcb83cd94ab]: exited"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-ad7cd21c-12d8-4162-b388-fdcb83cd94ab]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-ad7cd21c-12d8-4162-b388-fdcb83cd94ab]: FINISHED"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-41fb68ba-1dfa-48f5-b229-6d918249be0b]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-41fb68ba-1dfa-48f5-b229-6d918249be0b]: exited"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-41fb68ba-1dfa-48f5-b229-6d918249be0b]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-41fb68ba-1dfa-48f5-b229-6d918249be0b]: FINISHED"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-f1dd23fb-3cbf-4b0f-97dd-ca4645475f80]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-f1dd23fb-3cbf-4b0f-97dd-ca4645475f80]: exited"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-f1dd23fb-3cbf-4b0f-97dd-ca4645475f80]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-f1dd23fb-3cbf-4b0f-97dd-ca4645475f80]: FINISHED"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-3f9a7643-f4e1-46b7-9734-64ab82a96acf]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-3f9a7643-f4e1-46b7-9734-64ab82a96acf]: exited"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-3f9a7643-f4e1-46b7-9734-64ab82a96acf]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-3f9a7643-f4e1-46b7-9734-64ab82a96acf]: FINISHED"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-df7a14dc-dfdf-4a89-9047-3d55a038757d]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-df7a14dc-dfdf-4a89-9047-3d55a038757d]: exited"}}
+[debug] [2026-03-06T14:43:34.815Z] [worker-us-central1-api-df7a14dc-dfdf-4a89-9047-3d55a038757d]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-api"},"extension":{},"message":"[worker-us-central1-api-df7a14dc-dfdf-4a89-9047-3d55a038757d]: FINISHED"}}
+[debug] [2026-03-06T14:43:51.313Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:43:52.315Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:43:52.612Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:43:52.612Z] Building nodejs source
+[debug] [2026-03-06T14:43:52.612Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:43:52.613Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:43:52.614Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8206
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+   Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+
+[debug] [2026-03-06T14:43:52.873Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[debug] [2026-03-06T14:43:55.349Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:43:56.349Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:43:56.673Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:43:56.673Z] Building nodejs source
+[debug] [2026-03-06T14:43:56.673Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:43:56.674Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:43:56.675Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8777
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  override existing env vars with { override: true }
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+   Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+
+[debug] [2026-03-06T14:43:57.057Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[debug] [2026-03-06T14:44:04.857Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:44:05.859Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:44:06.245Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:44:06.245Z] Building nodejs source
+[debug] [2026-03-06T14:44:06.245Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:44:06.245Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:44:06.246Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8612
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  override existing env vars with { override: true }
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+
+[debug] [2026-03-06T14:44:06.494Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[info] PostgreSQL connection established successfully.
+
+[debug] [2026-03-06T14:44:07.964Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:44:08.965Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:44:09.228Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:44:09.228Z] Building nodejs source
+[debug] [2026-03-06T14:44:09.228Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:44:09.228Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:44:09.229Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8573
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+
+[debug] [2026-03-06T14:44:09.456Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[debug] [2026-03-06T14:48:11.005Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:48:11.308Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:48:12.310Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:48:12.792Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:48:12.792Z] Building nodejs source
+[debug] [2026-03-06T14:48:12.792Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:48:12.793Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:48:12.794Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8997
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+[debug] [2026-03-06T14:48:13.375Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[debug] [2026-03-06T14:51:27.637Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:51:28.641Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:51:29.132Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:51:29.132Z] Building nodejs source
+[debug] [2026-03-06T14:51:29.132Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:51:29.134Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:51:29.135Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8205
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+
+[debug] [2026-03-06T14:51:29.564Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[debug] [2026-03-06T14:51:49.327Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:51:50.330Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:51:50.732Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:51:50.732Z] Building nodejs source
+[debug] [2026-03-06T14:51:50.732Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:51:50.734Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:51:50.734Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8328
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+
+[debug] [2026-03-06T14:51:51.112Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[debug] [2026-03-06T14:51:58.105Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:51:59.107Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:51:59.527Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:51:59.527Z] Building nodejs source
+[debug] [2026-03-06T14:51:59.527Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:51:59.566Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:51:59.568Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8087
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+
+[debug] [2026-03-06T14:51:59.976Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[debug] [2026-03-06T14:52:10.738Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:52:11.739Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:52:12.145Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:52:12.145Z] Building nodejs source
+[debug] [2026-03-06T14:52:12.145Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:52:12.146Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:52:12.147Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8282
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+
+[debug] [2026-03-06T14:52:12.591Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[debug] [2026-03-06T14:52:14.204Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/progress/progress.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:52:15.205Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:52:15.511Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:52:15.511Z] Building nodejs source
+[debug] [2026-03-06T14:52:15.511Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:52:15.511Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:52:15.512Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8428
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  override existing env vars with { override: true }
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+
+[debug] [2026-03-06T14:52:15.743Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[debug] [2026-03-06T14:52:41.915Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:52:42.915Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:52:43.170Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:52:43.170Z] Building nodejs source
+[debug] [2026-03-06T14:52:43.170Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:52:43.171Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:52:43.172Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8544
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+
+[debug] [2026-03-06T14:52:43.402Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[debug] [2026-03-06T14:52:49.128Z] File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File /Users/jacobdayton/projects/conscious-bookclub/functions/src/routes/v1/posts/posts.ctrl.js changed, reloading triggers"}}
+[debug] [2026-03-06T14:52:50.129Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-03-06T14:52:50.521Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:last": "node scripts/undo-last-migration.js",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "migrate:status": "sequelize-cli db:migrate:status"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "googleapis": "^162.0.0",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "react-big-calendar": "^1.19.4",
+    "sequelize": "^6.35.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0",
+    "sequelize-cli": "^6.6.3"
+  },
+  "private": true
+}
+[debug] [2026-03-06T14:52:50.521Z] Building nodejs source
+[debug] [2026-03-06T14:52:50.521Z] Failed to find version of module node: reached end of search path /Users/jacobdayton/projects/conscious-bookclub/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-03-06T14:52:50.521Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-03-06T14:52:50.522Z] Found firebase-functions binary at '/Users/jacobdayton/projects/conscious-bookclub/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8333
+
+[info] [dotenv@17.2.3] injecting env (9) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+[info] ⚠️  FIREBASE_AUTH_EMULATOR_HOST is set, but we're using production Auth
+
+[info]    Unsetting FIREBASE_AUTH_EMULATOR_HOST to use production Firebase Auth
+
+[info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+[debug] [2026-03-06T14:52:50.755Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":80,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"},"dailyGoalReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"dailyGoalReminder"},"meetingReminder":{"availableMemoryMb":512,"timeoutSeconds":540,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 * * * *","retryConfig":{},"timeZone":"UTC"},"entryPoint":"meetingReminder"},"rotateQuotesOfWeek":{"availableMemoryMb":256,"timeoutSeconds":300,"minInstances":null,"maxInstances":1,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"0 0 * * 0","retryConfig":{},"timeZone":"UTC"},"entryPoint":"rotateQuotesOfWeek"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[info] PostgreSQL connection established successfully.
+
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api, dailyGoalReminder, meetingReminder, rotateQuotesOfWeek."}}
