@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+// Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
-import { 
-  getGoals, 
-  addGoal, 
-  updateGoal, 
-  deleteGoal,
+import GoalsContext from './GoalsContext';
+// Services
+import {
   createGoalEntry,
   updateGoalEntry,
   deleteGoalEntry,
@@ -15,8 +14,10 @@ import {
   deleteMilestone,
   updateMilestone,
 } from 'services/goals/goals.service';
+// Hooks
+import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from 'hooks/useGoals';
+// Utils
 import { normalizeGoalType } from 'utils/goalHelpers';
-import GoalsContext from './GoalsContext';
 
 // Helper function to normalize goal data
 const normalizeGoal = (goalData, docId = null, preserveEntries = false) => {
@@ -73,124 +74,94 @@ const GoalsProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const goalEntriesCacheRef = useRef({});
 
-  // ******************LOAD FUNCTIONS**********************
-  // Fetch goals from API
-  const refreshGoals = useCallback(async (options = {}) => {
-    if (!user || !currentClub) return;
+  const {
+    data: goalsData,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useGoals(user?.uid, currentClub?.id);
 
+  const createGoalMutation = useCreateGoal(user?.uid, currentClub?.id);
+  const updateGoalMutation = useUpdateGoal(user?.uid, currentClub?.id);
+  const deleteGoalMutation = useDeleteGoal(user?.uid, currentClub?.id);
+
+  // ******************LOAD FUNCTIONS**********************
+  // Fetch goals from API (cache is kept in sync via mutation invalidation)
+  const refreshGoals = useCallback(async () => {
+    if (!user || !currentClub) return;
     try {
-      setLoading(true);
-      setError(null);
-      const goals = await getGoals(user.uid, currentClub.id, options);
-      const goalsData = goals.map(goal => {
-        const normalized = normalizeGoal(goal, goal.id);
-        // Goals now include today's entries from API for habit/metric goals
-        // Initialize entriesPagination if entries are present
-        if (normalized.entries && normalized.entries.length > 0 && !normalized.entriesPagination) {
-          normalized.entriesPagination = {
-            hasMore: false, // Today's entries are a limited set
-            offset: normalized.entries.length,
-            limit: 10
-          };
-        }
-        return normalized;
-      });
-      setGoals(goalsData);
+      await refetch();
     } catch (err) {
       setError('Failed to fetch goals');
       console.error('Error fetching goals:', err);
-    } finally {
-      setLoading(false);
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, refetch]);
 
   // ******************EFFECTS/REACTIONS**********************
-  // Initial load
   useEffect(() => {
-    refreshGoals();
-  }, [refreshGoals]);
+    if (goalsData) {
+      setGoals(goalsData);
+    }
+  }, [goalsData]);
+
+  useEffect(() => {
+    setLoading(isLoading);
+  }, [isLoading]);
+
+  useEffect(() => {
+    if (queryError) {
+      setError('Failed to fetch goals');
+    } else {
+      setError(null);
+    }
+  }, [queryError]);
 
   // ******************SETTERS**********************
-  // Add a new goal
+  // Add a new goal (mutations invalidate goals query so cache and remounts stay in sync)
   const handleAddGoal = useCallback(async (goalData) => {
     if (!user || !currentClub) return;
 
     try {
-      // Make API call - returns full goal object with id, created_at, etc.
-      const result = await addGoal(user.uid, currentClub.id, goalData);
-      
-      // Normalize and add to state directly from API response
+      setError(null);
+      const result = await createGoalMutation.mutateAsync(goalData);
       const newGoal = normalizeGoal(result, result.id);
-      setGoals(prev => [...prev, newGoal]);
-      
       return newGoal;
     } catch (err) {
       setError('Failed to create goal');
       console.error('Error creating goal:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, createGoalMutation]);
 
   // Update an existing goal
   const handleUpdateGoal = useCallback(async (goalId, updates) => {
     if (!user || !currentClub) return;
 
     try {
-      // Make API call - returns full updated goal object with progress
-      const result = await updateGoal(user.uid, currentClub.id, goalId, updates);
-      
-      // Preserve entries and pagination when updating (they're cached separately)
-      let updatedGoalResult = null;
-      setGoals(prev => prev.map(goal => {
-        if (goal.id === goalId) {
-          const updatedGoal = normalizeGoal(result, result.id, true);
-          // Preserve cached entries and pagination if they exist
-          updatedGoalResult = {
-            ...updatedGoal,
-            entries: goal.entries || updatedGoal.entries || [],
-            entriesPagination: goal.entriesPagination || updatedGoal.entriesPagination || {
-              hasMore: true,
-              offset: 0,
-              limit: 10
-            }
-          };
-          return updatedGoalResult;
-        }
-        return goal;
-      }));
-      
-      return updatedGoalResult || normalizeGoal(result, result.id);
+      setError(null);
+      const result = await updateGoalMutation.mutateAsync({ goalId, updates });
+      const updatedGoal = normalizeGoal(result, result.id, true);
+      return updatedGoal;
     } catch (err) {
       setError('Failed to update goal');
       console.error('Error updating goal:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, updateGoalMutation]);
 
   // Delete a goal
   const handleDeleteGoal = useCallback(async (goalId) => {
     if (!user || !currentClub) return;
 
-    // Store the goal for potential revert and optimistically remove from state
-    let deletedGoal = null;
-    setGoals(prev => {
-      deletedGoal = prev.find(g => g.id === goalId);
-      return prev.filter(goal => goal.id !== goalId);
-    });
-    
     try {
-      // Make API call
-      await deleteGoal(user.uid, currentClub.id, goalId);
+      setError(null);
+      await deleteGoalMutation.mutateAsync(goalId);
     } catch (err) {
       setError('Failed to delete goal');
       console.error('Error deleting goal:', err);
-      // Revert optimistic update on error
-      if (deletedGoal) {
-        setGoals(prev => [...prev, deletedGoal]);
-      }
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, deleteGoalMutation]);
 
   // ******************ENTRY OPERATIONS**********************
   const clearGoalEntriesCache = useCallback((goalId) => {
@@ -655,32 +626,13 @@ const GoalsProvider = ({ children }) => {
     if (!user || !currentClub || !goalId) return;
 
     try {
-      // Update goal with new milestones array
-      const result = await updateGoal(user.uid, currentClub.id, goalId, { milestones });
-      
-      // Update goal in state
-      setGoals(prev => prev.map(goal => {
-        if (goal.id === goalId) {
-          const updatedGoal = normalizeGoal(result, result.id, true);
-          return {
-            ...updatedGoal,
-            entries: goal.entries || [],
-            entriesPagination: goal.entriesPagination || {
-              hasMore: true,
-              offset: 0,
-              limit: 10
-            }
-          };
-        }
-        return goal;
-      }));
-
+      const result = await updateGoalMutation.mutateAsync({ goalId, updates: { milestones } });
       return normalizeGoal(result, result.id);
     } catch (err) {
       console.error('Error bulk updating milestones:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, updateGoalMutation]);
 
   // ******************EXPORTS**********************
   return (

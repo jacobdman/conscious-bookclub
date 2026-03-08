@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -37,8 +37,8 @@ import {
   ThumbUp as ThumbUpIcon,
   ThumbUpOffAlt as ThumbUpOffAltIcon
 } from '@mui/icons-material';
-import { getMeetings } from 'services/meetings/meetings.service';
 import { useAuth } from 'AuthContext';
+import { useMeetings } from 'hooks/useMeetings';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
 import Layout from 'components/Layout';
@@ -77,8 +77,21 @@ const BookList = () => {
   
   // Local UI state for button loading
   const [loadingProgress, setLoadingProgress] = useState({});
-  const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> earliest meeting date
   const [meetingFormOpen, setMeetingFormOpen] = useState(false);
+
+  const { data: meetingsList = [] } = useMeetings(currentClub?.id, user?.uid, {});
+  const meetingDates = useMemo(() => {
+    const datesMap = {};
+    (meetingsList || []).forEach(meeting => {
+      if (meeting.bookId) {
+        const meetingDate = parseLocalDate(meeting.date);
+        if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
+          datesMap[meeting.bookId] = meeting.date;
+        }
+      }
+    });
+    return datesMap;
+  }, [meetingsList]);
   const [meetingFormBook, setMeetingFormBook] = useState(null);
   const [meetingFormPreviousChosen, setMeetingFormPreviousChosen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState(null);
@@ -93,32 +106,6 @@ const BookList = () => {
   const themeOptions = Array.isArray(currentClub?.themes) && currentClub?.themes.length > 0
     ? currentClub.themes
     : ['Classy', 'Creative', 'Curious'];
-
-  // Load meetings to get discussion dates (keeping this logic for now as it aggregates meetings)
-  useEffect(() => {
-    const loadMeetings = async () => {
-      if (!currentClub) return;
-      
-      try {
-        const meetings = await getMeetings(currentClub.id);
-        // Create a map of bookId -> earliest meeting date
-        const datesMap = {};
-        meetings.forEach(meeting => {
-          if (meeting.bookId) {
-            const meetingDate = parseLocalDate(meeting.date);
-            if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
-              datesMap[meeting.bookId] = meeting.date;
-            }
-          }
-        });
-        setMeetingDates(datesMap);
-      } catch (error) {
-        console.error('Error loading meetings:', error);
-      }
-    };
-
-    loadMeetings();
-  }, [currentClub]);
 
   useEffect(() => {
     if (!themesEnabled && filters.theme !== 'all') {

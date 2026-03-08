@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -11,8 +11,8 @@ import {
 } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import { getUserBookProgress, updateUserBookProgress } from 'services/progress/progress.service';
-import { getMeetings } from 'services/meetings/meetings.service';
 import useClubContext from 'contexts/Club';
+import { useMeetings } from 'hooks/useMeetings';
 import { parseLocalDate } from 'utils/dateHelpers';
 
 const CurrentBooksSection = ({ books }) => {
@@ -21,34 +21,20 @@ const CurrentBooksSection = ({ books }) => {
   const [bookProgress, setBookProgress] = useState({});
   const [loadingProgress, setLoadingProgress] = useState({});
   const [percentInputs, setPercentInputs] = useState({});
-  const [meetingDates, setMeetingDates] = useState({}); // Map of bookId -> meeting date
 
-  
-  // Load meetings to get discussion dates
-  useEffect(() => {
-    const loadMeetings = async () => {
-      if (!currentClub) return;
-      
-      try {
-        const meetings = await getMeetings(currentClub.id);
-        // Create a map of bookId -> earliest meeting date
-        const datesMap = {};
-        meetings.forEach(meeting => {
-          if (meeting.bookId) {
-            const meetingDate = parseLocalDate(meeting.date);
-            if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
-              datesMap[meeting.bookId] = meeting.date;
-            }
-          }
-        });
-        setMeetingDates(datesMap);
-      } catch (error) {
-        console.error('Error loading meetings:', error);
+  const { data: meetingsList = [] } = useMeetings(currentClub?.id, user?.uid, {});
+  const meetingDates = useMemo(() => {
+    const datesMap = {};
+    (meetingsList || []).forEach(meeting => {
+      if (meeting.bookId) {
+        const meetingDate = parseLocalDate(meeting.date);
+        if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
+          datesMap[meeting.bookId] = meeting.date;
+        }
       }
-    };
-
-    loadMeetings();
-  }, [currentClub]);
+    });
+    return datesMap;
+  }, [meetingsList]);
 
   // Load progress for all books when component mounts or books change
   useEffect(() => {
