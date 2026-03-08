@@ -1,6 +1,11 @@
 const db = require("../../../../db/models/index");
 const webpush = require("web-push");
 
+const FEED_NOTIFICATION_ICON =
+  "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
+  ".firebasestorage.app/o/app-icons%2Ffeed-notification-icon.jpg?alt=media" +
+  "&token=72c28a9a-88c5-485b-a9c9-74f349fc0f99";
+
 // Mention regex pattern: @[displayName](userId)
 const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
@@ -34,8 +39,8 @@ const sendPushNotification = async (subscription, title, body, data = {}) => {
     const payload = JSON.stringify({
       title,
       body,
-      icon: "/feed-notification-icon.jpg",
-      badge: "/feed-notification-icon.jpg",
+      icon: FEED_NOTIFICATION_ICON,
+      badge: FEED_NOTIFICATION_ICON,
       data,
     });
 

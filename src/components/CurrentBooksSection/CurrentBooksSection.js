@@ -248,6 +248,11 @@ const CurrentBooksSection = ({ books }) => {
               <Typography variant="caption" display="block">
                 Discussion: {formatDiscussionDate(meetingDates[book.id])}
               </Typography>
+              {meetingDates[book.id] && (
+                <Typography variant="caption" display="block" color="text.secondary">
+                  ({new Date(meetingDates[book.id]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })})
+                </Typography>
+              )}
               <Typography variant="caption" display="block" gutterBottom>
                 Theme: {getDiscussionTheme(book)}
               </Typography>

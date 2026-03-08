@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -27,6 +28,7 @@ import GoalFormModal from 'components/Goals/GoalFormModal';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import PersonalGoalsReport from 'components/PersonalGoalsReport';
+import ClubGoalsReport from 'components/ClubGoalsReport';
 import Layout from 'components/Layout';
 import GoalsTour from 'components/Tours/GoalsTour';
 import { usePullToRefresh } from 'hooks/usePullToRefresh';
@@ -38,8 +40,12 @@ import {
   getProgressBarValue,
 } from 'utils/goalHelpers';
 
+const CLUB_TAB_INDEX = 2;
+
 const Goals = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { goals, loading, error, addGoal, updateGoal, deleteGoal, refreshGoals } = useGoalsContext();
   const scrollRef = useRef(null);
   const pullToRefresh = usePullToRefresh({
@@ -54,6 +60,24 @@ const Goals = () => {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
+
+  const isClubTabFromUrl = location.pathname === '/goals/club';
+  const effectiveTab = isClubTabFromUrl ? CLUB_TAB_INDEX : currentTab;
+
+  useEffect(() => {
+    if (isClubTabFromUrl && currentTab !== CLUB_TAB_INDEX) {
+      setCurrentTab(CLUB_TAB_INDEX);
+    }
+  }, [isClubTabFromUrl, currentTab]);
+
+  const handleTabChange = (e, newValue) => {
+    setCurrentTab(newValue);
+    if (newValue === CLUB_TAB_INDEX) {
+      navigate('/goals/club', { replace: true });
+    } else {
+      navigate('/goals', { replace: true });
+    }
+  };
 
   const handleGoalClick = (goal) => {
     setSelectedGoal(goal);
@@ -171,7 +195,7 @@ const Goals = () => {
         />
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4">Goals</Typography>
-          {currentTab === 0 && (
+          {effectiveTab === 0 && (
             <Button
               variant="contained"
               startIcon={<Add />}
@@ -184,20 +208,25 @@ const Goals = () => {
         </Box>
 
         <Tabs
-          value={currentTab}
-          onChange={(e, newValue) => setCurrentTab(newValue)}
+          value={effectiveTab}
+          onChange={handleTabChange}
           sx={{ mb: 3 }}
           data-tour="goals-tabs"
         >
           <Tab label="Goals" />
           <Tab label="Goals Report" />
+          <Tab label="Club" />
         </Tabs>
 
-        {currentTab === 1 && (
+        {effectiveTab === 1 && (
           <PersonalGoalsReport />
         )}
 
-        {currentTab === 0 && (
+        {effectiveTab === CLUB_TAB_INDEX && (
+          <ClubGoalsReport />
+        )}
+
+        {effectiveTab === 0 && (
           <>
 
         <Box sx={{ mb: 3 }} data-tour="goals-quick">

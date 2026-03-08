@@ -1,11 +1,12 @@
-import React, { useState, useEffect, startTransition } from 'react';
+import React, { useState, useEffect, startTransition, useContext } from 'react';
 import { Home, Message, CheckCircle, MenuBook } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 // UI
-import { BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
+import { BottomNavigation, BottomNavigationAction, Paper, Badge } from '@mui/material';
 // Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
+import FeedContext from 'contexts/Feed/FeedContext';
 // Utils
 import { getClubFeatures } from 'utils/clubFeatures';
 // Components
@@ -16,11 +17,13 @@ const BottomNav = ({ onMenuClick }) => {
   const location = useLocation();
   const { user } = useAuth();
   const { currentClub } = useClubContext();
+  const feedContext = useContext(FeedContext);
+  const unreadCount = feedContext?.unreadCount ?? 0;
   const features = getClubFeatures(currentClub);
 
   const navItems = [
     { label: 'Home', icon: <Home />, path: '/', dataTour: 'nav-home' },
-    { label: 'Feed', icon: <Message />, path: '/feed', dataTour: 'nav-feed' },
+    { label: 'Feed', icon: <Message />, path: '/feed', dataTour: 'nav-feed', showUnreadBadge: true },
     { label: 'Goals', icon: <CheckCircle />, path: '/goals', feature: 'goals', dataTour: 'nav-goals' },
     { label: 'Books', icon: <MenuBook />, path: '/books', feature: 'books', dataTour: 'nav-books' },
   ].filter((item) => !item.feature || features[item.feature]);
@@ -83,7 +86,32 @@ const BottomNav = ({ onMenuClick }) => {
           <BottomNavigationAction
             key={item.path}
             label={item.label}
-            icon={item.icon}
+            icon={
+              item.showUnreadBadge && unreadCount > 0 ? (
+                <Badge
+                  badgeContent={unreadCount > 99 ? '99+' : unreadCount}
+                  color="error"
+                  anchorOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      fontSize: '0.65rem',
+                      minWidth: '16px',
+                      height: '16px',
+                      padding: '0 3px',
+                      top: -2,
+                      right: -4,
+                    },
+                  }}
+                >
+                  {item.icon}
+                </Badge>
+              ) : (
+                item.icon
+              )
+            }
             value={item.path}
             data-tour={item.dataTour}
           />

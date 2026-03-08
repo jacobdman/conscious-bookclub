@@ -1,15 +1,15 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotification';
 import ClubProvider from './contexts/Club/ClubProvider';
+import FeedProvider from './contexts/Feed/FeedProvider';
 import { setGlobalErrorHandler } from './services/apiHelpers';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './views/Dashboard';
 import Feed from './views/Feed';
-import ClubView from './views/ClubView';
 import ClubManagement from './views/ClubManagement';
 import Books from './views/Books';
 import Calendar from './views/Calendar';
@@ -94,112 +94,106 @@ function AppContent() {
                 <ClubSetup />
               }
             />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/feed"
-              element={
-                <ProtectedRoute>
-                  <Feed />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/club"
-              element={
-                <ProtectedRoute>
-                  <ClubView />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/club/books"
-              element={
-                <ProtectedRoute>
-                  <FeatureGateRoute featureKey="books">
-                    <ClubView />
-                  </FeatureGateRoute>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/club/goals"
-              element={
-                <ProtectedRoute>
-                  <FeatureGateRoute featureKey="goals">
-                    <ClubView />
-                  </FeatureGateRoute>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/club/manage"
-              element={
-                <ProtectedRoute>
-                  <ClubManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/books"
-              element={
-                <ProtectedRoute>
-                  <FeatureGateRoute featureKey="books">
-                    <Books />
-                  </FeatureGateRoute>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/calendar"
-              element={
-                <ProtectedRoute>
-                  <Calendar />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/goals"
-              element={
-                <ProtectedRoute>
-                  <FeatureGateRoute featureKey="goals">
-                    <Goals />
-                  </FeatureGateRoute>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/meetings"
-              element={
-                <ProtectedRoute>
-                  <Meetings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/quotes"
-              element={
-                <ProtectedRoute>
-                  <FeatureGateRoute featureKey="quotes">
-                    <Quotes />
-                  </FeatureGateRoute>
-                </ProtectedRoute>
-              }
-            />
+            <Route element={<FeedProvider><Outlet /></FeedProvider>}>
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/feed"
+                element={
+                  <ProtectedRoute>
+                    <Feed />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/club/manage"
+                element={
+                  <ProtectedRoute>
+                    <ClubManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/books"
+                element={
+                  <ProtectedRoute>
+                    <FeatureGateRoute featureKey="books">
+                      <Books />
+                    </FeatureGateRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/books/club"
+                element={
+                  <ProtectedRoute>
+                    <FeatureGateRoute featureKey="books">
+                      <Books />
+                    </FeatureGateRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute>
+                    <Calendar />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/goals"
+                element={
+                  <ProtectedRoute>
+                    <FeatureGateRoute featureKey="goals">
+                      <Goals />
+                    </FeatureGateRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/goals/club"
+                element={
+                  <ProtectedRoute>
+                    <FeatureGateRoute featureKey="goals">
+                      <Goals />
+                    </FeatureGateRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/meetings"
+                element={
+                  <ProtectedRoute>
+                    <Meetings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/quotes"
+                element={
+                  <ProtectedRoute>
+                    <FeatureGateRoute featureKey="quotes">
+                      <Quotes />
+                    </FeatureGateRoute>
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (

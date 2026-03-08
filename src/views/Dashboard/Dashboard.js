@@ -4,7 +4,6 @@ import { Box, Typography, Button, Paper } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import GoalsProvider from 'contexts/Goals/GoalsProvider';
-import FeedProvider from 'contexts/Feed/FeedProvider';
 import Layout from 'components/Layout';
 import NextMeetingCard from 'components/NextMeetingCard';
 import CurrentBooksSection from 'components/CurrentBooksSection';
@@ -116,7 +115,6 @@ const Dashboard = () => {
 
   return (
     <GoalsProvider>
-      <FeedProvider>
       <Layout onRefresh={handleRefresh}>
           <DashboardTour />
           <Box 
@@ -181,7 +179,7 @@ const Dashboard = () => {
                           <Button
                             fullWidth
                             endIcon={<ArrowForward />}
-                            onClick={() => navigate('/club/goals')}
+                            onClick={() => navigate('/goals/club')}
                             sx={{ textTransform: 'none', lineHeight: 1.2 }}
                           >
                             View Full Goals Report
@@ -217,7 +215,7 @@ const Dashboard = () => {
                           <Button
                             fullWidth
                             endIcon={<ArrowForward />}
-                            onClick={() => navigate('/club/books')}
+                            onClick={() => navigate('/books/club')}
                             sx={{ textTransform: 'none', lineHeight: 1.2 }}
                           >
                             View Full Book Report
@@ -237,7 +235,6 @@ const Dashboard = () => {
               })}
         </Box>
       </Layout>
-      </FeedProvider>
     </GoalsProvider>
   );
 };

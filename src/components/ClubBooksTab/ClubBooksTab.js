@@ -77,7 +77,7 @@ const ClubBooksTab = () => {
           aria-label="books view tabs"
         >
           <Tab label="Current" {...a11yProps(0)} />
-          <Tab label="Reports" {...a11yProps(1)} />
+          <Tab label="Past books" {...a11yProps(1)} />
         </Tabs>
       </Box>
       

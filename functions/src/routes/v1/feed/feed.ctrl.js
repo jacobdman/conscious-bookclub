@@ -60,6 +60,28 @@ const markAsRead = async (req, res, next) => {
   }
 };
 
+// Browser-like User-Agent so sites (e.g. Amazon) serve full HTML with og/twitter meta
+const LINK_PREVIEW_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// Extract content from meta tag: property="og:title" content="..." or content="..." property="og:title"
+function extractMetaContent(html, property) {
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(
+      "<meta[^>]*(?:property=[\"']" + escaped + "[\"'][^>]*content=[\"']([^\"']*)[\"']|" +
+      "content=[\"']([^\"']*)[\"'][^>]*property=[\"']" + escaped + "[\"'])",
+      "i",
+  );
+  const m = html.match(re);
+  if (m) return (m[1] || m[2] || "").trim();
+  const nameRe = new RegExp(
+      "<meta[^>]*(?:name=[\"']" + escaped + "[\"'][^>]*content=[\"']([^\"']*)[\"']|" +
+      "content=[\"']([^\"']*)[\"'][^>]*name=[\"']" + escaped + "[\"'])",
+      "i",
+  );
+  const m2 = html.match(nameRe);
+  return m2 ? (m2[1] || m2[2] || "").trim() : null;
+}
+
 // GET /v1/feed/link-preview - Fetch og:title and og:image for a URL (for feed link bubbles)
 const getLinkPreview = async (req, res, next) => {
   try {
@@ -77,10 +99,15 @@ const getLinkPreview = async (req, res, next) => {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     const response = await fetch(trimmed, {
       signal: controller.signal,
-      headers: {"User-Agent": "ConsciousBookClub/1.0 (link preview)"},
+      redirect: "follow",
+      headers: {
+        "User-Agent": LINK_PREVIEW_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
     });
     clearTimeout(timeoutId);
 
@@ -89,20 +116,25 @@ const getLinkPreview = async (req, res, next) => {
     }
     const html = await response.text();
 
-    // Extract og:title and og:image (attribute order may vary)
-    const ogTitleRe = /<meta[^>]*(?:property=["']og:title["'][^>]*content=["']([^"']*)["']|content=["']([^"']*)["'][^>]*property=["']og:title["'])/i;
-    const ogImageRe = /<meta[^>]*(?:property=["']og:image["'][^>]*content=["']([^"']*)["']|content=["']([^"']*)["'][^>]*property=["']og:image["'])/i;
-    const titleMatch = html.match(ogTitleRe);
-    const imageMatch = html.match(ogImageRe);
-    const title = titleMatch ? (titleMatch[1] || titleMatch[2] || "").trim() : null;
-    let image = imageMatch ? (imageMatch[1] || imageMatch[2] || "").trim() : null;
+    let title = extractMetaContent(html, "og:title");
+    if (!title) title = extractMetaContent(html, "twitter:title");
+    if (!title) {
+      const titleTag = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+      if (titleTag) title = titleTag[1].trim().replace(/\s+/g, " ");
+    }
+
+    let image = extractMetaContent(html, "og:image");
+    if (!image) image = extractMetaContent(html, "og:image:secure_url");
+    if (!image) image = extractMetaContent(html, "twitter:image");
     if (image && !/^https?:\/\//i.test(image)) {
       try {
-        image = new URL(image, trimmed).href;
+        const baseUrl = response.url || trimmed;
+        image = new URL(image, baseUrl).href;
       } catch {
         image = null;
       }
     }
+
     res.json({title: title || null, image: image || null});
   } catch (e) {
     return res.status(200).json({title: null, image: null});
@@ -128,7 +160,7 @@ const getImageProxy = async (req, res, next) => {
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     const response = await fetch(trimmed, {
       signal: controller.signal,
-      headers: {"User-Agent": "ConsciousBookClub/1.0 (link preview)"},
+      headers: {"User-Agent": LINK_PREVIEW_UA},
     });
     clearTimeout(timeoutId);
     if (!response.ok || !response.headers.get("content-type")?.startsWith("image/")) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -26,7 +27,9 @@ import {
   Collapse,
   IconButton,
   ClickAwayListener,
-  Tooltip
+  Tooltip,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -48,10 +51,15 @@ import AddBookForm from 'components/AddBookForm';
 import MeetingForm from 'components/MeetingForm';
 import BookInfoDialog from 'components/BookInfoDialog';
 import BooksTour from 'components/Tours/BooksTour';
+import ClubBooksTab from 'components/ClubBooksTab';
 import { parseLocalDate } from 'utils/dateHelpers';
+
+const CLUB_TAB_INDEX = 1;
 
 const BookList = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { currentClub } = useClubContext();
   const { 
     books, 
@@ -106,6 +114,25 @@ const BookList = () => {
   const [selectedBookId, setSelectedBookId] = useState(null);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [loadingLikes, setLoadingLikes] = useState({});
+  const [bookListTab, setBookListTab] = useState(0);
+
+  const isClubTabFromUrl = location.pathname === '/books/club';
+  const effectiveTab = isClubTabFromUrl ? CLUB_TAB_INDEX : bookListTab;
+
+  useEffect(() => {
+    if (isClubTabFromUrl && bookListTab !== CLUB_TAB_INDEX) {
+      setBookListTab(CLUB_TAB_INDEX);
+    }
+  }, [isClubTabFromUrl, bookListTab]);
+
+  const handleBookListTabChange = (e, newValue) => {
+    setBookListTab(newValue);
+    if (newValue === CLUB_TAB_INDEX) {
+      navigate('/books/club', { replace: true });
+    } else {
+      navigate('/books', { replace: true });
+    }
+  };
 
   // UI Enhancement States
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -324,31 +351,23 @@ const BookList = () => {
 
   const selectedBook = books.find((book) => book.id === selectedBookId) || null;
 
-  if (contextLoading && books.length === 0) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (contextError) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <Alert severity="error" action={
-          <Button color="inherit" size="small" onClick={refreshBooks}>
-            Retry
-          </Button>
-        }>
-          {contextError}
-        </Alert>
-      </Box>
-    );
-  }
+  const showBookListLoading = contextLoading && books.length === 0;
+  const showBookListError = !!contextError;
+  const showBookListContent = !showBookListLoading && !showBookListError;
 
   return (
     <Layout>
       <BooksTour />
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0, px: 2 }}>
+        <Tabs
+          value={effectiveTab}
+          onChange={handleBookListTabChange}
+          aria-label="books view tabs"
+        >
+          <Tab label="Book List" />
+          <Tab label="Club" />
+        </Tabs>
+      </Box>
       <Box
         ref={scrollRef}
         sx={{
@@ -356,13 +375,34 @@ const BookList = () => {
           height: '100%',
           overflowY: 'auto',
           overflowX: 'hidden',
+          flex: 1,
+          minHeight: 0,
         }}
       >
-        <PullToRefreshIndicator
-          direction="top"
-          pullProgress={pullToRefresh.pullProgress}
-          isRefreshing={pullToRefresh.isRefreshing}
-        />
+        {effectiveTab === CLUB_TAB_INDEX && <ClubBooksTab />}
+        {effectiveTab === 0 && (
+          <>
+            <PullToRefreshIndicator
+              direction="top"
+              pullProgress={pullToRefresh.pullProgress}
+              isRefreshing={pullToRefresh.isRefreshing}
+            />
+            {showBookListLoading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            )}
+            {showBookListError && (
+              <Alert severity="error" action={
+                <Button color="inherit" size="small" onClick={refreshBooks}>
+                  Retry
+                </Button>
+              }>
+                {contextError}
+              </Alert>
+            )}
+            {showBookListContent && (
+              <>
         {/* Header Section */}
         <Box sx={{ 
             display: 'flex', 
@@ -825,6 +865,10 @@ const BookList = () => {
         >
           <AddIcon />
         </Fab>
+              </>
+            )}
+          </>
+        )}
       </Box>
 
       <AddBookForm

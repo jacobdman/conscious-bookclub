@@ -107,9 +107,10 @@ const Layout = ({ children, onRefresh }) => {
     const routeTitles = {
       '/': 'Dashboard',
       '/books': 'Books',
+      '/books/club': 'Books',
       '/goals': 'Goals',
+      '/goals/club': 'Goals',
       '/calendar': 'Calendar',
-      '/club': 'Club',
       '/club/manage': 'Manage Club',
       '/profile': 'Profile',
       '/meetings': 'Meetings',

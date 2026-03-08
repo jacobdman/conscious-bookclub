@@ -11,6 +11,11 @@ if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
 }
 
+const GOALS_NOTIFICATION_ICON =
+  "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
+  ".firebasestorage.app/o/app-icons%2Fgoals-notification-icon.jpg?alt=media" +
+  "&token=278fbb7f-022f-4794-8808-9a46b218fa21";
+
 // Helper function to check if goal needs a reminder
 const goalNeedsReminder = async (userId, goal) => {
   // For daily goals, check if incomplete today
@@ -61,8 +66,8 @@ const sendPushNotification = async (subscription, title, body, data = {}) => {
     const payload = JSON.stringify({
       title,
       body,
-      icon: "/goals-notification-icon.jpg",
-      badge: "/goals-notification-icon.jpg",
+      icon: GOALS_NOTIFICATION_ICON,
+      badge: GOALS_NOTIFICATION_ICON,
       data,
     });
 

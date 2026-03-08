@@ -12,6 +12,15 @@ if (vapidPublicKey && vapidPrivateKey) {
 
 const DEFAULT_APP_ICON = "/android-chrome-192x192.png";
 
+const FEED_NOTIFICATION_ICON =
+  "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
+  ".firebasestorage.app/o/app-icons%2Ffeed-notification-icon.jpg?alt=media" +
+  "&token=72c28a9a-88c5-485b-a9c9-74f349fc0f99";
+const GOALS_NOTIFICATION_ICON =
+  "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
+  ".firebasestorage.app/o/app-icons%2Fgoals-notification-icon.jpg?alt=media" +
+  "&token=278fbb7f-022f-4794-8808-9a46b218fa21";
+
 // Helper function to send push notification
 const sendPushNotification = async (subscription, title, body, data = {}, options = {}) => {
   try {
@@ -162,19 +171,19 @@ const getSubscription = async (req, res, next) => {
   }
 };
 
-// Presets for test notifications by type (feed/goal use custom icons; meeting and default use app icon)
+// Test notification presets: feed/goal use custom icons; meeting and default use app icon
 const TEST_PRESETS = {
   feed: {
     title: "Feed · New post",
     body: "Someone posted in your book club.",
     data: {route: "/feed", type: "feed"},
-    icon: "/feed-notification-icon.jpg",
+    icon: FEED_NOTIFICATION_ICON,
   },
   goal: {
     title: "Goals · Daily reminder",
     body: "Don't forget to update your goals today!",
     data: {route: "/goals", type: "goal"},
-    icon: "/goals-notification-icon.jpg",
+    icon: GOALS_NOTIFICATION_ICON,
   },
   meeting: {
     title: "Meetings · Reminder",

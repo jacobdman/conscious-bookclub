@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 /* Service Worker file - uses service worker globals (self, caches, clients, location) */
-const CACHE_NAME = 'cbc-app-v0.7.3';
+const CACHE_NAME = 'cbc-app-v0.7.5';
 const VERSION_URL = '/version.json';
 
 // Install event - cache static assets
@@ -210,10 +210,19 @@ self.addEventListener('push', (event) => {
     notifType === 'meeting' ? 'cbc-meeting' : 'cbc-notification';
   const vibrate = notifType === 'goal' ? [300, 100, 300] : [200, 100, 200];
 
+  // Use absolute URLs for icon/badge (required for reliable display on mobile)
+  const base = self.location.origin;
+  const icon = notificationData.icon
+    ? new URL(notificationData.icon, base).href
+    : notificationData.icon;
+  const badge = notificationData.badge
+    ? new URL(notificationData.badge, base).href
+    : notificationData.badge;
+
   const notificationOptions = {
     body: notificationData.body,
-    icon: notificationData.icon,
-    badge: notificationData.badge,
+    icon: icon,
+    badge: badge,
     data: notificationData.data,
     tag: tag,
     requireInteraction: false,

@@ -57,7 +57,6 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
   const mainNavigationItems = [
     { name: 'Dashboard', path: '/' },
     { name: 'Feed', path: '/feed' },
-    { name: 'Club', path: '/club' },
     { name: 'Book List', path: '/books', feature: 'books' },
     { name: 'Calendar', path: '/calendar' },
     { name: 'Goals', path: '/goals', feature: 'goals' },

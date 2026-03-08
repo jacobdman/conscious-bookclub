@@ -188,10 +188,10 @@ const createMeeting = async (req, res, next) => {
       timezone,
     });
 
-    // Update book discussion date if book is selected
+    // Update book discussion date and chosen status if book is selected
     if (meeting.bookId) {
       await db.Book.update(
-          {discussionDate: meeting.date},
+          {discussionDate: meeting.date, chosenForBookclub: true},
           {where: {id: meeting.bookId}},
       );
     }
@@ -291,10 +291,10 @@ const updateMeeting = async (req, res, next) => {
 
     await meeting.save();
 
-    // Update book discussion date if book is selected
+    // Update book discussion date and chosen status if book is selected
     if (meeting.bookId) {
       await db.Book.update(
-          {discussionDate: meeting.date},
+          {discussionDate: meeting.date, chosenForBookclub: true},
           {where: {id: meeting.bookId}},
       );
     }
