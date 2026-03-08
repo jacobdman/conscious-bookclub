@@ -14,6 +14,7 @@ import useFeedContext from 'contexts/Feed';
 import EmojiInput from 'components/EmojiInput';
 import ReplyQuote from 'components/ReplyQuote';
 import { formatMeetingDisplay } from 'utils/meetingTime';
+import { renderMentions } from 'utils/mentionHelpers';
 
 const FeedPreview = () => {
   const navigate = useNavigate();
@@ -321,7 +322,7 @@ const FeedPreview = () => {
                     </Box>
                   ) : (
                     <Typography variant="body2" sx={{ mb: 0.5, wordBreak: 'break-word' }}>
-                      {previewText}
+                      {renderMentions(previewText)}
                     </Typography>
                   )}
 

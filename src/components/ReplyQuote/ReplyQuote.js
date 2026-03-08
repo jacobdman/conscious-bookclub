@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import useFeedContext from 'contexts/Feed';
+import { renderMentions } from 'utils/mentionHelpers';
 
 const ReplyQuote = ({ parentPostText, parentPostId, parentAuthorName, parentIsSpoiler }) => {
   const { scrollToPost } = useFeedContext();
@@ -67,7 +68,7 @@ const ReplyQuote = ({ parentPostText, parentPostId, parentAuthorName, parentIsSp
             WebkitBoxOrient: 'vertical',
           }}
         >
-          {parentPostText}
+          {renderMentions(parentPostText)}
         </Typography>
       )}
     </Box>
