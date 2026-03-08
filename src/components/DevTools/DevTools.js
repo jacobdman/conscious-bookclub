@@ -13,18 +13,24 @@ import {
   useTheme,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+// Context
+import { useAuth } from 'AuthContext';
 // Components
 import THEME_COLORS from 'components/ClubBooksTab/themeColors';
+// Services
+import { sendTestNotification } from 'services/notifications/notifications.service';
 // Utils
 import triggerHaptic, { getHapticsSupport } from 'utils/haptics';
 
 const DevTools = () => {
+  const { user } = useAuth();
   const [toastState, setToastState] = useState({
     open: false,
     message: '',
     severity: 'info',
   });
   const [hapticsResult, setHapticsResult] = useState(null);
+  const [testNotificationSending, setTestNotificationSending] = useState(false);
 
   const navigate = useNavigate();
   const muiTheme = useTheme();
@@ -87,30 +93,38 @@ const DevTools = () => {
 
   const handleTestNotification = () => {
     // eslint-disable-next-line no-console
-    console.log('[dev] notifications: send test');
+    console.log('[dev] notifications: send test (local)');
     if (!('Notification' in window)) {
-      // eslint-disable-next-line no-console
-      console.log('[dev] notifications: unsupported');
       openToast('warning', 'Notifications are not supported in this browser.');
       return;
     }
-
     if (Notification.permission !== 'granted') {
-      // eslint-disable-next-line no-console
-      console.log('[dev] notifications: permission not granted');
       openToast('info', 'Grant permission before sending a test notification.');
       return;
     }
-
     try {
       new Notification('CBC Test Notification', {
         body: 'This is a test notification from /dev.',
       });
       openToast('success', 'Notification sent (check your system).');
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log('[dev] notifications: error', error);
       openToast('warning', 'Failed to send test notification.');
+    }
+  };
+
+  const handleTestPushNotification = async (type) => {
+    if (!user?.uid) {
+      openToast('warning', 'You must be signed in to send a test push.');
+      return;
+    }
+    setTestNotificationSending(true);
+    try {
+      await sendTestNotification(user.uid, undefined, undefined, type);
+      openToast('success', `Test ${type || 'default'} push notification sent.`);
+    } catch (err) {
+      openToast('error', err.message || 'Failed to send test push notification.');
+    } finally {
+      setTestNotificationSending(false);
     }
   };
 
@@ -238,12 +252,33 @@ const DevTools = () => {
           <Typography variant="h6" sx={{ mb: 2 }}>
             Notifications
           </Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} flexWrap="wrap">
             <Button variant="contained" onClick={handleRequestNotificationPermission}>
               Request Permission
             </Button>
             <Button variant="outlined" onClick={handleTestNotification}>
-              Send Test Notification
+              Test (local)
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => handleTestPushNotification('feed')}
+              disabled={testNotificationSending}
+            >
+              Test feed
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => handleTestPushNotification('goal')}
+              disabled={testNotificationSending}
+            >
+              Test goal
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => handleTestPushNotification('meeting')}
+              disabled={testNotificationSending}
+            >
+              Test meeting
             </Button>
           </Stack>
         </Paper>

@@ -204,14 +204,20 @@ self.addEventListener('push', (event) => {
     console.warn('Service Worker: Push event has no data');
   }
 
+  const notifType = (notificationData.data && notificationData.data.type) || '';
+  const tag = notifType === 'feed' ? 'cbc-feed' :
+    notifType === 'goal' ? 'cbc-goal' :
+    notifType === 'meeting' ? 'cbc-meeting' : 'cbc-notification';
+  const vibrate = notifType === 'goal' ? [300, 100, 300] : [200, 100, 200];
+
   const notificationOptions = {
     body: notificationData.body,
     icon: notificationData.icon,
     badge: notificationData.badge,
     data: notificationData.data,
-    tag: 'cbc-notification',
+    tag: tag,
     requireInteraction: false,
-    vibrate: [200, 100, 200],
+    vibrate: vibrate,
   };
 
   console.log('Service Worker: Showing notification:', notificationData.title, notificationOptions);

@@ -51,7 +51,7 @@ const goalNeedsReminder = async (userId, goal) => {
 };
 
 // Helper function to send push notification
-const sendPushNotification = async (subscription, title, body) => {
+const sendPushNotification = async (subscription, title, body, data = {}) => {
   try {
     // Ensure subscription is an object (not a string)
     const subscriptionObj = typeof subscription === "string" ?
@@ -61,8 +61,9 @@ const sendPushNotification = async (subscription, title, body) => {
     const payload = JSON.stringify({
       title,
       body,
-      icon: "/android-chrome-192x192.png",
-      badge: "/android-chrome-192x192.png",
+      icon: "/goals-notification-icon.jpg",
+      badge: "/goals-notification-icon.jpg",
+      data,
     });
 
     console.log("Sending push notification to subscription:", {
@@ -280,7 +281,7 @@ exports.dailyGoalReminder = onSchedule(
           );
 
           // Send notification to all subscriptions
-          const title = "Daily Goals Reminder";
+          const title = "Goals · Daily reminder";
           const goalText = goalsNeedingReminder.length > 1 ? "s" : "";
           const body =
             `Don't forget to update your ${goalsNeedingReminder.length} goal${goalText} today!`;
@@ -291,6 +292,7 @@ exports.dailyGoalReminder = onSchedule(
                 subscription.subscriptionJson,
                 title,
                 body,
+                {route: "/goals", type: "goal"},
             );
             if (result && result.success) {
               userNotificationsSent++;

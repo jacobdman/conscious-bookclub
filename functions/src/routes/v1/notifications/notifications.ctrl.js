@@ -10,19 +10,25 @@ if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
 }
 
+const DEFAULT_APP_ICON = "/android-chrome-192x192.png";
+
 // Helper function to send push notification
-const sendPushNotification = async (subscription, title, body) => {
+const sendPushNotification = async (subscription, title, body, data = {}, options = {}) => {
   try {
     // Ensure subscription is an object (not a string)
     const subscriptionObj = typeof subscription === "string" ?
       JSON.parse(subscription) :
       subscription;
 
+    const icon = options.icon != null ? options.icon : DEFAULT_APP_ICON;
+    const badge = options.badge != null ? options.badge : DEFAULT_APP_ICON;
+
     const payload = JSON.stringify({
       title,
       body,
-      icon: "/android-chrome-192x192.png",
-      badge: "/android-chrome-192x192.png",
+      icon,
+      badge,
+      data: data || {},
     });
 
     console.log("Sending push notification to subscription:", {
@@ -156,11 +162,33 @@ const getSubscription = async (req, res, next) => {
   }
 };
 
+// Presets for test notifications by type (feed/goal use custom icons; meeting and default use app icon)
+const TEST_PRESETS = {
+  feed: {
+    title: "Feed · New post",
+    body: "Someone posted in your book club.",
+    data: {route: "/feed", type: "feed"},
+    icon: "/feed-notification-icon.jpg",
+  },
+  goal: {
+    title: "Goals · Daily reminder",
+    body: "Don't forget to update your goals today!",
+    data: {route: "/goals", type: "goal"},
+    icon: "/goals-notification-icon.jpg",
+  },
+  meeting: {
+    title: "Meetings · Reminder",
+    body: "Your book club meeting is coming up.",
+    data: {route: "/meetings", type: "meeting"},
+    icon: DEFAULT_APP_ICON,
+  },
+};
+
 // POST /v1/notifications/test - Send a test push notification to user
 const sendTestNotification = async (req, res, next) => {
   try {
     const {userId} = req.query;
-    const {title, body} = req.body;
+    const {title, body, type} = req.body;
 
     if (!userId) {
       const error = new Error("userId is required");
@@ -186,9 +214,21 @@ const sendTestNotification = async (req, res, next) => {
       });
     }
 
-    // Send notification to all subscriptions
-    const notificationTitle = title || "Test Notification";
-    const notificationBody = body || "This is a test push notification from Conscious Book Club";
+    let notificationTitle;
+    let notificationBody;
+    let notificationData = {};
+    let icon = DEFAULT_APP_ICON;
+
+    const preset = type && TEST_PRESETS[type];
+    if (preset) {
+      notificationTitle = title != null ? title : preset.title;
+      notificationBody = body != null ? body : preset.body;
+      notificationData = preset.data || {};
+      icon = preset.icon;
+    } else {
+      notificationTitle = title || "Test Notification";
+      notificationBody = body || "This is a test push notification from Conscious Book Club";
+    }
 
     const results = [];
     for (const subscription of subscriptions) {
@@ -196,6 +236,8 @@ const sendTestNotification = async (req, res, next) => {
           subscription.subscriptionJson,
           notificationTitle,
           notificationBody,
+          notificationData,
+          {icon, badge: icon},
       );
       results.push({
         subscriptionId: subscription.id,

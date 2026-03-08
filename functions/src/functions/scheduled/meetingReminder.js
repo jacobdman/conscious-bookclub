@@ -12,7 +12,7 @@ if (vapidPublicKey && vapidPrivateKey) {
 }
 
 // Helper function to send push notification
-const sendPushNotification = async (subscription, title, body) => {
+const sendPushNotification = async (subscription, title, body, data = {}) => {
   try {
     // Ensure subscription is an object (not a string)
     const subscriptionObj = typeof subscription === "string" ?
@@ -24,6 +24,7 @@ const sendPushNotification = async (subscription, title, body) => {
       body,
       icon: "/android-chrome-192x192.png",
       badge: "/android-chrome-192x192.png",
+      data,
     });
 
     console.log("Sending push notification to subscription:", {
@@ -293,7 +294,7 @@ exports.meetingReminder = onSchedule(
                 `Your book club meeting for "${bookTitle}" is in ${daysText} ` +
                 `on ${meetingDateFormatted}`;
             const notification = {
-              title: "Meeting Reminder",
+              title: "Meetings · Reminder",
               body: notificationBody,
             };
 
@@ -302,6 +303,7 @@ exports.meetingReminder = onSchedule(
                   subscription.subscriptionJson,
                   notification.title,
                   notification.body,
+                  {route: "/meetings", type: "meeting"},
               );
               if (result && result.success) {
                 meetingNotificationsSent++;

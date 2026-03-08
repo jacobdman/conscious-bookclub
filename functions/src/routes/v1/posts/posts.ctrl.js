@@ -34,8 +34,8 @@ const sendPushNotification = async (subscription, title, body, data = {}) => {
     const payload = JSON.stringify({
       title,
       body,
-      icon: "/android-chrome-192x192.png",
-      badge: "/android-chrome-192x192.png",
+      icon: "/feed-notification-icon.jpg",
+      badge: "/feed-notification-icon.jpg",
       data,
     });
 
@@ -348,7 +348,7 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
       }
 
       let shouldNotify = false;
-      let notificationTitle = "New Post";
+      let notificationTitle = "Feed · New post";
       let notificationBody = "";
 
       if (mentionNotifications.has(user.uid)) {
@@ -357,15 +357,15 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
         const displayText = (postData.text || "").replace(regex, "@$1");
         const truncatedText =
           displayText.length > 60 ? displayText.substring(0, 60) + "..." : displayText;
-        notificationTitle = "Mentioned in Post";
+        notificationTitle = "Feed · Mentioned in Post";
         notificationBody = `${authorName} has tagged you in a message: "${truncatedText}"`;
       } else if (isActivityCompletion) {
         shouldNotify = true;
         if (text.includes(BOOK_COMPLETION_TOKEN)) {
-          notificationTitle = "Book completed";
+          notificationTitle = "Feed · Book completed";
           notificationBody = `${authorName} completed a book`;
         } else {
-          notificationTitle = "Goal completed";
+          notificationTitle = "Feed · Goal completed";
           notificationBody = `${authorName} completed a goal`;
         }
       } else if (feedSettings.mode === "all") {
@@ -376,7 +376,7 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
 
       if (shouldNotify && !mentionNotifications.has(user.uid) && !isActivityCompletion) {
         if (isReply) {
-          notificationTitle = "New Reply";
+          notificationTitle = "Feed · New reply";
           notificationBody = `${authorName} replied to your post`;
         } else {
           const regex = new RegExp(MENTION_REGEX);

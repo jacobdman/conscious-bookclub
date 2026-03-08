@@ -26,12 +26,16 @@ export const getSubscriptionStatus = async (userId) => {
   return subscriptions;
 };
 
-// Send a test push notification
-export const sendTestNotification = async (userId, title, body) => {
+// Send a test push notification (optional type: 'feed' | 'goal' | 'meeting' for preset payload)
+export const sendTestNotification = async (userId, title, body, type) => {
   const params = new URLSearchParams({ userId });
+  const bodyPayload = {};
+  if (type != null) bodyPayload.type = type;
+  if (title != null) bodyPayload.title = title;
+  if (body != null) bodyPayload.body = body;
   const result = await apiCall(`/v1/notifications/test?${params}`, {
     method: 'POST',
-    body: JSON.stringify({ title, body }),
+    body: JSON.stringify(bodyPayload),
   });
   return result;
 };
