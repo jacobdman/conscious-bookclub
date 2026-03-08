@@ -23,3 +23,9 @@ export const markAsRead = async (clubId, userId, lastReadAt = null) => {
   return result;
 };
 
+export const getLinkPreview = async (url) => {
+  const params = new URLSearchParams({ url });
+  const result = await apiCall(`/v1/feed/link-preview?${params}`);
+  return result;
+};
+

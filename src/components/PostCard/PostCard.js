@@ -16,6 +16,8 @@ import {
   Button,
   Stack,
   Grid,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   Reply as ReplyIcon,
@@ -23,6 +25,8 @@ import {
   MoreHoriz,
   EditOutlined,
   DeleteOutline,
+  ContentCopy,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import ProfileAvatar from 'components/ProfileAvatar';
@@ -34,7 +38,7 @@ import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
 import { formatSemanticDateTime } from 'utils/dateHelpers';
 import { formatMeetingDisplay } from 'utils/meetingTime';
-import { renderMentions, encodeMentions, MENTION_REGEX } from 'utils/mentionHelpers';
+import { renderMentions, encodeMentions, MENTION_REGEX, parseMentions, extractFirstLink } from 'utils/mentionHelpers';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
   const { user } = useAuth();
@@ -57,6 +61,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const [editMentions, setEditMentions] = useState([]); // Track mentions in edit
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState(null);
+  const [copySnackbar, setCopySnackbar] = useState({ open: false, message: '' });
   const postRef = useRef(null);
   const replyInputRef = useRef(null);
   const editInputRef = useRef(null);
@@ -178,6 +183,35 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     setFullPickerOpen(false);
     setActionsOpen(false);
   };
+
+  const handleCopyText = async () => {
+    const text = post?.text;
+    if (!text) return;
+    const { displayText } = parseMentions(text);
+    try {
+      await navigator.clipboard.writeText(displayText);
+      triggerHaptic('light');
+      setCopySnackbar({ open: true, message: 'Copied to clipboard' });
+      closeActions();
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const link = extractFirstLink(post?.text);
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      triggerHaptic('light');
+      setCopySnackbar({ open: true, message: 'Link copied' });
+      closeActions();
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
+  const firstLink = extractFirstLink(post?.text);
 
   const cancelLongPress = () => {
     if (longPressTimerRef.current) {
@@ -1094,6 +1128,26 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           >
             Reply to {authorName}
           </Button>
+          {post?.text?.trim() && (
+            <Button
+              fullWidth
+              startIcon={<ContentCopy />}
+              onClick={handleCopyText}
+              sx={{ textTransform: 'none' }}
+            >
+              Copy post text
+            </Button>
+          )}
+          {firstLink && (
+            <Button
+              fullWidth
+              startIcon={<LinkIcon />}
+              onClick={handleCopyLink}
+              sx={{ textTransform: 'none' }}
+            >
+              Copy link
+            </Button>
+          )}
           {isAuthor && (
             <>
               <Divider sx={{ my: 1 }} />
@@ -1186,6 +1240,16 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
           </Box>
         )}
       </Dialog>
+      <Snackbar
+        open={copySnackbar.open}
+        autoHideDuration={2500}
+        onClose={() => setCopySnackbar({ open: false, message: '' })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setCopySnackbar({ open: false, message: '' })} severity="success">
+          {copySnackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

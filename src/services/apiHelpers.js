@@ -1,6 +1,6 @@
 // Shared API helper functions
 // Determine API base URL based on environment
-const getApiBase = () => {
+export const getApiBase = () => {
   // Check if we're in development
   const isDevelopment = process.env.NODE_ENV === 'development';
   
