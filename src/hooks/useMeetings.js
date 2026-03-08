@@ -9,7 +9,5 @@ export const useMeetings = (clubId, userId, options = {}) => {
     queryKey: ['meetings', clubId, userId, startDate, limit],
     queryFn: () => getMeetings(clubId, userId, startDate, null, limit),
     enabled: !!clubId && !!userId,
-    staleTime: 1000 * 60 * 5,
-    refetchOnMount: false,
   });
 };

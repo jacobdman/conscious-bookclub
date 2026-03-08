@@ -138,7 +138,6 @@ export const useBooks = (clubId, userId, options = {}) => {
     queryKey: ['books', clubId, userId, options],
     queryFn: () => fetchBooks(clubId, userId, options),
     enabled: !!clubId,
-    staleTime: 1000 * 60 * 5,
   });
 };
 

@@ -84,7 +84,7 @@ const FeedProvider = ({ children }) => {
   });
 
   const fetchPosts = useCallback(() => {
-    refetchFeed();
+    return refetchFeed();
   }, [refetchFeed]);
 
   // Sync query data to state so rest of provider (load more, mutations, socket) works

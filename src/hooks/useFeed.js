@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { getPosts } from 'services/posts/posts.service';
 import { getReadStatus } from 'services/feed/feed.service';
 
-const STALE_TIME_MS = 1000 * 60 * 5; // 5 min - avoid refetch when navigating back to dashboard
-
 const fetchFeedInitial = async (clubId, userId, options = {}) => {
   const { limit = 25, includeActivity = true } = options;
   const [postsResponse, readStatusData] = await Promise.all([
@@ -27,7 +25,5 @@ export const useFeedInitial = (clubId, userId, options = {}) => {
     queryKey: ['feed', clubId, userId, options?.includeActivity ?? true],
     queryFn: () => fetchFeedInitial(clubId, userId, options),
     enabled: !!clubId && !!userId,
-    staleTime: STALE_TIME_MS,
-    refetchOnMount: false,
   });
 };

@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Box, Typography, Button, Paper } from '@mui/material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -21,9 +22,17 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowForward } from '@mui/icons-material';
 
 const Dashboard = () => {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { currentClub } = useClubContext();
+  const { currentClub, refreshClubMembers } = useClubContext();
   const navigate = useNavigate();
+
+  const handleRefresh = useCallback(async () => {
+    await queryClient.refetchQueries({ type: 'active' });
+    if (currentClub?.id) {
+      await refreshClubMembers(currentClub.id, true);
+    }
+  }, [queryClient, currentClub?.id, refreshClubMembers]);
   const dashboardConfig = useMemo(
       () => sanitizeDashboardConfig(currentClub?.dashboardConfig),
       [currentClub],
@@ -108,7 +117,7 @@ const Dashboard = () => {
   return (
     <GoalsProvider>
       <FeedProvider>
-      <Layout>
+      <Layout onRefresh={handleRefresh}>
           <DashboardTour />
           <Box 
             sx={{ 

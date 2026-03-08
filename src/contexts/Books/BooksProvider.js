@@ -229,7 +229,7 @@ const BooksProvider = ({ children }) => {
 
   // ******************LOAD FUNCTIONS**********************
   const refreshBooks = useCallback(() => {
-    refetch();
+    return refetch();
   }, [refetch]);
 
   // ******************ACTIONS**********************

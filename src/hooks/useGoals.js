@@ -68,7 +68,6 @@ export const useGoals = (userId, clubId, options = {}) => {
     queryKey: ['goals', userId, clubId, options],
     queryFn: () => fetchGoals(userId, clubId, options),
     enabled: !!userId && !!clubId,
-    staleTime: 1000 * 60 * 5,
   });
 };
 
@@ -79,6 +78,7 @@ export const useCreateGoal = (userId, clubId) => {
     mutationFn: (goalData) => addGoal(userId, clubId, goalData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals', userId, clubId] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
     },
   });
 };
@@ -90,6 +90,7 @@ export const useUpdateGoal = (userId, clubId) => {
     mutationFn: ({ goalId, updates }) => updateGoal(userId, clubId, goalId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals', userId, clubId] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
     },
   });
 };
@@ -101,6 +102,7 @@ export const useDeleteGoal = (userId, clubId) => {
     mutationFn: (goalId) => deleteGoal(userId, clubId, goalId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals', userId, clubId] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
     },
   });
 };

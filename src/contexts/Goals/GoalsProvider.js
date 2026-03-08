@@ -99,7 +99,7 @@ let _goalsRestoreCache = null;
 // ******************STATE VALUES**********************
 const GoalsProvider = ({ children }) => {
   const { user } = useAuth();
-  const { currentClub } = useClubContext();
+  const { currentClub, refreshClubMembers } = useClubContext();
   const [goals, setGoals] = useState(() => {
     if (!_goalsRestoreCache) _goalsRestoreCache = getStoredGoalsList();
     return _goalsRestoreCache?.goals ?? [];
@@ -453,12 +453,13 @@ const GoalsProvider = ({ children }) => {
       });
 
       clearGoalEntriesCache(goalId);
+      refreshClubMembers(currentClub.id, true);
       return { entry: normalizedEntry, goal: updatedGoal };
     } catch (err) {
       console.error('Error creating entry:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, refreshClubMembers]);
 
   // Update an existing entry
   const handleUpdateEntry = useCallback(async (goalId, entryId, updates) => {

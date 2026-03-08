@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from 'AuthContext';
 // UI
 import { Box, CssBaseline, Drawer, ThemeProvider, useMediaQuery } from '@mui/material';
+import PullToRefreshIndicator from 'UI/PullToRefreshIndicator';
 // Context
 import useClubContext from 'contexts/Club';
 import ClubReportingProvider from 'contexts/ClubReporting/ClubReportingProvider';
@@ -10,11 +11,13 @@ import ClubReportingProvider from 'contexts/ClubReporting/ClubReportingProvider'
 import BottomNav from 'components/BottomNav';
 import Header from 'components/Header';
 import NavigationContent from 'components/NavigationContent';
+// Hooks
+import { usePullToRefresh } from 'hooks/usePullToRefresh';
 // Utils
 import { buildTheme } from 'theme';
 import { resolveThemeOverrides } from 'utils/themeResolver';
 
-const Layout = ({ children }) => {
+const Layout = ({ children, onRefresh }) => {
   const { user, userProfile, logout } = useAuth();
   const { currentClub } = useClubContext();
   const location = useLocation();
@@ -37,7 +40,16 @@ const Layout = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const headerRef = useRef(null);
+  const mainRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(56); // Default to 56px (MUI Toolbar default)
+
+  const handleRefresh = useCallback(() => (onRefresh ? onRefresh() : Promise.resolve()), [onRefresh]);
+  const pullToRefresh = usePullToRefresh({
+    ref: mainRef,
+    onRefresh: handleRefresh,
+    direction: 'top',
+    disabled: !onRefresh,
+  });
 
   // Measure header height for proper spacing (only relevant on desktop now)
   useEffect(() => {
@@ -175,7 +187,8 @@ const Layout = ({ children }) => {
           {/* Spacer for fixed header (Desktop only) */}
           <Box sx={{ height: `${headerHeight}px`, flexShrink: 0, display: { xs: 'none', md: 'block' } }} />
 
-          <Box 
+          <Box
+            ref={mainRef}
             component="main"
             sx={{
               display: 'flex',
@@ -187,6 +200,13 @@ const Layout = ({ children }) => {
               pb: { xs: 7, md: 0 } // Add padding bottom on mobile for BottomNav
             }}
           >
+            {onRefresh && (
+              <PullToRefreshIndicator
+                direction="top"
+                pullProgress={pullToRefresh.pullProgress}
+                isRefreshing={pullToRefresh.isRefreshing}
+              />
+            )}
             {children}
           </Box>
 

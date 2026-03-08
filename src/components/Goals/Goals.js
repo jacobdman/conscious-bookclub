@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Button,
@@ -29,6 +29,8 @@ import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import PersonalGoalsReport from 'components/PersonalGoalsReport';
 import Layout from 'components/Layout';
 import GoalsTour from 'components/Tours/GoalsTour';
+import { usePullToRefresh } from 'hooks/usePullToRefresh';
+import PullToRefreshIndicator from 'UI/PullToRefreshIndicator';
 import { 
   getGoalTypeLabel,
   getGoalTypeColor,
@@ -38,7 +40,13 @@ import {
 
 const Goals = () => {
   const { user } = useAuth();
-  const { goals, loading, error, addGoal, updateGoal, deleteGoal } = useGoalsContext();
+  const { goals, loading, error, addGoal, updateGoal, deleteGoal, refreshGoals } = useGoalsContext();
+  const scrollRef = useRef(null);
+  const pullToRefresh = usePullToRefresh({
+    ref: scrollRef,
+    onRefresh: refreshGoals,
+    direction: 'top',
+  });
   const [localError, setLocalError] = useState(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -147,12 +155,20 @@ const Goals = () => {
   return (
     <Layout>
       <GoalsTour />
-      <Box sx={{ 
-        p: 3, 
-        height: '100%', 
-        overflowY: 'auto', 
-        overflowX: 'hidden' 
-      }}>
+      <Box
+        ref={scrollRef}
+        sx={{
+          p: 3,
+          height: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
+        <PullToRefreshIndicator
+          direction="top"
+          pullProgress={pullToRefresh.pullProgress}
+          isRefreshing={pullToRefresh.isRefreshing}
+        />
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4">Goals</Typography>
           {currentTab === 0 && (

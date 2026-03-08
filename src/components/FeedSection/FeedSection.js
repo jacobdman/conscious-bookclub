@@ -17,6 +17,8 @@ import { Send, KeyboardArrowDown, Image as ImageIcon, Close, AlternateEmail, Set
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useFeedContext from 'contexts/Feed';
+import { usePullToRefresh } from 'hooks/usePullToRefresh';
+import PullToRefreshIndicator from 'UI/PullToRefreshIndicator';
 import PostCard from 'components/PostCard';
 import MentionInput from 'components/MentionInput';
 import { uploadPostImages } from 'services/storage';
@@ -31,6 +33,7 @@ const FeedSection = () => {
     loadingMore,
     error,
     createPost,
+    fetchPosts,
     hasMore,
     loadMorePosts,
     showActivity,
@@ -52,6 +55,12 @@ const FeedSection = () => {
   const justLoadedMoreRef = useRef(false); // Track if we just loaded older posts
   const previousFirstPostIdRef = useRef(null); // Track first post ID to detect new posts
   const MAX_IMAGES = 5;
+
+  const pullToRefresh = usePullToRefresh({
+    ref: scrollContainerRef,
+    onRefresh: fetchPosts,
+    direction: 'bottom',
+  });
   const MAX_IMAGE_SIZE_MB = 5;
   const hasContent = newPostText.trim().length > 0 || selectedFiles.length > 0;
 
@@ -413,6 +422,11 @@ const FeedSection = () => {
           }}
         >
           {postsContent}
+          <PullToRefreshIndicator
+            direction="bottom"
+            pullProgress={pullToRefresh.pullProgress}
+            isRefreshing={pullToRefresh.isRefreshing}
+          />
         </Box>
 
         {/* Scroll-to-bottom FAB */}

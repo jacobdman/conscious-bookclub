@@ -42,6 +42,8 @@ import { useMeetings } from 'hooks/useMeetings';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
 import Layout from 'components/Layout';
+import { usePullToRefresh } from 'hooks/usePullToRefresh';
+import PullToRefreshIndicator from 'UI/PullToRefreshIndicator';
 import AddBookForm from 'components/AddBookForm';
 import MeetingForm from 'components/MeetingForm';
 import BookInfoDialog from 'components/BookInfoDialog';
@@ -71,6 +73,13 @@ const BookList = () => {
     toggleBookLike,
     refreshBooks
   } = useBooksContext();
+
+  const scrollRef = useRef(null);
+  const pullToRefresh = usePullToRefresh({
+    ref: scrollRef,
+    onRefresh: refreshBooks,
+    direction: 'top',
+  });
 
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
@@ -340,13 +349,20 @@ const BookList = () => {
   return (
     <Layout>
       <BooksTour />
-      <Box sx={{ 
-        p: 2, 
-        height: '100%', 
-        overflowY: 'auto', 
-        overflowX: 'hidden' 
-      }}>
-        
+      <Box
+        ref={scrollRef}
+        sx={{
+          p: 2,
+          height: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
+        <PullToRefreshIndicator
+          direction="top"
+          pullProgress={pullToRefresh.pullProgress}
+          isRefreshing={pullToRefresh.isRefreshing}
+        />
         {/* Header Section */}
         <Box sx={{ 
             display: 'flex', 

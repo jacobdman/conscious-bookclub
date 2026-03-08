@@ -141,6 +141,17 @@ const ClubProvider = ({ children }) => {
     }
   }, [currentClub, user, refreshClubMembers]);
 
+  // Refresh club members when app becomes visible (e.g. other users completed goals)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && currentClub && user) {
+        refreshClubMembers(currentClub.id, true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [currentClub, user, refreshClubMembers]);
+
   // ******************SETTERS**********************
   // Set current club
   const setCurrentClub = useCallback(async (clubId) => {
