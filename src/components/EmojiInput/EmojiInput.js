@@ -1,7 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AddReaction, ChevronLeft, ChevronRight } from '@mui/icons-material';
+import { AddReaction } from '@mui/icons-material';
 // UI
-import { Box, Button, Chip, IconButton, MobileStepper, Popover, Stack, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Chip,
+  IconButton,
+  Popover,
+  Stack,
+  SwipeableDrawer,
+  Tab,
+  Tabs,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 // Context
 import { useAuth } from 'AuthContext';
 import useFeedContext from 'contexts/Feed';
@@ -12,107 +24,40 @@ import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
 import { alpha } from '@mui/material/styles';
 
+const LONG_PRESS_MS = 500;
+
 const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
   const { user } = useAuth();
   const { addReaction, removeReaction } = useFeedContext();
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [userListAnchor, setUserListAnchor] = useState(null);
-  const [selectedEmoji, setSelectedEmoji] = useState(null);
-  const [selectedEmojiIndex, setSelectedEmojiIndex] = useState(0);
-  const longPressTimer = useRef(null);
-  const longPressTriggeredRef = useRef(false);
-  const gestureHandledRef = useRef(false); // Single source of truth: pointer path handled this gesture (suppress click)
-  const swipeStartXRef = useRef(null);
-  const LONG_PRESS_MS = 450;
+  const [pickerAnchor, setPickerAnchor] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTabIndex, setDrawerTabIndex] = useState(0);
+  const touchTimerRef = useRef(null);
+  const touchMovedRef = useRef(false);
+  const longPressHandledRef = useRef(false);
+  /** When true, we already handled this gesture in onTouchEnd (short tap); suppress the synthetic click. */
+  const touchTapHandledRef = useRef(false);
 
   // Group reactions by emoji
-  const reactionsByEmoji = reactions.reduce((acc, reaction) => {
-    if (!acc[reaction.emoji]) {
-      acc[reaction.emoji] = [];
-    }
-    acc[reaction.emoji].push(reaction);
-    return acc;
-  }, {});
+  const reactionsByEmoji = useMemo(
+    () =>
+      reactions.reduce((acc, reaction) => {
+        if (!acc[reaction.emoji]) acc[reaction.emoji] = [];
+        acc[reaction.emoji].push(reaction);
+        return acc;
+      }, {}),
+    [reactions]
+  );
 
   const emojiKeys = useMemo(() => Object.keys(reactionsByEmoji), [reactionsByEmoji]);
-
-  // Count user's reactions on this post
-  const userReactionCount = reactions.filter(r => r.userId === user?.uid).length;
+  const userReactionCount = reactions.filter((r) => r.userId === user?.uid).length;
   const maxReactions = 5;
 
-  const openUserList = (emoji, anchor, { withHaptics = true } = {}) => {
-    const index = emojiKeys.indexOf(emoji);
-    setSelectedEmojiIndex(index >= 0 ? index : 0);
-    setSelectedEmoji(emoji);
-    setUserListAnchor(anchor);
-    if (withHaptics) {
-      triggerHaptic('medium');
-    }
-  };
-
-  const closeUserList = () => {
-    setUserListAnchor(null);
-    setSelectedEmoji(null);
-    setSelectedEmojiIndex(0);
-  };
-
-  const goToEmojiIndex = (nextIndex) => {
-    if (emojiKeys.length === 0) return;
-    const normalized = ((nextIndex % emojiKeys.length) + emojiKeys.length) % emojiKeys.length;
-    const nextEmoji = emojiKeys[normalized];
-    setSelectedEmojiIndex(normalized);
-    setSelectedEmoji(nextEmoji);
-  };
-
-  const handleViewerPointerDown = (event) => {
-    if (event.pointerType !== 'touch') return;
-    swipeStartXRef.current = event.clientX;
-  };
-
-  const handleViewerPointerUp = (event) => {
-    if (event.pointerType !== 'touch') return;
-    if (swipeStartXRef.current === null) return;
-    const deltaX = event.clientX - swipeStartXRef.current;
-    swipeStartXRef.current = null;
-    const threshold = 30;
-    if (Math.abs(deltaX) < threshold) return;
-    if (deltaX > 0) {
-      goToEmojiIndex(selectedEmojiIndex - 1);
-    } else {
-      goToEmojiIndex(selectedEmojiIndex + 1);
-    }
-  };
-
-  const handleOpenPicker = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClosePicker = () => {
-    setAnchorEl(null);
-  };
-
-  const handleEmojiSelect = async (emoji) => {
-    // Check if user has reached the limit
-    if (userReactionCount >= maxReactions) {
-      const hasThisEmoji = reactionsByEmoji[emoji]?.some(r => r.userId === user?.uid);
-      if (!hasThisEmoji) {
-        // User is trying to add a new emoji but has reached limit
-        alert(`You can only add ${maxReactions} reactions per post. Remove one to add another.`);
-        handleClosePicker();
-        return;
-      }
-    }
-
-    try {
-      await addReaction(postId, emoji);
-      handleClosePicker();
-    } catch (err) {
-      console.error('Error adding reaction:', err);
-    }
-  };
+  const hasUserReacted = (emoji) =>
+    reactionsByEmoji[emoji]?.some((r) => r.userId === user?.uid);
 
   const toggleReaction = async (emoji, { haptic = true } = {}) => {
-    const userReaction = reactionsByEmoji[emoji]?.find(r => r.userId === user?.uid);
+    const userReaction = reactionsByEmoji[emoji]?.find((r) => r.userId === user?.uid);
     if (userReaction) {
       await removeReaction(postId, emoji);
     } else {
@@ -122,147 +67,159 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
       }
       await addReaction(postId, emoji);
     }
-    if (haptic) {
-      triggerHaptic('light');
+    if (haptic) triggerHaptic('light');
+  };
+
+  const handleOpenPicker = (e) => {
+    e.stopPropagation();
+    setPickerAnchor(e.currentTarget);
+  };
+
+  const handleClosePicker = () => setPickerAnchor(null);
+
+  const handleEmojiSelect = async (emoji) => {
+    if (userReactionCount >= maxReactions) {
+      const hasThisEmoji = reactionsByEmoji[emoji]?.some((r) => r.userId === user?.uid);
+      if (!hasThisEmoji) {
+        alert(`You can only add ${maxReactions} reactions per post. Remove one to add another.`);
+        handleClosePicker();
+        return;
+      }
+    }
+    try {
+      await addReaction(postId, emoji);
+      handleClosePicker();
+    } catch (err) {
+      console.error('Error adding reaction:', err);
     }
   };
 
-  const handleReactionClick = async (emoji, event) => {
-    if (gestureHandledRef.current) {
-      gestureHandledRef.current = false;
-      return;
-    }
-    if (userListOpen) {
-      handleUserListClose();
-    }
-    await toggleReaction(emoji, { haptic: true });
+  const openDrawerForEmoji = (emoji) => {
+    const index = emojiKeys.indexOf(emoji);
+    setDrawerTabIndex(index >= 0 ? index : 0);
+    setDrawerOpen(true);
+    triggerHaptic('medium');
+    longPressHandledRef.current = true;
   };
 
-  const handleReactionMouseEnter = (event, emoji) => {
-    openUserList(emoji, event.currentTarget, { withHaptics: false });
-  };
+  const closeDrawer = () => setDrawerOpen(false);
 
-  const handleReactionMouseLeave = () => {
-    closeUserList();
-  };
-
-  const cancelLongPress = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-
-  const handleReactionPointerDown = (event, emoji) => {
-    if (event.pointerType !== 'touch') return;
-    event.preventDefault();
-    gestureHandledRef.current = false;
-    longPressTriggeredRef.current = false;
-    cancelLongPress();
-    const anchor = event.currentTarget;
-    longPressTimer.current = setTimeout(() => {
-      longPressTimer.current = null;
-      openUserList(emoji, anchor, { withHaptics: true });
-      longPressTriggeredRef.current = true;
-      gestureHandledRef.current = true;
+  // Touch: long-press opens drawer; short tap toggles in onTouchEnd (click suppressed when long-press fired)
+  const handleChipTouchStart = (emoji) => {
+    touchMovedRef.current = false;
+    touchTimerRef.current = setTimeout(() => {
+      touchTimerRef.current = null;
+      openDrawerForEmoji(emoji);
     }, LONG_PRESS_MS);
   };
 
-  const handleReactionPointerUp = (event, emoji) => {
-    if (event.pointerType !== 'touch') return;
-    cancelLongPress();
-    if (longPressTriggeredRef.current) {
-      longPressTriggeredRef.current = false;
+  const handleChipTouchMove = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+    touchMovedRef.current = true;
+  };
+
+  const handleChipTouchEnd = (emoji) => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+      if (!touchMovedRef.current) {
+        touchTapHandledRef.current = true; // suppress synthetic click that will fire after
+        toggleReaction(emoji, { haptic: true });
+      }
+    }
+  };
+
+  const handleChipClick = (emoji, e) => {
+    e.stopPropagation();
+    if (longPressHandledRef.current) {
+      longPressHandledRef.current = false;
       return;
     }
-    gestureHandledRef.current = true;
+    // On touch devices we already handled the tap in onTouchEnd; ignore synthetic click
+    if (touchTapHandledRef.current) {
+      touchTapHandledRef.current = false;
+      return;
+    }
     toggleReaction(emoji, { haptic: true });
   };
 
-  const handleReactionPointerCancel = () => {
-    if (longPressTimer.current) cancelLongPress();
-    longPressTriggeredRef.current = false;
-  };
-
-  const handleUserListClose = () => {
-    closeUserList();
+  const tooltipTitle = (emoji) => {
+    const list = reactionsByEmoji[emoji] || [];
+    const names = list.map(
+      (r) => r.user?.displayName || r.userId || 'Unknown'
+    );
+    return names.length ? names.join(', ') : '';
   };
 
   useEffect(() => {
     return () => {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-      }
+      if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
     };
   }, []);
 
-  const hasUserReacted = (emoji) => {
-    return reactionsByEmoji[emoji]?.some(r => r.userId === user?.uid);
-  };
-
-  const open = Boolean(anchorEl);
-  const userListOpen = Boolean(userListAnchor);
-  const selectedEmojiUsers = selectedEmoji ? reactionsByEmoji[selectedEmoji] || [] : [];
+  const pickerOpen = Boolean(pickerAnchor);
 
   return (
     <Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
-        {Object.keys(reactionsByEmoji).map((emoji) => {
+        {emojiKeys.map((emoji) => {
           const count = reactionsByEmoji[emoji].length;
           const userReacted = hasUserReacted(emoji);
+          const label = count > 1 ? `${emoji} ${count}` : emoji;
           return (
-            <Chip
-              key={emoji}
-              label={`${emoji} ${count > 1 ? count : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReactionClick(emoji, e);
-              }}
-              onMouseEnter={(e) => handleReactionMouseEnter(e, emoji)}
-              onMouseLeave={handleReactionMouseLeave}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                handleReactionPointerDown(e, emoji);
-              }}
-              onPointerUp={(e) => handleReactionPointerUp(e, emoji)}
-              onPointerCancel={handleReactionPointerCancel}
-              onPointerLeave={handleReactionPointerCancel}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              size="small"
-              sx={{
-                cursor: 'pointer',
-                height: 24,
-                fontSize: '0.75rem',
-                backgroundColor: (theme) =>
-                  userReacted
-                    ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.35 : 0.12)
-                    : theme.palette.action.selected,
-                border: '1px solid',
-                borderColor: userReacted ? 'primary.main' : 'transparent',
-                color: 'text.primary',
-                touchAction: 'manipulation',
-                '&:hover': {
+            <Tooltip key={emoji} title={tooltipTitle(emoji)} placement="top">
+              <Chip
+                label={label}
+                onClick={(e) => handleChipClick(emoji, e)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onTouchStart={() => handleChipTouchStart(emoji)}
+                onTouchMove={handleChipTouchMove}
+                onTouchEnd={() => handleChipTouchEnd(emoji)}
+                onTouchCancel={() => {
+                  if (touchTimerRef.current) {
+                    clearTimeout(touchTimerRef.current);
+                    touchTimerRef.current = null;
+                  }
+                }}
+                size="small"
+                sx={{
+                  cursor: 'pointer',
+                  height: 24,
+                  fontSize: '0.75rem',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
                   backgroundColor: (theme) =>
                     userReacted
-                      ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.5 : 0.2)
-                      : theme.palette.action.hover,
-                  color: userReacted ? 'primary.main' : 'text.primary',
-                },
-                transition: 'all 0.2s',
-              }}
-            />
+                      ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.35 : 0.12)
+                      : theme.palette.action.selected,
+                  border: '1px solid',
+                  borderColor: userReacted ? 'primary.main' : 'transparent',
+                  color: 'text.primary',
+                  touchAction: 'manipulation',
+                  '&:hover': {
+                    backgroundColor: (theme) =>
+                      userReacted
+                        ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.5 : 0.2)
+                        : theme.palette.action.hover,
+                    color: userReacted ? 'primary.main' : 'text.primary',
+                  },
+                  transition: 'all 0.2s',
+                }}
+              />
+            </Tooltip>
           );
         })}
         {showAddButton && (
           <IconButton
             size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenPicker(e);
-            }}
+            onClick={handleOpenPicker}
             sx={{
               padding: '2px',
               minHeight: 24,
@@ -281,24 +238,15 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
         )}
       </Box>
 
+      {/* Emoji picker popover */}
       <Popover
-        open={open}
-        anchorEl={anchorEl}
+        open={pickerOpen}
+        anchorEl={pickerAnchor}
         onClose={handleClosePicker}
-        anchorOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         PaperProps={{
-          sx: {
-            maxWidth: 320,
-            maxHeight: 400,
-            p: 1.5,
-          },
+          sx: { maxWidth: 320, maxHeight: 400, p: 1.5 },
         }}
       >
         <Box sx={{ overflowY: 'auto', maxHeight: 350 }}>
@@ -324,10 +272,10 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
                   gap: 0.5,
                 }}
               >
-                {emojis.map((emoji) => (
+                {emojis.map((e) => (
                   <Button
-                    key={emoji}
-                    onClick={() => handleEmojiSelect(emoji)}
+                    key={e}
+                    onClick={() => handleEmojiSelect(e)}
                     sx={{
                       minWidth: 'auto',
                       width: 32,
@@ -341,7 +289,7 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
                       transition: 'all 0.2s',
                     }}
                   >
-                    {emoji}
+                    {e}
                   </Button>
                 ))}
               </Box>
@@ -350,130 +298,114 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
         </Box>
       </Popover>
 
-      {/* User List Popover - Slack style; swipe handlers on content only to avoid backdrop close/reopen loops */}
-      <Popover
-        open={userListOpen}
-        anchorEl={userListAnchor}
-        onClose={handleUserListClose}
-        anchorOrigin={{
-          vertical: 'top',
-          horizontal: 'center',
-        }}
-        transformOrigin={{
-          vertical: 'bottom',
-          horizontal: 'center',
-        }}
-        disableRestoreFocus
+      {/* Bottom drawer: who reacted (Slack-style with tabs) */}
+      <SwipeableDrawer
+        anchor="bottom"
+        open={drawerOpen}
+        onClose={closeDrawer}
+        onOpen={() => {}}
         PaperProps={{
           sx: {
-            p: 1,
-            minWidth: 200,
-            maxWidth: 280,
-            maxHeight: 300,
-            overflow: 'hidden',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            borderTopLeftRadius: 12,
+            borderTopRightRadius: 12,
+            maxHeight: '70vh',
+            pb: 2,
           },
         }}
       >
-        <Box
-          sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}
-          onPointerDown={handleViewerPointerDown}
-          onPointerUp={handleViewerPointerUp}
-          onPointerLeave={() => { swipeStartXRef.current = null; }}
-        >
-          {emojiKeys.length > 1 && (
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1 }}>
-              <IconButton size="small" onClick={() => goToEmojiIndex(selectedEmojiIndex - 1)}>
-                <ChevronLeft fontSize="small" />
-              </IconButton>
-              <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                {selectedEmoji} {selectedEmojiUsers.length} {selectedEmojiUsers.length === 1 ? 'reaction' : 'reactions'}
-              </Typography>
-              <IconButton size="small" onClick={() => goToEmojiIndex(selectedEmojiIndex + 1)}>
-                <ChevronRight fontSize="small" />
-              </IconButton>
-            </Stack>
-          )}
-          {emojiKeys.length <= 1 && (
-            <Typography
-              variant="caption"
+        <Box sx={{ px: 1 }}>
+          <Stack direction="row" justifyContent="center" sx={{ py: 1 }}>
+            <Box
               sx={{
-                display: 'block',
-                px: 1,
-                fontWeight: 600,
-                color: 'text.secondary',
-                fontSize: '0.7rem',
-              }}
-            >
-              {selectedEmoji} {selectedEmojiUsers.length} {selectedEmojiUsers.length === 1 ? 'reaction' : 'reactions'}
-            </Typography>
-          )}
-          {emojiKeys.length > 1 && (
-            <MobileStepper
-              variant="dots"
-              steps={emojiKeys.length}
-              position="static"
-              activeStep={selectedEmojiIndex}
-              nextButton={<Box />}
-              backButton={<Box />}
-              sx={{
-                background: 'transparent',
-                justifyContent: 'center',
-                py: 0,
-                px: 1,
-                '& .MuiMobileStepper-dot': {
-                  width: 7,
-                  height: 7,
-                  mx: 0.25,
-                },
-                '& .MuiMobileStepper-dotActive': {
-                  backgroundColor: 'text.primary',
-                },
+                width: 40,
+                height: 4,
+                backgroundColor: 'divider',
+                borderRadius: 2,
               }}
             />
-          )}
-          <Box sx={{ overflowY: 'auto', maxHeight: 250 }}>
-            {selectedEmojiUsers.map((reaction) => (
-              <Box
-                key={reaction.id || `${reaction.userId}-${reaction.emoji}`}
+          </Stack>
+          {emojiKeys.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+              No reactions yet
+            </Typography>
+          ) : (
+            <>
+              <Tabs
+                value={Math.min(drawerTabIndex, emojiKeys.length - 1)}
+                onChange={(_, v) => setDrawerTabIndex(v)}
+                variant="scrollable"
+                scrollButtons="auto"
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  px: 1,
-                  py: 0.75,
-                  borderRadius: 1,
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                  },
+                  minHeight: 40,
+                  '& .MuiTab-root': { minHeight: 40, py: 0.5 },
                 }}
               >
-                <ProfileAvatar
-                  user={reaction.user}
-                  size={24}
-                  alt={reaction.user?.displayName || 'User'}
-                  showEntryRing={false}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontSize: '0.875rem',
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+                {emojiKeys.map((emoji, idx) => {
+                  const count = reactionsByEmoji[emoji].length;
+                  return (
+                    <Tab
+                      key={emoji}
+                      label={`${emoji} ${count}`}
+                      id={`reaction-tab-${idx}`}
+                      aria-controls={`reaction-tabpanel-${idx}`}
+                    />
+                  );
+                })}
+              </Tabs>
+              {emojiKeys.map((emoji, idx) => (
+                <Box
+                  key={emoji}
+                  role="tabpanel"
+                  hidden={drawerTabIndex !== idx}
+                  id={`reaction-tabpanel-${idx}`}
+                  aria-labelledby={`reaction-tab-${idx}`}
+                  sx={{ pt: 1 }}
                 >
-                  {reaction.user?.displayName || reaction.userId || 'Unknown'}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
+                  {drawerTabIndex === idx && (
+                    <Box sx={{ overflowY: 'auto', maxHeight: 280 }}>
+                      {(reactionsByEmoji[emoji] || []).map((reaction) => (
+                        <Box
+                          key={reaction.id || `${reaction.userId}-${reaction.emoji}`}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            px: 1,
+                            py: 0.75,
+                            borderRadius: 1,
+                            '&:hover': { backgroundColor: 'action.hover' },
+                          }}
+                        >
+                          <ProfileAvatar
+                            user={reaction.user}
+                            size={24}
+                            alt={reaction.user?.displayName || 'User'}
+                            showEntryRing={false}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontSize: '0.875rem',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {reaction.user?.displayName || reaction.userId || 'Unknown'}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              ))}
+            </>
+          )}
         </Box>
-      </Popover>
+      </SwipeableDrawer>
     </Box>
   );
 };
 
 export default EmojiInput;
-

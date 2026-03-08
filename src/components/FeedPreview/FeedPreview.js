@@ -208,6 +208,7 @@ const FeedPreview = () => {
                 }}
                 sx={{
                   display: 'flex',
+                  alignItems: 'flex-start',
                   gap: 1.5,
                   '&:hover': {
                     backgroundColor: 'action.hover',
@@ -220,7 +221,7 @@ const FeedPreview = () => {
                 }}
               >
                 {/* Avatar - only show for first message in group */}
-                <Box sx={{ flexShrink: 0, width: 32, display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ flexShrink: 0, width: 32, display: 'flex', justifyContent: 'center', pt: 0.35 }}>
                   {isFirstInGroup ? (
                     <ProfileAvatar
                       user={post.author}

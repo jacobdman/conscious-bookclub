@@ -593,6 +593,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
       onClick={handlePostClick}
       sx={{
         display: 'flex',
+        alignItems: 'flex-start',
         gap: 1.5,
         px: 2,
         py: 0.75,
@@ -610,8 +611,8 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         touchAction: 'manipulation',
       }}
     >
-      {/* Avatar - only show for first message in group */}
-      <Box sx={{ flexShrink: 0, width: 40, display: 'flex', justifyContent: 'center' }}>
+      {/* Avatar - only show for first message in group; pt aligns top of image with top of name text */}
+      <Box sx={{ flexShrink: 0, width: 40, display: 'flex', justifyContent: 'center', pt: 0.35 }}>
         {showAvatar ? (
           <ProfileAvatar
             user={post.author}
