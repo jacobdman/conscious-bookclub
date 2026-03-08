@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { Home, Message, CheckCircle, MenuBook } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 // UI
@@ -26,13 +26,19 @@ const BottomNav = ({ onMenuClick }) => {
   ].filter((item) => !item.feature || features[item.feature]);
 
   const currentValue = navItems.find((item) => item.path === location.pathname)?.path || false;
+  const [optimisticPath, setOptimisticPath] = useState(null);
+  const value = optimisticPath ?? currentValue;
+
+  useEffect(() => {
+    setOptimisticPath(null);
+  }, [location.pathname]);
 
   const handleChange = (event, newValue) => {
     if (newValue === 'menu') {
-      // Menu/Profile action
       onMenuClick();
     } else {
-      navigate(newValue);
+      setOptimisticPath(newValue);
+      startTransition(() => navigate(newValue));
     }
   };
 
@@ -51,7 +57,7 @@ const BottomNav = ({ onMenuClick }) => {
     >
       <BottomNavigation
         showLabels
-        value={currentValue}
+        value={value}
         onChange={handleChange}
         sx={{
             backgroundColor: (theme) =>

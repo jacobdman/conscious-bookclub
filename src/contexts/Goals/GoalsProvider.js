@@ -65,11 +65,45 @@ const normalizeGoal = (goalData, docId = null, preserveEntries = false) => {
   return normalized;
 };
 
+const GOALS_LIST_STORAGE_KEY = 'goals_list';
+
+const getStoredGoalsList = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(GOALS_LIST_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const goals = Array.isArray(parsed.goals) ? parsed.goals : [];
+    return { clubId: parsed.clubId, userId: parsed.userId, goals };
+  } catch {
+    return null;
+  }
+};
+
+const setStoredGoalsList = (clubId, userId, goals) => {
+  if (typeof window === 'undefined' || !clubId || !userId) return;
+  try {
+    sessionStorage.setItem(GOALS_LIST_STORAGE_KEY, JSON.stringify({
+      clubId,
+      userId,
+      goals: Array.isArray(goals) ? goals : [],
+    }));
+  } catch {
+    // ignore quota or parse errors
+  }
+};
+
+let _goalsRestoreCache = null;
+
 // ******************STATE VALUES**********************
 const GoalsProvider = ({ children }) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
-  const [goals, setGoals] = useState([]);
+  const [goals, setGoals] = useState(() => {
+    if (!_goalsRestoreCache) _goalsRestoreCache = getStoredGoalsList();
+    return _goalsRestoreCache?.goals ?? [];
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const goalEntriesCacheRef = useRef({});
@@ -116,6 +150,23 @@ const GoalsProvider = ({ children }) => {
     }
   }, [queryError]);
 
+  // Clear restored state if stored goals were for a different club/user
+  useEffect(() => {
+    if (!currentClub?.id || !user?.uid) return;
+    const stored = getStoredGoalsList();
+    if (stored && (stored.clubId !== currentClub.id || stored.userId !== user.uid)) {
+      setGoals([]);
+    }
+  }, [currentClub?.id, user?.uid]);
+
+  // Persist goals list so we can restore on remount (avoid empty flash)
+  useEffect(() => {
+    if (!currentClub?.id || !user?.uid) return;
+    setStoredGoalsList(currentClub.id, user.uid, goals);
+  }, [currentClub?.id, user?.uid, goals]);
+
+  useEffect(() => () => { _goalsRestoreCache = null }, []);
+
   // ******************SETTERS**********************
   // Add a new goal (mutations invalidate goals query so cache and remounts stay in sync)
   const handleAddGoal = useCallback(async (goalData) => {
@@ -141,7 +192,24 @@ const GoalsProvider = ({ children }) => {
       setError(null);
       const result = await updateGoalMutation.mutateAsync({ goalId, updates });
       const updatedGoal = normalizeGoal(result, result.id, true);
-      return updatedGoal;
+      // Preserve entries and pagination when updating (they're cached separately)
+      let updatedGoalResult = null;
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          updatedGoalResult = {
+            ...updatedGoal,
+            entries: goal.entries || updatedGoal.entries || [],
+            entriesPagination: goal.entriesPagination || updatedGoal.entriesPagination || {
+              hasMore: true,
+              offset: 0,
+              limit: 10,
+            },
+          };
+          return updatedGoalResult;
+        }
+        return goal;
+      }));
+      return updatedGoalResult || updatedGoal;
     } catch (err) {
       setError('Failed to update goal');
       console.error('Error updating goal:', err);
@@ -153,12 +221,21 @@ const GoalsProvider = ({ children }) => {
   const handleDeleteGoal = useCallback(async (goalId) => {
     if (!user || !currentClub) return;
 
+    let deletedGoal = null;
+    setGoals(prev => {
+      deletedGoal = prev.find(g => g.id === goalId);
+      return prev.filter(goal => goal.id !== goalId);
+    });
+
     try {
       setError(null);
       await deleteGoalMutation.mutateAsync(goalId);
     } catch (err) {
       setError('Failed to delete goal');
       console.error('Error deleting goal:', err);
+      if (deletedGoal) {
+        setGoals(prev => [...prev, deletedGoal]);
+      }
       throw err;
     }
   }, [user, currentClub, deleteGoalMutation]);

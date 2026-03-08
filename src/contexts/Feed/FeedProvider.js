@@ -15,17 +15,59 @@ import { setBadge, clearBadge } from 'services/badge';
 import FeedContext from './FeedContext';
 import { useFeedInitial } from 'hooks/useFeed';
 
+const FEED_POSTS_STORAGE_KEY = 'feed_posts';
+
+const getStoredFeedPosts = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(FEED_POSTS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const posts = Array.isArray(parsed.posts) ? parsed.posts : [];
+    return {
+      clubId: parsed.clubId,
+      userId: parsed.userId,
+      posts,
+      hasMore: Boolean(parsed.hasMore),
+      oldestPostId: parsed.oldestPostId ?? null,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const setStoredFeedPosts = (clubId, userId, payload) => {
+  if (typeof window === 'undefined' || !clubId || !userId || !payload) return;
+  try {
+    sessionStorage.setItem(FEED_POSTS_STORAGE_KEY, JSON.stringify({
+      clubId,
+      userId,
+      posts: Array.isArray(payload.posts) ? payload.posts : [],
+      hasMore: Boolean(payload.hasMore),
+      oldestPostId: payload.oldestPostId ?? null,
+    }));
+  } catch {
+    // ignore quota or parse errors
+  }
+};
+
+let _feedRestoreCache = null;
+
 // ******************STATE VALUES**********************
 const FeedProvider = ({ children }) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts] = useState(() => {
+    if (!_feedRestoreCache) _feedRestoreCache = getStoredFeedPosts();
+    return _feedRestoreCache?.posts ?? [];
+  });
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [lastReadTimestamp, setLastReadTimestamp] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [oldestPostId, setOldestPostId] = useState(null);
+  const [hasMore, setHasMore] = useState(() => _feedRestoreCache?.hasMore ?? false);
+  const [oldestPostId, setOldestPostId] = useState(() => _feedRestoreCache?.oldestPostId ?? null);
   const [showActivity, setShowActivity] = useState(true);
   const postRefs = useRef({});
   const lastReadTimestampRef = useRef(null);
@@ -55,10 +97,13 @@ const FeedProvider = ({ children }) => {
     const lastReadAt = feedData.readStatus?.lastReadAt
       ? new Date(feedData.readStatus.lastReadAt)
       : null;
-    setLastReadTimestamp(lastReadAt);
     const cacheKey = currentClub && user ? `feedLastRead_${currentClub.id}_${user.uid}` : null;
     const cachedTimestamp = cacheKey ? localStorage.getItem(cacheKey) : null;
-    const lastRead = lastReadAt || (cachedTimestamp ? new Date(cachedTimestamp) : null);
+    const effectiveLastRead = (cachedTimestamp && (!lastReadAt || new Date(cachedTimestamp) > lastReadAt))
+      ? new Date(cachedTimestamp)
+      : lastReadAt;
+    setLastReadTimestamp(effectiveLastRead);
+    const lastRead = effectiveLastRead || (cachedTimestamp ? new Date(cachedTimestamp) : null);
     if (lastRead) {
       const unread = postsData.filter(post => new Date(post.created_at) > lastRead).length;
       setUnreadCount(unread);
@@ -74,6 +119,25 @@ const FeedProvider = ({ children }) => {
       setError(null);
     }
   }, [queryError]);
+
+  // Clear restored state if stored feed was for a different club/user
+  useEffect(() => {
+    if (!currentClub?.id || !user?.uid) return;
+    const stored = getStoredFeedPosts();
+    if (stored && (stored.clubId !== currentClub.id || stored.userId !== user.uid)) {
+      setPosts([]);
+      setHasMore(false);
+      setOldestPostId(null);
+    }
+  }, [currentClub?.id, user?.uid]);
+
+  // Persist feed list so we can restore on remount (avoid "no messages" flash)
+  useEffect(() => {
+    if (!currentClub?.id || !user?.uid) return;
+    setStoredFeedPosts(currentClub.id, user.uid, { posts, hasMore, oldestPostId });
+  }, [currentClub?.id, user?.uid, posts, hasMore, oldestPostId]);
+
+  useEffect(() => () => { _feedRestoreCache = null }, []);
 
   // Load more posts (older posts) when scrolling to top
   const loadMorePosts = useCallback(async () => {
@@ -324,15 +388,10 @@ const FeedProvider = ({ children }) => {
     };
   }, [user, currentClub]); // Removed lastReadTimestamp from dependencies
 
-  // Reset state when club or user changes (query key changes so feed data will update)
-  useEffect(() => {
-    setPosts([]);
-    setLastReadTimestamp(null);
-    setUnreadCount(0);
-    setError(null);
-    setHasMore(false);
-    setOldestPostId(null);
-  }, [currentClub?.id, user?.uid]);
+  // No reset effect: when club/user changes, the feed query key changes so React Query
+  // returns different data (or refetches). The sync effect above runs when feedData
+  // updates and populates state. A separate reset effect would run after sync and clear
+  // posts, leaving the feed empty on remount (e.g. navigating between Dashboard and Feed).
 
   // ******************SETTERS**********************
   const createPost = useCallback(async (postData) => {

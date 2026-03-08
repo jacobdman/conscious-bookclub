@@ -45,6 +45,43 @@ const setStoredBooksViewState = (clubId, state) => {
   }
 };
 
+const BOOKS_LIST_STORAGE_KEY = 'books_list';
+
+const getStoredBooksList = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(BOOKS_LIST_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const books = Array.isArray(parsed.books) ? parsed.books : [];
+    return {
+      clubId: parsed.clubId,
+      userId: parsed.userId,
+      books,
+      totalCount: typeof parsed.totalCount === 'number' ? parsed.totalCount : 0,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const setStoredBooksList = (clubId, userId, payload) => {
+  if (typeof window === 'undefined' || !clubId || !userId || !payload) return;
+  try {
+    sessionStorage.setItem(BOOKS_LIST_STORAGE_KEY, JSON.stringify({
+      clubId,
+      userId,
+      books: Array.isArray(payload.books) ? payload.books : [],
+      totalCount: typeof payload.totalCount === 'number' ? payload.totalCount : 0,
+    }));
+  } catch {
+    // ignore quota or parse errors
+  }
+};
+
+let _booksRestoreCache = null;
+
 // Simple debounce hook
 const useDebounce = (value, delay) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -124,8 +161,40 @@ const BooksProvider = ({ children }) => {
     refetch,
   } = useBooks(currentClub?.id, user?.uid, queryOptions);
 
-  const books = data?.books || [];
-  const totalCount = data?.totalCount || 0;
+  const [displayBooks, setDisplayBooks] = useState(() => {
+    if (!_booksRestoreCache) _booksRestoreCache = getStoredBooksList();
+    return _booksRestoreCache?.books ?? [];
+  });
+  const [displayTotalCount, setDisplayTotalCount] = useState(() => _booksRestoreCache?.totalCount ?? 0);
+
+  // Sync display state from query data when available (React Query remains source of truth)
+  useEffect(() => {
+    if (data != null) {
+      setDisplayBooks(Array.isArray(data.books) ? data.books : []);
+      setDisplayTotalCount(typeof data.totalCount === 'number' ? data.totalCount : 0);
+    }
+  }, [data]);
+
+  // Clear restored state if stored list was for a different club/user
+  useEffect(() => {
+    if (!currentClub?.id || !user?.uid) return;
+    const stored = getStoredBooksList();
+    if (stored && (stored.clubId !== currentClub.id || stored.userId !== user.uid)) {
+      setDisplayBooks([]);
+      setDisplayTotalCount(0);
+    }
+  }, [currentClub?.id, user?.uid]);
+
+  // Persist books list so we can restore on remount (avoid empty flash)
+  useEffect(() => {
+    if (!currentClub?.id || !user?.uid) return;
+    setStoredBooksList(currentClub.id, user.uid, { books: displayBooks, totalCount: displayTotalCount });
+  }, [currentClub?.id, user?.uid, displayBooks, displayTotalCount]);
+
+  useEffect(() => () => { _booksRestoreCache = null }, []);
+
+  const books = displayBooks;
+  const totalCount = displayTotalCount;
   const totalPages = Math.ceil(totalCount / pagination.pageSize);
   const error = queryError?.message || (queryError ? 'Failed to fetch books' : null);
   const loading = isLoading;
