@@ -159,11 +159,23 @@ const ClubManagement = () => {
   const handleAddMember = async () => {
     if (!currentClub || !user || !newMemberId.trim()) return;
 
+    const uid = newMemberId.trim();
     try {
-      await addClubMember(currentClub.id, user.uid, newMemberId.trim());
+      const response = await addClubMember(currentClub.id, user.uid, uid);
+      const newMember = {
+        userId: response.userId,
+        role: response.role,
+        joinedAt: response.joinedAt,
+        user: {
+          uid: response.userId,
+          email: '',
+          displayName: 'New member',
+          photoUrl: null,
+        },
+      };
+      setMembers((prev) => [...prev, newMember]);
       setNewMemberId('');
       setAddMemberDialog(false);
-      await loadMembers();
     } catch (err) {
       setError('Failed to add member');
       console.error('Error adding member:', err);
@@ -175,7 +187,7 @@ const ClubManagement = () => {
 
     try {
       await removeClubMember(currentClub.id, user.uid, memberUserId);
-      await loadMembers();
+      setMembers((prev) => prev.filter((m) => m.userId !== memberUserId));
     } catch (err) {
       setError('Failed to remove member');
       console.error('Error removing member:', err);
@@ -190,8 +202,12 @@ const ClubManagement = () => {
     }
 
     try {
-      await updateMemberRole(currentClub.id, user.uid, memberUserId, newRole);
-      await loadMembers();
+      const response = await updateMemberRole(currentClub.id, user.uid, memberUserId, newRole);
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.userId === memberUserId ? { ...m, role: response.role } : m
+        )
+      );
     } catch (err) {
       setError('Failed to update role');
       console.error('Error updating role:', err);
