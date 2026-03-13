@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { isNativeApp } from 'utils/platformHelpers';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -16,8 +17,12 @@ root.render(
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
-// Register service worker in production only
-if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
+// Register service worker in production only (skip when running as Capacitor native app)
+if (
+  process.env.NODE_ENV === 'production' &&
+  'serviceWorker' in navigator &&
+  !isNativeApp()
+) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/service-worker.js')

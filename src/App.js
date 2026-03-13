@@ -25,10 +25,13 @@ import Quotes from './views/Quotes';
 import Dev from './views/Dev';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
+import BackButtonHandler from 'components/BackButtonHandler';
 import FeatureGateRoute from 'components/FeatureGateRoute';
 import TutorialProvider from 'contexts/Tutorial/TutorialProvider';
+import KeyboardProvider from 'contexts/Keyboard';
 import { CircularProgress, Box } from '@mui/material';
 import { queryClient, persistOptions } from './queryClient';
+import { initCapacitorNative } from 'utils/capacitorNative';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -38,6 +41,13 @@ function AppContent() {
   useEffect(() => {
     setGlobalErrorHandler(showError);
   }, [showError]);
+
+  // Capacitor native: init status bar, keyboard, splash when app is ready
+  useEffect(() => {
+    if (!loading) {
+      initCapacitorNative();
+    }
+  }, [loading]);
 
   if (loading) {
     return (
@@ -55,8 +65,10 @@ function AppContent() {
   }
 
   return (
-    <Router>
-      <Routes>
+    <KeyboardProvider>
+      <Router>
+        <BackButtonHandler />
+        <Routes>
         {/* Public routes */}
         <Route
           path="/landing"
@@ -200,7 +212,8 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/landing" replace />} />
         )}
       </Routes>
-    </Router>
+      </Router>
+    </KeyboardProvider>
   );
 }
 
