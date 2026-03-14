@@ -21,7 +21,7 @@ import {
   CircularProgress,
   Avatar
 } from '@mui/material';
-import { debouncedSearchBooks } from 'services/googleBooksService';
+import { debouncedSearchBooks, isGoogleBooksSearchAvailable } from 'services/googleBooksService';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
 
@@ -353,6 +353,12 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
           {submitError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {submitError}
+            </Alert>
+          )}
+
+          {!isGoogleBooksSearchAvailable() && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Enter title and author below. Use the web app to search for books by name.
             </Alert>
           )}
 

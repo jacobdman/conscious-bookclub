@@ -1,6 +1,20 @@
 /**
- * Utility functions for PWA detection and management
+ * Utility functions for PWA detection and management.
+ * For native app (Capacitor) detection, use isNativeApp() and getPlatform() which re-export from platformHelpers.
  */
+import { isNativeApp as _isNativeApp, getPlatform as _getPlatform } from 'utils/platformHelpers';
+
+/**
+ * Check if the app is running inside a Capacitor native shell (iOS/Android).
+ * @returns {boolean} True if running as native app
+ */
+export const isNativeApp = _isNativeApp;
+
+/**
+ * Current platform: 'ios' | 'android' | 'web'.
+ * @returns {'ios' | 'android' | 'web'}
+ */
+export const getPlatform = _getPlatform;
 
 /**
  * Check if the app is running as a PWA (installed on home screen)

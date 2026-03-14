@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Snackbar, Alert, Button, Box } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
+import { isNativeApp } from 'utils/platformHelpers';
 
 const UpdatePrompt = () => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState(null);
 
   useEffect(() => {
-    // Only check in production
-    if (process.env.NODE_ENV !== 'production') {
+    // Only check in production; skip when running as native app (app store handles updates)
+    if (process.env.NODE_ENV !== 'production' || isNativeApp()) {
       return;
     }
 

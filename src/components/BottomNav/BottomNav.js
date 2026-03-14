@@ -6,6 +6,7 @@ import { BottomNavigation, BottomNavigationAction, Paper, Badge } from '@mui/mat
 // Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
+import useKeyboardContext from 'contexts/Keyboard';
 import FeedContext from 'contexts/Feed/FeedContext';
 // Utils
 import { getClubFeatures } from 'utils/clubFeatures';
@@ -17,6 +18,7 @@ const BottomNav = ({ onMenuClick }) => {
   const location = useLocation();
   const { user } = useAuth();
   const { currentClub } = useClubContext();
+  const { keyboardVisible } = useKeyboardContext();
   const feedContext = useContext(FeedContext);
   const unreadCount = feedContext?.unreadCount ?? 0;
   const features = getClubFeatures(currentClub);
@@ -54,6 +56,8 @@ const BottomNav = ({ onMenuClick }) => {
         right: 0, 
         zIndex: 1100,
         borderRadius: 0,
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        visibility: keyboardVisible ? 'hidden' : 'visible',
       }} 
       data-tour="nav-container"
       elevation={3}

@@ -22,7 +22,8 @@ import { useAuth } from 'AuthContext';
 import NotificationPermission from 'components/NotificationPermission';
 // Services
 import { getUserDocument, updateNotificationPreferences } from 'services/users/users.service';
-import { getSubscriptionStatus, sendTestNotification, subscribeToNotifications } from 'services/notifications/notifications.service';
+import { getSubscriptionStatus, sendTestNotification, requestPermissionAndSubscribe } from 'services/notifications/notifications.service';
+import { isNativeApp } from 'utils/platformHelpers';
 
 const NotificationSettings = () => {
   const { user } = useAuth();
@@ -217,114 +218,64 @@ const NotificationSettings = () => {
   };
 
   const handleReRequestPermission = async () => {
-    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    const pushSupported = isNativeApp() ||
+      (('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window));
+    if (!pushSupported) {
       setError('Push notifications are not supported in this browser');
       return;
     }
+
+    if (!user?.uid) return;
 
     try {
       setReRequesting(true);
       setError(null);
 
-      // Request notification permission
-      const permissionResult = await Notification.requestPermission();
-      setNotificationPermission(permissionResult);
+      const result = await requestPermissionAndSubscribe(user.uid);
 
-      if (permissionResult !== 'granted') {
-        setError('Notification permission was denied. Please enable it in your browser settings.');
+      if (!result.success) {
+        setError(result.error || 'Failed to enable notifications');
         setReRequesting(false);
         return;
       }
 
-      // Register service worker if not already registered
-      let registration = await navigator.serviceWorker.ready;
-      if (!registration) {
-        registration = await navigator.serviceWorker.register('/service-worker.js');
-        // Wait for service worker to be ready
-        registration = await navigator.serviceWorker.ready;
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
       }
+      await checkSubscriptionStatus();
 
-      // Get VAPID public key
-      const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
-      if (!vapidPublicKey) {
-        setError('VAPID public key is not configured. Please contact support.');
-        setReRequesting(false);
-        return;
-      }
+      // If user just subscribed and has no notification types enabled, enable all by default
+      const hasAnyEnabled = goalNotificationsEnabled ||
+        feedNotificationsEnabled ||
+        meetingNotificationsEnabled;
 
-      // Helper function to convert VAPID key
-      const urlBase64ToUint8Array = (base64String) => {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding)
-          .replace(/-/g, '+')
-          .replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) {
-          outputArray[i] = rawData.charCodeAt(i);
+      if (!hasAnyEnabled) {
+        setGoalNotificationsEnabled(true);
+        setFeedNotificationsEnabled(true);
+        setFeedNotificationMode('all');
+        setMeetingNotificationsEnabled(true);
+        setMeetingOneWeekBefore(true);
+        setMeetingOneDayBefore(true);
+
+        try {
+          const hourStr = String(notificationHour).padStart(2, '0');
+          const timeStr = `${hourStr}:00:00`;
+          const notification_settings = {
+            goals: { enabled: true, time: timeStr },
+            feed: { enabled: true, mode: 'all' },
+            meetings: { enabled: true, oneWeekBefore: true, oneDayBefore: true },
+          };
+          await updateNotificationPreferences(user.uid, {
+            notification_settings,
+            timezone,
+          });
+        } catch (err) {
+          console.error('Error auto-enabling notification preferences:', err);
         }
-        return outputArray;
-      };
-
-      // Get push subscription
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      });
-
-      // Send subscription to backend
-      if (user) {
-        await subscribeToNotifications(user.uid, subscription.toJSON());
-        await checkSubscriptionStatus();
-        
-        // If user just subscribed and has no notification types enabled, enable all by default
-        const hasAnyEnabled = goalNotificationsEnabled || 
-                              feedNotificationsEnabled || 
-                              meetingNotificationsEnabled;
-        
-        if (!hasAnyEnabled) {
-          // Enable all notification types with sensible defaults
-          setGoalNotificationsEnabled(true);
-          setFeedNotificationsEnabled(true);
-          setFeedNotificationMode('all');
-          setMeetingNotificationsEnabled(true);
-          setMeetingOneWeekBefore(true);
-          setMeetingOneDayBefore(true);
-          
-          // Auto-save the preferences
-          try {
-            const hourStr = String(notificationHour).padStart(2, '0');
-            const timeStr = `${hourStr}:00:00`;
-            
-            const notification_settings = {
-              goals: {
-                enabled: true,
-                time: timeStr,
-              },
-              feed: {
-                enabled: true,
-                mode: 'all',
-              },
-              meetings: {
-                enabled: true,
-                oneWeekBefore: true,
-                oneDayBefore: true,
-              },
-            };
-            
-            await updateNotificationPreferences(user.uid, {
-              notification_settings,
-              timezone: timezone,
-            });
-          } catch (err) {
-            console.error('Error auto-enabling notification preferences:', err);
-            // Don't show error to user, just log it
-          }
-        }
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
       }
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error('Error re-requesting notification permission:', err);
       setError(err.message || 'Failed to enable notifications');

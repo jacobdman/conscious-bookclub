@@ -3,7 +3,8 @@ import { Snackbar, Alert } from '@mui/material';
 import ErrorNotificationContext from './ErrorNotificationContext';
 
 // ******************STATE VALUES**********************
-const ErrorNotificationProvider = ({ children }) => {
+const ErrorNotificationProvider = (props) => {
+  const children = props?.children;
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
 

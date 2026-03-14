@@ -85,6 +85,10 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "user_id",
       as: "pushSubscriptions",
     });
+    User.hasMany(models.NativePushToken, {
+      foreignKey: "user_id",
+      as: "nativePushTokens",
+    });
     User.hasMany(models.QuoteLike, {
       foreignKey: "user_id",
       as: "quoteLikes",

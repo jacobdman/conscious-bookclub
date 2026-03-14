@@ -217,13 +217,17 @@ function AppContent() {
   );
 }
 
-const QueryProvider = persistOptions
-  ? ({ children }) => (
+const QueryProvider = (props) => {
+  const children = props?.children;
+  if (persistOptions) {
+    return (
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
         {children}
       </PersistQueryClientProvider>
-    )
-  : ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    );
+  }
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+};
 
 function App() {
   return (

@@ -1,5 +1,13 @@
 // Google Books API service for autocomplete functionality
+// Uses REST (fetch) to www.googleapis.com, not the gapi JavaScript client.
+import { Capacitor } from '@capacitor/core';
+
 const GOOGLE_BOOKS_API_BASE = 'https://www.googleapis.com/books/v1/volumes';
+
+const isNativeApp = () => Capacitor.isNativePlatform();
+
+/** True when Google Books search can be used (blocked on native to avoid CORS from capacitor://localhost). */
+export const isGoogleBooksSearchAvailable = () => !isNativeApp();
 
 // Debounce utility to limit API calls
 const debounce = (func, wait) => {
@@ -221,11 +229,15 @@ const parseBookData = (item) => {
 // Search books using Google Books API
 // Supports searching by title, author, or both
 // Legacy support: if only title is provided (author is empty), works as before
+// On native (Capacitor), we skip the request to avoid CORS (origin capacitor://localhost not allowed by Google).
 export const searchBooks = async (title = '', author = '', maxResults = 10) => {
+  if (isNativeApp()) {
+    return [];
+  }
+
   const trimmedTitle = (title || '').trim();
   const trimmedAuthor = (author || '').trim();
-  
-  // Need at least 2 characters in title or author to search
+
   if (trimmedTitle.length < 2 && trimmedAuthor.length < 2) {
     return [];
   }
@@ -298,6 +310,9 @@ export const debouncedSearchBooks = (titleOrQuery, authorOrCallback, callback) =
 
 // Get book details by ID (for future use)
 export const getBookById = async (bookId) => {
+  if (isNativeApp()) {
+    return null;
+  }
   try {
     const url = `${GOOGLE_BOOKS_API_BASE}/${bookId}`;
     const response = await fetch(url);

@@ -141,6 +141,9 @@ const Layout = ({ children, onRefresh }) => {
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
+            paddingTop: 'env(safe-area-inset-top)',
+            paddingLeft: 'env(safe-area-inset-left)',
+            paddingRight: 'env(safe-area-inset-right)',
           }}
         >
           {/* Desktop Header - Hidden on Mobile */}
@@ -198,7 +201,8 @@ const Layout = ({ children, onRefresh }) => {
               overflow: 'auto',
               minHeight: 0,
               WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
-              pb: { xs: 7, md: 0 } // Add padding bottom on mobile for BottomNav
+              // Mobile: space for BottomNav (56px) + safe area inset
+              paddingBottom: { xs: 'calc(56px + env(safe-area-inset-bottom))', md: 0 },
             }}
           >
             {onRefresh && (

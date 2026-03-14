@@ -269,10 +269,72 @@ const sendTestNotification = async (req, res, next) => {
   }
 };
 
+// POST /v1/notifications/subscribe-native - Register native (FCM/APNs) push token
+const subscribeNative = async (req, res, next) => {
+  try {
+    const {userId} = req.query;
+    const {token, platform} = req.body;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    if (!token || !platform) {
+      const error = new Error("token and platform are required");
+      error.status = 400;
+      throw error;
+    }
+
+    if (!["ios", "android"].includes(platform)) {
+      const error = new Error("platform must be 'ios' or 'android'");
+      error.status = 400;
+      throw error;
+    }
+
+    const [nativeToken] = await db.NativePushToken.findOrCreate({
+      where: {userId, platform},
+      defaults: {userId, token, platform},
+    });
+
+    if (nativeToken.token !== token) {
+      await nativeToken.update({token});
+    }
+
+    res.status(201).json({id: nativeToken.id, ...nativeToken.toJSON()});
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /v1/notifications/subscription-native - Get native token status for user
+const getNativeSubscription = async (req, res, next) => {
+  try {
+    const {userId} = req.query;
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const tokens = await db.NativePushToken.findAll({
+      where: {userId},
+    });
+
+    res.json(tokens.map((t) => ({id: t.id, platform: t.platform, ...t.toJSON()})));
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   subscribe,
   unsubscribe,
   getSubscription,
+  subscribeNative,
+  getNativeSubscription,
   sendTestNotification,
 };
 
