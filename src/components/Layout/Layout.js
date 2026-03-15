@@ -137,13 +137,10 @@ const Layout = ({ children, onRefresh }) => {
         <CssBaseline />
         <Box
           sx={{
-            height: '100vh',
+            height: '100%',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            paddingTop: 'env(safe-area-inset-top)',
-            paddingLeft: 'env(safe-area-inset-left)',
-            paddingRight: 'env(safe-area-inset-right)',
           }}
         >
           {/* Desktop Header - Hidden on Mobile */}

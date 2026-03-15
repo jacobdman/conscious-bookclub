@@ -56,6 +56,10 @@ const BottomNav = ({ onMenuClick }) => {
         right: 0, 
         zIndex: 1100,
         borderRadius: 0,
+        backgroundColor: (theme) =>
+            theme.palette.mode === 'dark'
+              ? theme.palette.background.paper
+              : theme.palette.primary.main,
         paddingBottom: 'env(safe-area-inset-bottom)',
         visibility: keyboardVisible ? 'hidden' : 'visible',
       }} 

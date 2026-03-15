@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Snackbar, Alert, Button, Box } from '@mui/material';
+import { Snackbar, Alert, Button, Box, useMediaQuery, useTheme } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { isNativeApp } from 'utils/platformHelpers';
 
 const UpdatePrompt = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState(null);
 
@@ -95,7 +97,16 @@ const UpdatePrompt = () => {
   return (
     <Snackbar
       open={updateAvailable}
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      anchorOrigin={
+        isMobile
+          ? { vertical: 'top', horizontal: 'center' }
+          : { vertical: 'bottom', horizontal: 'center' }
+      }
+      sx={
+        isMobile
+          ? { '&.MuiSnackbar-root': { top: 'calc(env(safe-area-inset-top) + 8px)' } }
+          : undefined
+      }
       onClose={handleDismiss}
     >
       <Alert

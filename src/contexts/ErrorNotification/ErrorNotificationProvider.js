@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { Snackbar, Alert } from '@mui/material';
+import { Snackbar, Alert, useMediaQuery, useTheme } from '@mui/material';
 import ErrorNotificationContext from './ErrorNotificationContext';
 
 // ******************STATE VALUES**********************
 const ErrorNotificationProvider = (props) => {
   const children = props?.children;
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
 
@@ -39,7 +41,16 @@ const ErrorNotificationProvider = (props) => {
         open={open}
         autoHideDuration={6000}
         onClose={handleClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={
+          isMobile
+            ? { vertical: 'top', horizontal: 'center' }
+            : { vertical: 'bottom', horizontal: 'center' }
+        }
+        sx={
+          isMobile
+            ? { '&.MuiSnackbar-root': { top: 'calc(env(safe-area-inset-top) + 8px)' } }
+            : undefined
+        }
       >
         <Alert onClose={handleClose} severity="error" sx={{ width: '100%' }}>
           {error}

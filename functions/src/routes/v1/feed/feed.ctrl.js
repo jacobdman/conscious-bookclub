@@ -61,9 +61,16 @@ const markAsRead = async (req, res, next) => {
 };
 
 // Browser-like User-Agent so sites (e.g. Amazon) serve full HTML with og/twitter meta
-const LINK_PREVIEW_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const LINK_PREVIEW_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-// Extract content from meta tag: property="og:title" content="..." or content="..." property="og:title"
+/**
+ * Extract content from meta tag: property="og:title" content="..." or content="..." property
+ * @param {string} html - HTML string
+ * @param {string} property - Meta property name (e.g. og:title)
+ * @return {string|null} - Extracted content or null
+ */
 function extractMetaContent(html, property) {
   const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(

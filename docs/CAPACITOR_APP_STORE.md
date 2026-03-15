@@ -16,8 +16,7 @@ npm run cap:android  # Open Android Studio
 - [ ] **App ID** – Create an App ID with bundle ID `com.consciousbookclub.app` and enable Push Notifications capability.
 - [ ] **Provisioning** – Create provisioning profiles (development and distribution) in Apple Developer portal.
 - [ ] **Xcode** – Open `ios/App/App.xcworkspace`, select your Team and signing certificate.
-- [ ] **Push Notifications** – Enable Push Notifications capability in Xcode. Add to `AppDelegate.swift`:  
-  `NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)` (see [Capacitor Push Notifications](https://capacitorjs.com/docs/apis/push-notifications)).
+- [ ] **Push Notifications** – In Xcode: select the **App** target → **Signing & Capabilities** → **+ Capability** → add **Push Notifications**. (Without this you get "no valid aps-environment entitlement" when registering.) Also add to `AppDelegate.swift` the `didRegisterForRemoteNotificationsWithDeviceToken` / `didFailToRegisterForRemoteNotificationsWithError` handlers (see [Capacitor Push Notifications](https://capacitorjs.com/docs/apis/push-notifications)); these are already in the project.
 - [ ] **Firebase** – Add `GoogleService-Info.plist` to `ios/App/App/` (required for FCM and for Google Sign-In). Configure in Firebase Console.
 - [ ] **Google Sign-In (iOS)** – See [GOOGLE_SIGNIN_IOS.md](GOOGLE_SIGNIN_IOS.md). Summary: add `GoogleService-Info.plist`, set the URL scheme in `Info.plist` to your `REVERSED_CLIENT_ID` from that plist (replace `YOUR_REVERSED_CLIENT_ID`), enable Google in Firebase Auth. `AppDelegate.swift` already forwards URL opens to the plugin.
 - [ ] **Privacy** – Add any required usage descriptions to `ios/App/App/Info.plist` (e.g. `NSCameraUsageDescription` if you add camera later).

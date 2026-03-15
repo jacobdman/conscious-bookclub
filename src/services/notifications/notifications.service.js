@@ -47,21 +47,31 @@ export const requestPermissionAndSubscribe = async (userId) => {
       const token = await new Promise((resolve, reject) => {
         let regHandle;
         let errHandle;
+        const removeHandle = (h) => { if (h && typeof h.remove === 'function') h.remove(); };
         const cleanup = () => {
-          regHandle?.then((h) => h.remove());
-          errHandle?.then((h) => h.remove());
+          [regHandle, errHandle].forEach((handle) => {
+            if (handle == null) return;
+            if (typeof handle.then === 'function') handle.then(removeHandle);
+            else removeHandle(handle);
+          });
         };
-        PushNotifications.addListener('registration', (ev) => {
+        const timeout = setTimeout(() => {
           cleanup();
-          resolve(ev.value || ev);
-        }).then((h) => { regHandle = h; });
-        PushNotifications.addListener('registrationError', (ev) => {
+          reject(new Error('Registration timed out. Use a real device (not simulator) and ensure Push Notifications capability is enabled.'));
+        }, 15000);
+        regHandle = PushNotifications.addListener('registration', (ev) => {
+          clearTimeout(timeout);
+          cleanup();
+          resolve(ev.value ?? ev.token ?? ev);
+        });
+        errHandle = PushNotifications.addListener('registrationError', (ev) => {
+          clearTimeout(timeout);
           cleanup();
           reject(new Error(ev.error || 'Registration failed'));
-        }).then((h) => { errHandle = h; });
+        });
         PushNotifications.register();
       });
-      const tokenStr = typeof token === 'string' ? token : token?.value;
+      const tokenStr = typeof token === 'string' ? token : (token?.value ?? token?.token);
       if (!tokenStr) return { success: false, error: 'No token received' };
       await registerNativePushToken(userId, tokenStr, platform);
       return { success: true };
