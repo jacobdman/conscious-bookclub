@@ -6,6 +6,7 @@ import useClubContext from 'contexts/Club';
 // Components
 import UsersGoalsModal from 'components/UsersGoalsModal';
 // Utils
+import { EMOJI_FONT_FAMILY } from 'utils/emojiFont';
 import { getTodayBoundaries } from 'utils/goalHelpers';
 
 const medalByRank = {
@@ -101,6 +102,7 @@ const ProfileAvatar = ({
         {medal && (
           <Box
             sx={{
+              fontFamily: EMOJI_FONT_FAMILY,
               position: 'absolute',
               bottom: Math.round(-size * 0.08),
               right: Math.round(-size * 0.08),

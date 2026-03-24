@@ -17,6 +17,8 @@ import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
 import { useAuth } from './AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { isNativeApp } from 'utils/platformHelpers';
+import { baseThemeOptions } from 'theme';
 
 const theme = createTheme({
   palette: {
@@ -30,9 +32,7 @@ const theme = createTheme({
       default: '#F5F1EA',
     },
   },
-  typography: {
-    fontFamily: 'Georgia, serif',
-  },
+  typography: baseThemeOptions.typography,
 });
 
 const Login = () => {
@@ -73,9 +73,8 @@ const Login = () => {
       setLoading(true);
       setError(null);
       await signInWithGoogle();
-      // Navigation will happen via useEffect when user state updates
     } catch (error) {
-      setError('Failed to sign in. Please try again.');
+      setError(error?.message || 'Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
     }

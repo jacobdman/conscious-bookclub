@@ -4,7 +4,8 @@ import { updateUserProfile } from 'services/users/users.service';
 import TutorialContext from './TutorialContext';
 
 // ******************STATE VALUES**********************
-const TutorialProvider = ({ children }) => {
+const TutorialProvider = (props) => {
+  const children = props?.children;
   const { user, userProfile, setUserProfile } = useAuth();
   const [completedTutorials, setCompletedTutorials] = useState({});
   const [activeTutorialId, setActiveTutorialId] = useState(null);

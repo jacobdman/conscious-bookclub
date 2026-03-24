@@ -1,16 +1,21 @@
 // Shared API helper functions
-// Determine API base URL based on environment
+import { isNativeApp } from 'utils/platformHelpers';
+
+// Determine API base URL based on environment and platform
 export const getApiBase = () => {
-  // Check if we're in development
   const isDevelopment = process.env.NODE_ENV === 'development';
-  
+
   if (isDevelopment) {
-    // Use local emulator URL
     return 'http://localhost:5001/conscious-bookclub-87073-9eb71/us-central1/api';
   }
-  
-  // Production: use relative path which will be proxied by Firebase Hosting
-  // This hides the actual Firebase Functions URL for security
+
+  // Native app (Capacitor): origin is capacitor://localhost, so relative /api
+  // would resolve to capacitor://localhost/api. Use absolute Functions URL.
+  if (isNativeApp()) {
+    return 'https://us-central1-conscious-bookclub-87073-9eb71.cloudfunctions.net/api';
+  }
+
+  // Production web: relative path proxied by Firebase Hosting
   return '/api';
 };
 

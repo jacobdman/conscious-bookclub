@@ -21,6 +21,7 @@ import useFeedContext from 'contexts/Feed';
 import ProfileAvatar from 'components/ProfileAvatar';
 // Utils
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
+import { EMOJI_FONT_FAMILY } from 'utils/emojiFont';
 import { triggerHaptic } from 'utils/haptics';
 import { alpha } from '@mui/material/styles';
 
@@ -277,6 +278,7 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
                     key={e}
                     onClick={() => handleEmojiSelect(e)}
                     sx={{
+                      fontFamily: EMOJI_FONT_FAMILY,
                       minWidth: 'auto',
                       width: 32,
                       height: 32,
@@ -337,7 +339,11 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
                 scrollButtons="auto"
                 sx={{
                   minHeight: 40,
-                  '& .MuiTab-root': { minHeight: 40, py: 0.5 },
+                  '& .MuiTab-root': {
+                    minHeight: 40,
+                    py: 0.5,
+                    fontFamily: EMOJI_FONT_FAMILY,
+                  },
                 }}
               >
                 {emojiKeys.map((emoji, idx) => {

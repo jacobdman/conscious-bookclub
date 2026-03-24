@@ -1,14 +1,17 @@
 import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
+import {
+  getAuth,
+  initializeAuth,
+  indexedDBLocalPersistence,
   GoogleAuthProvider,
   OAuthProvider,
   getRedirectResult,
-  onAuthStateChanged, 
+  onAuthStateChanged,
   signOut,
 } from "firebase/auth";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getStorage } from "firebase/storage";
+import { Capacitor } from "@capacitor/core";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBmG4u5Kv4nt-5F5XfZhKNsyg9MJ-h96Qo",
@@ -20,10 +23,26 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
+// On native, use initializeAuth with IndexedDB persistence to avoid CORS issues
+// that occur when the default auth persistence talks to Firebase from capacitor://localhost.
+let auth;
+if (Capacitor.isNativePlatform()) {
+  auth = initializeAuth(app, {
+    persistence: indexedDBLocalPersistence,
+  });
+} else {
+  auth = getAuth(app);
+}
+
 const functions = getFunctions(app);
 const storage = getStorage(app);
-const googleProvider = new GoogleAuthProvider();
+
+// Only create GoogleAuthProvider on web. On Capacitor native, the Google provider
+// pulls in gapi and triggers CORS errors with apis.google.com. Skip on native.
+const googleProvider = Capacitor.isNativePlatform()
+  ? null
+  : new GoogleAuthProvider();
 const appleProvider = new OAuthProvider('apple.com');
 
 // Connect to emulators in development

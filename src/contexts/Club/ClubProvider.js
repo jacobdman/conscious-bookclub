@@ -22,7 +22,8 @@ const clearClubIdFromUrl = () => {
 };
 
 // ******************STATE VALUES**********************
-const ClubProvider = ({ children }) => {
+const ClubProvider = (props) => {
+  const children = props?.children;
   const { user } = useAuth();
   const [currentClub, setCurrentClubState] = useState(null);
   const [userClubs, setUserClubs] = useState([]);

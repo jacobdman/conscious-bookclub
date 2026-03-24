@@ -137,7 +137,7 @@ const Layout = ({ children, onRefresh }) => {
         <CssBaseline />
         <Box
           sx={{
-            height: '100vh',
+            height: '100%',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -174,7 +174,12 @@ const Layout = ({ children, onRefresh }) => {
               open={mobileMenuOpen}
               onClose={() => setMobileMenuOpen(false)}
               PaperProps={{
-                  sx: { width: '85%', maxWidth: 300 }
+                  sx: {
+                    width: '85%',
+                    maxWidth: 300,
+                    paddingTop: 'env(safe-area-inset-top)',
+                    paddingBottom: 'env(safe-area-inset-bottom)',
+                  },
               }}
           >
               <NavigationContent
@@ -195,10 +200,10 @@ const Layout = ({ children, onRefresh }) => {
               display: 'flex',
               flexDirection: 'column',
               flex: 1,
-              overflow: 'auto',
+              overflow: 'scroll',
               minHeight: 0,
-              WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
-              pb: { xs: 7, md: 0 } // Add padding bottom on mobile for BottomNav
+              // Mobile: space for BottomNav (56px) + safe area insetG
+              paddingBottom: { xs: 'calc(56px + env(safe-area-inset-bottom))', md: 0 },
             }}
           >
             {onRefresh && (

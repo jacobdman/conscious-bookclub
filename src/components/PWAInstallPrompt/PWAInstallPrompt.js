@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Alert, AlertTitle, IconButton, Box } from '@mui/material';
 import { Close as CloseIcon, Share as ShareIcon, MoreVert as MoreVertIcon } from '@mui/icons-material';
 import { isRunningAsPWA, isMobileDevice, isIOS, isAndroid, getBrowserName, isShareButtonAtTop } from 'utils/pwaHelpers';
+import { isNativeApp } from 'utils/platformHelpers';
 
 const PWAInstallPrompt = () => {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -11,6 +12,11 @@ const PWAInstallPrompt = () => {
     // Check if already dismissed
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     if (dismissed) {
+      return;
+    }
+
+    // Don't show when running as native app (Capacitor)
+    if (isNativeApp()) {
       return;
     }
 

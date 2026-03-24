@@ -3,6 +3,17 @@
   "version": "0.7.5",
   "private": true,
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.1.0",
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/haptics": "^8.0.1",
+    "@capacitor/ios": "^8.2.0",
+    "@capacitor/keyboard": "^8.0.1",
+    "@capacitor/push-notifications": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.0.2",
@@ -41,7 +52,12 @@
     "deploy": "npm run build && firebase deploy",
     "emulators": "firebase emulators:start",
     "emulators:ui": "firebase emulators:start --only ui",
-    "dev": "concurrently --names \"REACT,EMULATORS,SOCKET\" --prefix-colors \"blue,green,yellow\" \"npm start\" \"firebase emulators:start\" \"cd socket-service && PORT=3001 npm start\""
+    "dev": "concurrently --names \"REACT,EMULATORS,SOCKET\" --prefix-colors \"blue,green,yellow\" \"npm start\" \"firebase emulators:start\" \"cd socket-service && PORT=3001 npm start\"",
+    "cap:sync": "npx cap sync",
+    "cap:build": "npm run build && npx cap sync",
+    "cap:ios": "npx cap open ios",
+    "cap:android": "npx cap open android",
+    "cap:assets": "npx @capacitor/assets generate --iconBackgroundColor '#F5F1EA' --iconBackgroundColorDark '#2c2c2c' --splashBackgroundColor '#F5F1EA' --splashBackgroundColorDark '#1a1a1a'"
   },
   "eslintConfig": {
     "extends": [
@@ -62,6 +78,7 @@
     ]
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "concurrently": "^9.2.1"
   }
 }

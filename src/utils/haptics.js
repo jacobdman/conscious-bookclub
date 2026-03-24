@@ -1,7 +1,15 @@
+import { Capacitor } from '@capacitor/core';
+
 const VIBRATION_PATTERNS = {
   light: 20,
   medium: [30, 50],
   heavy: [50, 80, 50],
+};
+
+const NATIVE_IMPACT_STYLE = {
+  light: 'Light',
+  medium: 'Medium',
+  heavy: 'Heavy',
 };
 
 export const getHapticsSupport = () => {
@@ -21,20 +29,27 @@ export const getHapticsSupport = () => {
 };
 
 /**
- * Fire a lightweight haptic/vibration signal where supported.
+ * Fire a haptic/vibration signal. Uses native haptics on Capacitor (iOS/Android),
+ * falls back to Vibration API on web.
  * In development on web, logs when invoked for easier debugging.
  */
-export const triggerHaptic = (type = 'light') => {
+export const triggerHaptic = async (type = 'light') => {
   try {
     const support = getHapticsSupport();
     if (typeof window === 'undefined') {
       return { ...support, didVibrate: false };
     }
-    const pattern = VIBRATION_PATTERNS[type] || VIBRATION_PATTERNS.light;
 
     if (process.env.NODE_ENV === 'development') {
       // eslint-disable-next-line no-console
       console.log('[haptics] trigger', type);
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+      const style = ImpactStyle[NATIVE_IMPACT_STYLE[type] || 'Light'];
+      await Haptics.impact({ style });
+      return { ...support, didVibrate: true };
     }
 
     if (!support.hasVibrate) {
@@ -45,10 +60,10 @@ export const triggerHaptic = (type = 'light') => {
       return { ...support, didVibrate: false };
     }
 
+    const pattern = VIBRATION_PATTERNS[type] || VIBRATION_PATTERNS.light;
     const didVibrate = navigator.vibrate(pattern);
     return { ...support, didVibrate };
   } catch (err) {
-    // Fail silently; haptics are best-effort.
     if (process.env.NODE_ENV === 'development') {
       // eslint-disable-next-line no-console
       console.log('[haptics] error', err);

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Alert, AlertTitle, IconButton, Box, Button } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
-import { subscribeToNotifications } from 'services/notifications/notifications.service';
+import { requestPermissionAndSubscribe } from 'services/notifications/notifications.service';
 import { useSubscriptionStatus } from 'hooks/useSubscriptionStatus';
 import { useQueryClient } from '@tanstack/react-query';
+import { isNativeApp } from 'utils/platformHelpers';
 
 const NotificationPrompt = () => {
   const { user } = useAuth();
@@ -24,54 +25,16 @@ const NotificationPrompt = () => {
   };
 
   const requestPermission = async () => {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      setError('Notifications are not supported in this browser');
-      return;
-    }
-
-    if (!('PushManager' in window)) {
-      setError('Push notifications are not supported in this browser');
-      return;
-    }
+    if (!user?.uid) return;
 
     try {
       setRequesting(true);
       setError(null);
-
-      // Request notification permission
-      const permissionResult = await Notification.requestPermission();
-
-      if (permissionResult !== 'granted') {
-        setError('Notification permission was denied');
-        setRequesting(false);
-        return;
-      }
-
-      // Register service worker if not already registered
-      let registration = await navigator.serviceWorker.ready;
-      if (!registration) {
-        registration = await navigator.serviceWorker.register('/service-worker.js');
-      }
-
-      // Get VAPID public key
-      const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
-      if (!vapidPublicKey) {
-        setError('VAPID public key is not configured. Please contact support.');
-        setRequesting(false);
-        return;
-      }
-
-      // Get push subscription
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      });
-
-      // Send subscription to backend
-      if (user) {
-        await subscribeToNotifications(user.uid, subscription.toJSON());
+      const result = await requestPermissionAndSubscribe(user.uid);
+      if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['subscription', user.uid] });
-        // Don't mark as dismissed if they subscribed - they might want to see it again if they unsubscribe
+      } else {
+        setError(result.error || 'Failed to enable notifications');
       }
     } catch (err) {
       console.error('Error requesting notification permission:', err);
@@ -81,34 +44,20 @@ const NotificationPrompt = () => {
     }
   };
 
-  // Helper function to convert VAPID key
-  const urlBase64ToUint8Array = (base64String) => {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  };
-
   // Don't show if checking, already subscribed, or already dismissed
   if (checking || hasSubscription || !showPrompt) {
     return null;
   }
 
-  // Check if notifications are supported
-  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+  // Check if notifications are supported (native app or web with PushManager)
+  const pushSupported = isNativeApp() ||
+    (('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window));
+  if (!pushSupported) {
     return null;
   }
 
-  // Check if permission was already denied
-  if (Notification.permission === 'denied') {
+  // Check if permission was already denied (Notification may be undefined in native WebView)
+  if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
     return null;
   }
 
