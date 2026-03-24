@@ -45,8 +45,6 @@ import { useMeetings } from 'hooks/useMeetings';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
 import Layout from 'components/Layout';
-import { usePullToRefresh } from 'hooks/usePullToRefresh';
-import PullToRefreshIndicator from 'UI/PullToRefreshIndicator';
 import AddBookForm from 'components/AddBookForm';
 import MeetingForm from 'components/MeetingForm';
 import BookInfoDialog from 'components/BookInfoDialog';
@@ -81,13 +79,6 @@ const BookList = () => {
     toggleBookLike,
     refreshBooks
   } = useBooksContext();
-
-  const scrollRef = useRef(null);
-  const pullToRefresh = usePullToRefresh({
-    ref: scrollRef,
-    onRefresh: refreshBooks,
-    direction: 'top',
-  });
 
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
@@ -351,14 +342,34 @@ const BookList = () => {
 
   const selectedBook = books.find((book) => book.id === selectedBookId) || null;
 
+  // Force iOS WKWebView to re-evaluate scroll after content loads
+  useEffect(() => {
+    if (books.length === 0) return;
+    const main = document.querySelector('main');
+    if (!main) return;
+    main.style.overflow = 'hidden';
+    setTimeout(() => { main.style.overflow = 'scroll'; }, 1);
+  }, [books.length]);
+
   const showBookListLoading = contextLoading && books.length === 0;
   const showBookListError = !!contextError;
   const showBookListContent = !showBookListLoading && !showBookListError;
 
   return (
-    <Layout>
+    <Layout onRefresh={refreshBooks}>
       <BooksTour />
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0, px: 2 }}>
+      <Box
+        sx={{
+          borderBottom: 1,
+          borderColor: 'divider',
+          flexShrink: 0,
+          px: 2,
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
+          bgcolor: 'background.default',
+        }}
+      >
         <Tabs
           value={effectiveTab}
           onChange={handleBookListTabChange}
@@ -369,24 +380,14 @@ const BookList = () => {
         </Tabs>
       </Box>
       <Box
-        ref={scrollRef}
         sx={{
           p: 2,
-          height: '100%',
-          overflowY: 'auto',
           overflowX: 'hidden',
-          flex: 1,
-          minHeight: 0,
         }}
       >
         {effectiveTab === CLUB_TAB_INDEX && <ClubBooksTab />}
         {effectiveTab === 0 && (
           <>
-            <PullToRefreshIndicator
-              direction="top"
-              pullProgress={pullToRefresh.pullProgress}
-              isRefreshing={pullToRefresh.isRefreshing}
-            />
             {showBookListLoading && (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                 <CircularProgress />
@@ -840,7 +841,7 @@ const BookList = () => {
 
         {/* Bottom Pagination */}
         {totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, pb: { xs: 8, md: 0 } }}>
             <Pagination
               count={totalPages}
               page={pagination.page}
@@ -858,7 +859,7 @@ const BookList = () => {
           data-tour="add_book_mobile_button"
           sx={{
             position: 'fixed',
-            bottom: 72,
+            bottom: 'calc(72px + env(safe-area-inset-bottom))',
             right: 24,
             display: { xs: 'flex', md: 'none' }
           }}

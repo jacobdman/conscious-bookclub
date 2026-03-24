@@ -200,10 +200,9 @@ const Layout = ({ children, onRefresh }) => {
               display: 'flex',
               flexDirection: 'column',
               flex: 1,
-              overflow: 'auto',
+              overflow: 'scroll',
               minHeight: 0,
-              WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
-              // Mobile: space for BottomNav (56px) + safe area inset
+              // Mobile: space for BottomNav (56px) + safe area insetG
               paddingBottom: { xs: 'calc(56px + env(safe-area-inset-bottom))', md: 0 },
             }}
           >

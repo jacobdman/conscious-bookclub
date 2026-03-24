@@ -160,6 +160,7 @@ const ALLOWED_ORIGINS = process.env.NODE_ENV === "production"
       PRODUCTION_DOMAIN,
       "https://conscious-bookclub-87073-9eb71.firebaseapp.com",
       "https://cbc.jacobdayton.com", // Custom domain
+      "https://app.consciousbook.club", // Custom domain
     ]
   : true; // Allow all origins in development
 

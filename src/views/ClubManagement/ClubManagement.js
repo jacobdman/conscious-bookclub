@@ -63,6 +63,7 @@ import {
   sanitizeDashboardConfig,
 } from 'utils/dashboardConfig';
 import { CLUB_THEME_PRESETS, getPresetForOverrides } from 'utils/clubThemePresets';
+import { getAppOrigin } from 'utils/appOrigin';
 
 const DEFAULT_THEMES = ['Classy', 'Creative', 'Curious'];
 
@@ -241,7 +242,7 @@ const ClubManagement = () => {
 
   const handleCopyInviteUrl = async () => {
     if (currentClub?.inviteCode) {
-      const inviteUrl = `${window.location.origin}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}`;
+      const inviteUrl = `${getAppOrigin()}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}`;
       try {
         await navigator.clipboard.writeText(inviteUrl);
         setCopiedUrl(true);
@@ -479,7 +480,7 @@ const ClubManagement = () => {
                       '& .MuiInputBase-input': {
                         fontFamily: 'monospace',
                         letterSpacing: '0.1em',
-                        fontSize: { xs: '0.875rem', md: '1rem' },
+                        fontSize: { xs: '16px', md: '1rem' },
                       },
                     }}
                   />
@@ -499,7 +500,7 @@ const ClubManagement = () => {
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   <TextField
-                    value={currentClub?.inviteCode ? `${window.location.origin}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}` : ''}
+                    value={currentClub?.inviteCode ? `${getAppOrigin()}/login?inviteCode=${encodeURIComponent(currentClub.inviteCode)}` : ''}
                     fullWidth
                     size="small"
                     InputProps={{
@@ -507,7 +508,7 @@ const ClubManagement = () => {
                     }}
                     sx={{
                       '& .MuiInputBase-input': {
-                        fontSize: { xs: '0.75rem', md: '0.875rem' },
+                        fontSize: { xs: '16px', md: '0.875rem' },
                         wordBreak: 'break-all',
                       },
                     }}
