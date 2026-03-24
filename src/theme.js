@@ -1,5 +1,6 @@
 import { createTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { TYPOGRAPHY_FONT_FAMILY } from 'utils/emojiFont';
 
 export const baseThemeOptions = {
   palette: {
@@ -29,7 +30,7 @@ export const baseThemeOptions = {
     },
   },
   typography: {
-    fontFamily: 'Georgia, serif',
+    fontFamily: TYPOGRAPHY_FONT_FAMILY,
   },
 };
 

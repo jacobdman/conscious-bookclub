@@ -70,9 +70,10 @@ const FeedSection = () => {
     };
   }, [selectedFiles]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = useCallback((options = {}) => {
+    const behavior = options.behavior ?? 'smooth';
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
 
   // Scroll to bottom when new posts arrive (but not when loading more at top)
   useEffect(() => {
@@ -82,32 +83,34 @@ const FeedSection = () => {
     }
 
     const currentFirstPostId = posts[0]?.id;
-    
+
     // Only auto-scroll if:
     // 1. Not loading initial posts
     // 2. Not currently loading more
     // 3. Didn't just load older posts (flag prevents auto-scroll)
     // 4. First post changed (new posts added at beginning) OR initial load
     if (
-      !loading && 
-      !loadingMore && 
+      !loading &&
+      !loadingMore &&
       !justLoadedMoreRef.current &&
       (previousFirstPostIdRef.current === null || currentFirstPostId !== previousFirstPostIdRef.current)
     ) {
-      scrollToBottom();
+      scrollToBottom({ behavior: 'auto' });
     }
-    
-    // Update the tracked first post ID
-    previousFirstPostIdRef.current = currentFirstPostId;
-    
-    // Reset the flag after posts have rendered
+
+    // Only track first post id when the list is mounted (!loading); otherwise we
+    // consume the id while the sentinel is still out of the DOM and skip scroll on load.
+    if (!loading) {
+      previousFirstPostIdRef.current = currentFirstPostId;
+    }
+
     if (justLoadedMoreRef.current) {
       const timer = setTimeout(() => {
         justLoadedMoreRef.current = false;
-      }, 300); // Keep flag set longer to prevent auto-scroll
+      }, 300);
       return () => clearTimeout(timer);
     }
-  }, [posts, loading, loadingMore]);
+  }, [posts, loading, loadingMore, scrollToBottom]);
 
   // Detect scroll to top and load more posts
   useEffect(() => {

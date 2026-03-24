@@ -4,9 +4,10 @@ const ENV_IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // In production, use relative path which will be proxied by Firebase Hosting
 // In development, use local emulator
+const DEV_API_HOST = process.env.REACT_APP_API_HOST || 'localhost';
 const BASE_URL = ENV_IS_PRODUCTION
   ? '/api'
-  : 'http://localhost:5001/conscious-bookclub-87073-9eb71/us-central1/api';
+  : `http://${DEV_API_HOST}:5001/conscious-bookclub-87073-9eb71/us-central1/api`;
 
 class API {
   get = async (url, config) => {

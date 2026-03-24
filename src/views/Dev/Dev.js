@@ -24,7 +24,8 @@ const Dev = () => {
           bgcolor: 'background.default',
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
-          py: { xs: 3, md: 6 },
+          paddingTop: { xs: 'calc(24px + env(safe-area-inset-top))', md: 6 },
+          paddingBottom: { xs: 'calc(24px + env(safe-area-inset-bottom))', md: 6 },
         }}
       >
         <DevTools />

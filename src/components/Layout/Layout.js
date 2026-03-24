@@ -174,7 +174,12 @@ const Layout = ({ children, onRefresh }) => {
               open={mobileMenuOpen}
               onClose={() => setMobileMenuOpen(false)}
               PaperProps={{
-                  sx: { width: '85%', maxWidth: 300 }
+                  sx: {
+                    width: '85%',
+                    maxWidth: 300,
+                    paddingTop: 'env(safe-area-inset-top)',
+                    paddingBottom: 'env(safe-area-inset-bottom)',
+                  },
               }}
           >
               <NavigationContent
