@@ -20,3 +20,17 @@ export const getPlatform = () => {
   if (p === 'ios' || p === 'android') return p;
   return 'web';
 };
+
+/**
+ * True if push can be registered: Capacitor native (APNs/FCM) or full web push stack.
+ * @returns {boolean}
+ */
+export const isPushRegistrationSupported = () => {
+  if (isNativeApp()) return true;
+  if (typeof window === 'undefined') return false;
+  return (
+    'Notification' in window &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window
+  );
+};

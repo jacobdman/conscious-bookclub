@@ -23,7 +23,7 @@ import NotificationPermission from 'components/NotificationPermission';
 // Services
 import { getUserDocument, updateNotificationPreferences } from 'services/users/users.service';
 import { getSubscriptionStatus, sendTestNotification, requestPermissionAndSubscribe } from 'services/notifications/notifications.service';
-import { isNativeApp } from 'utils/platformHelpers';
+import { isPushRegistrationSupported } from 'utils/platformHelpers';
 
 const NotificationSettings = () => {
   const { user } = useAuth();
@@ -218,9 +218,7 @@ const NotificationSettings = () => {
   };
 
   const handleReRequestPermission = async () => {
-    const pushSupported = isNativeApp() ||
-      (('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window));
-    if (!pushSupported) {
+    if (!isPushRegistrationSupported()) {
       setError('Push notifications are not supported in this browser');
       return;
     }

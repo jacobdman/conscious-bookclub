@@ -1,5 +1,5 @@
 const db = require("../../../../db/models/index");
-const webpush = require("web-push");
+const {sendNotificationsToUser} = require("../../../utils/pushSender");
 
 const FEED_NOTIFICATION_ICON =
   "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
@@ -9,15 +9,6 @@ const FEED_NOTIFICATION_ICON =
 // Mention regex pattern: @[displayName](userId)
 const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
-// Configure web-push with VAPID keys (should be in environment variables)
-const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@consciousbookclub.com";
-
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
-}
-
 const sanitizeImages = (images) => {
   if (!images) return [];
   if (!Array.isArray(images)) return [];
@@ -26,49 +17,6 @@ const sanitizeImages = (images) => {
       .map((url) => (typeof url === "string" ? url.trim() : ""))
       .filter((url) => url.length > 0)
       .slice(0, maxImages);
-};
-
-// Helper function to send push notification
-const sendPushNotification = async (subscription, title, body, data = {}) => {
-  try {
-    // Ensure subscription is an object (not a string)
-    const subscriptionObj = typeof subscription === "string" ?
-      JSON.parse(subscription) :
-      subscription;
-
-    const payload = JSON.stringify({
-      title,
-      body,
-      icon: FEED_NOTIFICATION_ICON,
-      badge: FEED_NOTIFICATION_ICON,
-      data,
-    });
-
-    const result = await webpush.sendNotification(subscriptionObj, payload);
-    return {success: true, statusCode: result.statusCode};
-  } catch (error) {
-    console.error("Error sending push notification:", {
-      message: error.message,
-      statusCode: error.statusCode,
-    });
-
-    // If subscription is invalid, delete it
-    if (error.statusCode === 410 || error.statusCode === 404) {
-      const subscriptionObj = typeof subscription === "string" ?
-        JSON.parse(subscription) :
-        subscription;
-      await db.PushSubscription.destroy({
-        where: {
-          subscriptionJson: subscriptionObj,
-        },
-      });
-    }
-    return {
-      success: false,
-      error: error.message,
-      statusCode: error.statusCode,
-    };
-  }
 };
 
 // Helper to emit Socket.io events via Cloud Run service
@@ -296,8 +244,6 @@ const GOAL_COMPLETION_TOKEN = "{goal_completion_post}";
  */
 const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options = {}) => {
   const {postData = {}, mentionedUserIds = [], parentPostAuthorId = null} = options;
-  if (!vapidPublicKey || !vapidPrivateKey) return;
-
   try {
     const clubMembers = await db.ClubMember.findAll({
       where: {clubId: clubIdInt},
@@ -393,17 +339,13 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
       }
 
       if (shouldNotify) {
-        const subscriptions = await db.PushSubscription.findAll({
-          where: {userId: user.uid},
-        });
-        for (const subscription of subscriptions) {
-          await sendPushNotification(
-              subscription.subscriptionJson,
-              notificationTitle,
-              notificationBody,
-              {route: "/feed", type: "feed", clubId: clubIdInt},
-          );
-        }
+        await sendNotificationsToUser(
+            user.uid,
+            notificationTitle,
+            notificationBody,
+            {route: "/feed", type: "feed", clubId: clubIdInt},
+            {icon: FEED_NOTIFICATION_ICON, badge: FEED_NOTIFICATION_ICON},
+        );
       }
     }
   } catch (error) {

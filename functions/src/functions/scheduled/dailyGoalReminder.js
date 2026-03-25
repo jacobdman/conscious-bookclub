@@ -1,15 +1,6 @@
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const db = require("../../../db/models/index");
-const webpush = require("web-push");
-
-// Configure web-push with VAPID keys (should be in environment variables)
-const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@consciousbookclub.com";
-
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
-}
+const {sendNotificationsToUser} = require("../../utils/pushSender");
 
 const GOALS_NOTIFICATION_ICON =
   "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
@@ -55,59 +46,6 @@ const goalNeedsReminder = async (userId, goal) => {
   return false;
 };
 
-// Helper function to send push notification
-const sendPushNotification = async (subscription, title, body, data = {}) => {
-  try {
-    // Ensure subscription is an object (not a string)
-    const subscriptionObj = typeof subscription === "string" ?
-      JSON.parse(subscription) :
-      subscription;
-
-    const payload = JSON.stringify({
-      title,
-      body,
-      icon: GOALS_NOTIFICATION_ICON,
-      badge: GOALS_NOTIFICATION_ICON,
-      data,
-    });
-
-    console.log("Sending push notification to subscription:", {
-      endpoint: subscriptionObj.endpoint ?
-        subscriptionObj.endpoint.substring(0, 50) + "..." :
-        "missing",
-      keys: subscriptionObj.keys ? "present" : "missing",
-    });
-
-    const result = await webpush.sendNotification(subscriptionObj, payload);
-    console.log("Push notification sent successfully, status:", result.statusCode);
-    return {success: true, statusCode: result.statusCode};
-  } catch (error) {
-    console.error("Error sending push notification:", {
-      message: error.message,
-      statusCode: error.statusCode,
-      body: error.body,
-    });
-
-    // If subscription is invalid, delete it
-    if (error.statusCode === 410 || error.statusCode === 404) {
-      const subscriptionObj = typeof subscription === "string" ?
-        JSON.parse(subscription) :
-        subscription;
-      await db.PushSubscription.destroy({
-        where: {
-          subscriptionJson: subscriptionObj,
-        },
-      });
-      console.log("Deleted invalid subscription");
-    }
-    return {
-      success: false,
-      error: error.message,
-      statusCode: error.statusCode,
-    };
-  }
-};
-
 // Scheduled function to send daily goal reminders
 exports.dailyGoalReminder = onSchedule(
     {
@@ -121,12 +59,6 @@ exports.dailyGoalReminder = onSchedule(
     },
     async (event) => {
       console.log("Daily goal reminder function triggered");
-
-      // Check if VAPID keys are configured
-      if (!vapidPublicKey || !vapidPrivateKey) {
-        console.log("VAPID keys not configured, skipping daily goal reminders");
-        return;
-      }
 
       try {
         // Get all users with notifications enabled
@@ -216,19 +148,22 @@ exports.dailyGoalReminder = onSchedule(
             continue;
           }
 
-          // Get user's push subscriptions
-          const subscriptions = await db.PushSubscription.findAll({
-            where: {userId: user.uid},
-          });
+          const [webN, nativeN] = await Promise.all([
+            db.PushSubscription.count({where: {userId: user.uid}}),
+            db.NativePushToken.count({where: {userId: user.uid}}),
+          ]);
 
-          if (subscriptions.length === 0) {
-            console.log(`  Skipping user ${user.uid}: no push subscriptions found`);
+          if (webN === 0 && nativeN === 0) {
+            console.log(`  Skipping user ${user.uid}: no web or native push targets`);
             skipReasons.noSubscriptions++;
             usersSkipped++;
             continue;
           }
 
-          console.log(`  User ${user.uid} has ${subscriptions.length} subscription(s)`);
+          console.log(
+              `  User ${user.uid} has ${webN} web subscription(s), ` +
+              `${nativeN} native token(s)`,
+          );
 
           // Get user's goals that need daily reminders (daily and weekly cadence)
           const goalsToCheck = await db.Goal.findAll({
@@ -291,19 +226,17 @@ exports.dailyGoalReminder = onSchedule(
           const body =
             `Don't forget to update your ${goalsNeedingReminder.length} goal${goalText} today!`;
 
-          let userNotificationsSent = 0;
-          for (const subscription of subscriptions) {
-            const result = await sendPushNotification(
-                subscription.subscriptionJson,
-                title,
-                body,
-                {route: "/goals", type: "goal"},
-            );
-            if (result && result.success) {
-              userNotificationsSent++;
-              notificationsSent++;
-            }
-          }
+          const {web, native} = await sendNotificationsToUser(
+              user.uid,
+              title,
+              body,
+              {route: "/goals", type: "goal"},
+              {icon: GOALS_NOTIFICATION_ICON, badge: GOALS_NOTIFICATION_ICON},
+          );
+          const userNotificationsSent =
+            web.filter((r) => r.success).length +
+            native.filter((r) => r.success).length;
+          notificationsSent += userNotificationsSent;
 
           console.log(
               `  Sent ${userNotificationsSent} notification(s) to user ${user.uid} ` +

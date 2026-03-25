@@ -1,14 +1,5 @@
 const db = require("../../../../db/models/index");
-const webpush = require("web-push");
-
-// Configure web-push with VAPID keys (should be in environment variables)
-const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@consciousbookclub.com";
-
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
-}
+const {sendNotificationsToUser} = require("../../../utils/pushSender");
 
 const DEFAULT_APP_ICON = "/android-chrome-192x192.png";
 
@@ -20,62 +11,6 @@ const GOALS_NOTIFICATION_ICON =
   "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
   ".firebasestorage.app/o/app-icons%2Fgoals-notification-icon.jpg?alt=media" +
   "&token=278fbb7f-022f-4794-8808-9a46b218fa21";
-
-// Helper function to send push notification
-const sendPushNotification = async (subscription, title, body, data = {}, options = {}) => {
-  try {
-    // Ensure subscription is an object (not a string)
-    const subscriptionObj = typeof subscription === "string" ?
-      JSON.parse(subscription) :
-      subscription;
-
-    const icon = options.icon != null ? options.icon : DEFAULT_APP_ICON;
-    const badge = options.badge != null ? options.badge : DEFAULT_APP_ICON;
-
-    const payload = JSON.stringify({
-      title,
-      body,
-      icon,
-      badge,
-      data: data || {},
-    });
-
-    console.log("Sending push notification to subscription:", {
-      endpoint: subscriptionObj.endpoint ?
-        subscriptionObj.endpoint.substring(0, 50) + "..." :
-        "missing",
-      keys: subscriptionObj.keys ? "present" : "missing",
-    });
-
-    const result = await webpush.sendNotification(subscriptionObj, payload);
-    console.log("Push notification sent successfully, status:", result.statusCode);
-    return {success: true, statusCode: result.statusCode};
-  } catch (error) {
-    console.error("Error sending push notification:", {
-      message: error.message,
-      statusCode: error.statusCode,
-      body: error.body,
-    });
-
-    // If subscription is invalid, delete it
-    if (error.statusCode === 410 || error.statusCode === 404) {
-      const subscriptionObj = typeof subscription === "string" ?
-        JSON.parse(subscription) :
-        subscription;
-      await db.PushSubscription.destroy({
-        where: {
-          subscriptionJson: subscriptionObj,
-        },
-      });
-      console.log("Deleted invalid subscription");
-    }
-    return {
-      success: false,
-      error: error.message,
-      statusCode: error.statusCode,
-    };
-  }
-};
 
 // POST /v1/notifications/subscribe - Register push subscription for user
 const subscribe = async (req, res, next) => {
@@ -205,21 +140,14 @@ const sendTestNotification = async (req, res, next) => {
       throw error;
     }
 
-    // Check if VAPID keys are configured
-    if (!vapidPublicKey || !vapidPrivateKey) {
-      const error = new Error("VAPID keys not configured");
-      error.status = 500;
-      throw error;
-    }
+    const [webCount, nativeCount] = await Promise.all([
+      db.PushSubscription.count({where: {userId}}),
+      db.NativePushToken.count({where: {userId}}),
+    ]);
 
-    // Get user's push subscriptions
-    const subscriptions = await db.PushSubscription.findAll({
-      where: {userId},
-    });
-
-    if (subscriptions.length === 0) {
+    if (webCount === 0 && nativeCount === 0) {
       return res.status(404).json({
-        error: "No push subscriptions found for this user",
+        error: "No push subscriptions or native tokens found for this user",
       });
     }
 
@@ -239,30 +167,30 @@ const sendTestNotification = async (req, res, next) => {
       notificationBody = body || "This is a test push notification from Conscious Book Club";
     }
 
-    const results = [];
-    for (const subscription of subscriptions) {
-      const result = await sendPushNotification(
-          subscription.subscriptionJson,
-          notificationTitle,
-          notificationBody,
-          notificationData,
-          {icon, badge: icon},
-      );
-      results.push({
-        subscriptionId: subscription.id,
-        ...result,
-      });
-    }
+    const {web, native} = await sendNotificationsToUser(
+        userId,
+        notificationTitle,
+        notificationBody,
+        notificationData,
+        {icon, badge: icon},
+    );
 
-    const successCount = results.filter((r) => r.success).length;
-    const failureCount = results.filter((r) => !r.success).length;
+    const webOk = web.filter((r) => r.success).length;
+    const webFail = web.length - webOk;
+    const nativeOk = native.filter((r) => r.success).length;
+    const nativeFail = native.length - nativeOk;
+    const successCount = webOk + nativeOk;
+    const failureCount = webFail + nativeFail;
+    const total = web.length + native.length;
 
     res.json({
-      message: `Sent ${successCount} notification(s), ${failureCount} failed`,
-      total: subscriptions.length,
+      message: `Sent ${successCount} notification(s), ${failureCount} failed ` +
+        `(web: ${webOk}/${web.length}, native: ${nativeOk}/${native.length})`,
+      total,
       successful: successCount,
       failed: failureCount,
-      results,
+      web,
+      native,
     });
   } catch (e) {
     next(e);

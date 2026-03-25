@@ -5,7 +5,7 @@ import { useAuth } from 'AuthContext';
 import { requestPermissionAndSubscribe } from 'services/notifications/notifications.service';
 import { useSubscriptionStatus } from 'hooks/useSubscriptionStatus';
 import { useQueryClient } from '@tanstack/react-query';
-import { isNativeApp } from 'utils/platformHelpers';
+import { isPushRegistrationSupported } from 'utils/platformHelpers';
 
 const NotificationPrompt = () => {
   const { user } = useAuth();
@@ -49,10 +49,7 @@ const NotificationPrompt = () => {
     return null;
   }
 
-  // Check if notifications are supported (native app or web with PushManager)
-  const pushSupported = isNativeApp() ||
-    (('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window));
-  if (!pushSupported) {
+  if (!isPushRegistrationSupported()) {
     return null;
   }
 

@@ -38,42 +38,15 @@ export const requestPermissionAndSubscribe = async (userId) => {
 
   if (Capacitor.isNativePlatform()) {
     try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      const perm = await PushNotifications.requestPermissions();
+      const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+      const perm = await FirebaseMessaging.requestPermissions();
       if (perm.receive !== 'granted') {
         return { success: false, error: 'Permission denied' };
       }
       const platform = Capacitor.getPlatform();
-      const token = await new Promise((resolve, reject) => {
-        let regHandle;
-        let errHandle;
-        const removeHandle = (h) => { if (h && typeof h.remove === 'function') h.remove(); };
-        const cleanup = () => {
-          [regHandle, errHandle].forEach((handle) => {
-            if (handle == null) return;
-            if (typeof handle.then === 'function') handle.then(removeHandle);
-            else removeHandle(handle);
-          });
-        };
-        const timeout = setTimeout(() => {
-          cleanup();
-          reject(new Error('Registration timed out. Use a real device (not simulator) and ensure Push Notifications capability is enabled.'));
-        }, 15000);
-        regHandle = PushNotifications.addListener('registration', (ev) => {
-          clearTimeout(timeout);
-          cleanup();
-          resolve(ev.value ?? ev.token ?? ev);
-        });
-        errHandle = PushNotifications.addListener('registrationError', (ev) => {
-          clearTimeout(timeout);
-          cleanup();
-          reject(new Error(ev.error || 'Registration failed'));
-        });
-        PushNotifications.register();
-      });
-      const tokenStr = typeof token === 'string' ? token : (token?.value ?? token?.token);
-      if (!tokenStr) return { success: false, error: 'No token received' };
-      await registerNativePushToken(userId, tokenStr, platform);
+      const { token: fcmToken } = await FirebaseMessaging.getToken();
+      if (!fcmToken) return { success: false, error: 'No FCM token received' };
+      await registerNativePushToken(userId, fcmToken, platform);
       return { success: true };
     } catch (err) {
       return { success: false, error: err?.message || 'Native push registration failed' };

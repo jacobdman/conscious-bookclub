@@ -1,68 +1,6 @@
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const db = require("../../../db/models/index");
-const webpush = require("web-push");
-
-// Configure web-push with VAPID keys (should be in environment variables)
-const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-const vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@consciousbookclub.com";
-
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
-}
-
-// Helper function to send push notification
-const sendPushNotification = async (subscription, title, body, data = {}) => {
-  try {
-    // Ensure subscription is an object (not a string)
-    const subscriptionObj = typeof subscription === "string" ?
-      JSON.parse(subscription) :
-      subscription;
-
-    const payload = JSON.stringify({
-      title,
-      body,
-      icon: "/android-chrome-192x192.png",
-      badge: "/android-chrome-192x192.png",
-      data,
-    });
-
-    console.log("Sending push notification to subscription:", {
-      endpoint: subscriptionObj.endpoint ?
-        subscriptionObj.endpoint.substring(0, 50) + "..." :
-        "missing",
-      keys: subscriptionObj.keys ? "present" : "missing",
-    });
-
-    const result = await webpush.sendNotification(subscriptionObj, payload);
-    console.log("Push notification sent successfully, status:", result.statusCode);
-    return {success: true, statusCode: result.statusCode};
-  } catch (error) {
-    console.error("Error sending push notification:", {
-      message: error.message,
-      statusCode: error.statusCode,
-      body: error.body,
-    });
-
-    // If subscription is invalid, delete it
-    if (error.statusCode === 410 || error.statusCode === 404) {
-      const subscriptionObj = typeof subscription === "string" ?
-        JSON.parse(subscription) :
-        subscription;
-      await db.PushSubscription.destroy({
-        where: {
-          subscriptionJson: subscriptionObj,
-        },
-      });
-      console.log("Deleted invalid subscription");
-    }
-    return {
-      success: false,
-      error: error.message,
-      statusCode: error.statusCode,
-    };
-  }
-};
+const {sendNotificationsToUser, DEFAULT_APP_ICON} = require("../../utils/pushSender");
 
 // Helper function to format date
 const formatDate = (date) => {
@@ -87,12 +25,6 @@ exports.meetingReminder = onSchedule(
     },
     async (event) => {
       console.log("Meeting reminder function triggered");
-
-      // Check if VAPID keys are configured
-      if (!vapidPublicKey || !vapidPrivateKey) {
-        console.log("VAPID keys not configured, skipping meeting reminders");
-        return;
-      }
 
       try {
         const now = new Date();
@@ -277,17 +209,20 @@ exports.meetingReminder = onSchedule(
           for (const member of clubMembers) {
             if (!member.user) continue;
 
-            const subscriptions = await db.PushSubscription.findAll({
-              where: {userId: member.user.uid},
-            });
+            const [webN, nativeN] = await Promise.all([
+              db.PushSubscription.count({where: {userId: member.user.uid}}),
+              db.NativePushToken.count({where: {userId: member.user.uid}}),
+            ]);
 
-            if (subscriptions.length === 0) {
-              console.log(`    User ${member.user.uid} has no push subscriptions`);
+            if (webN === 0 && nativeN === 0) {
+              console.log(`    User ${member.user.uid} has no web or native push targets`);
               skipReasons.noSubscriptions++;
               continue;
             }
 
-            console.log(`    User ${member.user.uid} has ${subscriptions.length} subscription(s)`);
+            console.log(
+                `    User ${member.user.uid} has ${webN} web + ${nativeN} native target(s)`,
+            );
 
             // Send notification
             const notificationBody =
@@ -298,18 +233,18 @@ exports.meetingReminder = onSchedule(
               body: notificationBody,
             };
 
-            for (const subscription of subscriptions) {
-              const result = await sendPushNotification(
-                  subscription.subscriptionJson,
-                  notification.title,
-                  notification.body,
-                  {route: "/meetings", type: "meeting"},
-              );
-              if (result && result.success) {
-                meetingNotificationsSent++;
-                notificationsSent++;
-              }
-            }
+            const {web, native} = await sendNotificationsToUser(
+                member.user.uid,
+                notification.title,
+                notification.body,
+                {route: "/meetings", type: "meeting"},
+                {icon: DEFAULT_APP_ICON, badge: DEFAULT_APP_ICON},
+            );
+            const sentOk =
+              web.filter((r) => r.success).length +
+              native.filter((r) => r.success).length;
+            meetingNotificationsSent += sentOk;
+            notificationsSent += sentOk;
           }
 
           console.log(
