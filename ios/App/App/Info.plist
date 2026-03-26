@@ -51,6 +51,10 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Conscious Book Club uses the camera so you can take photos for your profile or posts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Conscious Book Club needs access to your photo library so you can attach images to posts and your profile.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

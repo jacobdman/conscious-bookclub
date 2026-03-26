@@ -27,3 +27,12 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+@keyframes iosPageFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ios-page-fade {
+  animation: iosPageFade 250ms ease-out;
+}

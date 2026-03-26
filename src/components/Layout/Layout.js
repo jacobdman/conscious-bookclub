@@ -16,6 +16,26 @@ import { usePullToRefresh } from 'hooks/usePullToRefresh';
 // Utils
 import { buildTheme } from 'theme';
 import { resolveThemeOverrides } from 'utils/themeResolver';
+import { getPlatform } from 'utils/platformHelpers';
+import { syncIosStatusBarForTheme } from 'utils/capacitorNative';
+
+const ROUTE_TITLES = {
+  '/': 'Dashboard',
+  '/feed': 'Feed',
+  '/books': 'Books',
+  '/books/club': 'Books',
+  '/goals': 'Goals',
+  '/goals/club': 'Goals',
+  '/calendar': 'Calendar',
+  '/club/manage': 'Manage Club',
+  '/profile': 'Profile',
+  '/meetings': 'Meetings',
+  '/quotes': 'Quotes',
+  '/join-club': 'Join Club',
+};
+
+/** iOS-native page-fade CSS class name — keyframes defined in index.css. */
+const IOS_FADE_CLASS = 'ios-page-fade';
 
 const Layout = ({ children, onRefresh }) => {
   const { user, userProfile, logout } = useAuth();
@@ -32,9 +52,11 @@ const Layout = ({ children, onRefresh }) => {
     const baseOverrides = currentClub?.themeOverrides || {};
     const effectiveOverrides = resolveThemeOverrides(baseOverrides, userClubThemeOverride);
     return buildTheme(effectiveOverrides);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentClub?.id, currentClub?.themeOverrides, userClubThemeOverride]);
   
   const isMobile = useMediaQuery(clubTheme.breakpoints.down('md'));
+  const isIosNative = getPlatform() === 'ios';
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -102,26 +124,19 @@ const Layout = ({ children, onRefresh }) => {
     };
   }, [currentClub, isMobile]); // Re-measure when club changes (affects header height) or mobile state changes
 
+  const pageTitle = ROUTE_TITLES[location.pathname] || 'Dashboard';
+
+  useEffect(() => {
+    syncIosStatusBarForTheme(clubTheme.palette.mode);
+  }, [clubTheme.palette.mode]);
+
   // Update page title based on route and club
   useEffect(() => {
-    const routeTitles = {
-      '/': 'Dashboard',
-      '/books': 'Books',
-      '/books/club': 'Books',
-      '/goals': 'Goals',
-      '/goals/club': 'Goals',
-      '/calendar': 'Calendar',
-      '/club/manage': 'Manage Club',
-      '/profile': 'Profile',
-      '/meetings': 'Meetings',
-    };
-
-    const pageTitle = routeTitles[location.pathname] || 'Dashboard';
     const clubName = currentClub?.name || '';
     const title = clubName ? `${clubName} - ${pageTitle}` : pageTitle;
-    
+
     document.title = title;
-  }, [location.pathname, currentClub]);
+  }, [location.pathname, currentClub, pageTitle]);
 
   const handleLogout = async () => {
     try {
@@ -202,7 +217,7 @@ const Layout = ({ children, onRefresh }) => {
               flex: 1,
               overflow: 'scroll',
               minHeight: 0,
-              // Mobile: space for BottomNav (56px) + safe area insetG
+              // Mobile: space for BottomNav (56px) + safe area insetBottom
               paddingBottom: { xs: 'calc(56px + env(safe-area-inset-bottom))', md: 0 },
             }}
           >
@@ -210,10 +225,23 @@ const Layout = ({ children, onRefresh }) => {
               <PullToRefreshIndicator
                 direction="top"
                 pullProgress={pullToRefresh.pullProgress}
+                pullDistance={pullToRefresh.pullDistance}
                 isRefreshing={pullToRefresh.isRefreshing}
               />
             )}
-            {children}
+            <Box
+              key={location.pathname}
+              className={isMobile && isIosNative ? IOS_FADE_CLASS : undefined}
+              sx={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignSelf: 'stretch',
+                minWidth: 0,
+              }}
+            >
+              {children}
+            </Box>
           </Box>
 
           {/* Mobile Bottom Nav - Hidden on Desktop */}

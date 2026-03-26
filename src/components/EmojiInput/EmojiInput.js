@@ -23,6 +23,7 @@ import ProfileAvatar from 'components/ProfileAvatar';
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { EMOJI_FONT_FAMILY } from 'utils/emojiFont';
 import { triggerHaptic } from 'utils/haptics';
+import { isIosNativeApp, iosBottomSheetPaperSx, iosSheetGrabberSx } from 'utils/iosNativeUi';
 import { alpha } from '@mui/material/styles';
 
 const LONG_PRESS_MS = 500;
@@ -307,23 +308,28 @@ const EmojiInput = ({ postId, reactions = [], showAddButton = true }) => {
         onClose={closeDrawer}
         onOpen={() => {}}
         PaperProps={{
-          sx: {
-            borderTopLeftRadius: 12,
-            borderTopRightRadius: 12,
+          sx: (theme) => ({
             maxHeight: '70vh',
             pb: 2,
-          },
+            ...(isIosNativeApp()
+              ? iosBottomSheetPaperSx(theme)
+              : { borderTopLeftRadius: 12, borderTopRightRadius: 12 }),
+          }),
         }}
       >
         <Box sx={{ px: 1 }}>
           <Stack direction="row" justifyContent="center" sx={{ py: 1 }}>
             <Box
-              sx={{
-                width: 40,
-                height: 4,
-                backgroundColor: 'divider',
-                borderRadius: 2,
-              }}
+              sx={
+                isIosNativeApp()
+                  ? iosSheetGrabberSx
+                  : {
+                      width: 40,
+                      height: 4,
+                      backgroundColor: 'divider',
+                      borderRadius: 2,
+                    }
+              }
             />
           </Stack>
           {emojiKeys.length === 0 ? (

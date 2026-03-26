@@ -13,7 +13,7 @@ import {
   InputLabel,
   Badge,
 } from '@mui/material';
-import { OpenInNew, ExitToApp } from '@mui/icons-material';
+import { OpenInNew, ExitToApp, ChevronRight } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useClubContext from 'contexts/Club';
 import FeedContext from 'contexts/Feed/FeedContext';
@@ -21,6 +21,7 @@ import { useContext } from 'react';
 // Utils
 import { getClubFeatures } from 'utils/clubFeatures';
 import MenuTour from 'components/Tours/MenuTour';
+import { getPlatform } from 'utils/platformHelpers';
 
 const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = false }) => {
   const navigate = useNavigate();
@@ -30,6 +31,26 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
   // FeedContext may not be available if not on Feed page, so use useContext with try/catch
   const feedContext = useContext(FeedContext);
   const unreadCount = feedContext?.unreadCount || 0;
+  const isIosMobileDrawer = isMobile && getPlatform() === 'ios';
+
+  const iosGroupedListProps = isIosMobileDrawer
+    ? {
+        sx: {
+          py: 0,
+          mb: 1.5,
+          mx: 0.5,
+          borderRadius: '10px',
+          overflow: 'hidden',
+          border: '1px solid',
+          borderColor: 'rgba(0,0,0,0.12)',
+          bgcolor: 'background.paper',
+        },
+      }
+    : { sx: { py: 0, mb: 1 } };
+
+  const iosChevron = isIosMobileDrawer ? (
+    <ChevronRight sx={{ color: 'text.disabled', fontSize: 22 }} />
+  ) : null;
   const [appVersion, setAppVersion] = useState('');
   const [versionTapCount, setVersionTapCount] = useState(0);
   const versionTapTimeoutRef = useRef(null);
@@ -187,22 +208,38 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
             <Typography variant="caption" sx={{ px: 2, py: 1, color: 'text.secondary', fontWeight: 'medium', textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Club Management
             </Typography>
-            <List sx={{ py: 0, mb: 1 }}>
-                {clubManagementItems.map((item) => (
+            <List {...iosGroupedListProps}>
+                {clubManagementItems.map((item, idx) => (
                     <ListItem 
                     button 
                     key={item.name}
                     onClick={() => handleNavigation(item.path)}
                     selected={location.pathname === item.path}
                         data-tour={item.path === '/club/manage' ? 'menu-manage-club' : 'menu-meetings'}
-                    sx={{
+                    secondaryAction={iosChevron}
+                    sx={
+                      isIosMobileDrawer
+                        ? {
+                            py: 1.1,
+                            px: 1.5,
+                            mb: 0,
+                            borderRadius: 0,
+                            borderBottom:
+                              idx === clubManagementItems.length - 1 ? 'none' : '1px solid rgba(0,0,0,0.08)',
+                            bgcolor:
+                              location.pathname === item.path ? 'action.selected' : 'transparent',
+                            pr: iosChevron ? 1 : undefined,
+                            '&:hover': { bgcolor: 'action.hover' },
+                          }
+                        : {
                     borderRadius: 1,
                     mb: 0.5,
                     bgcolor: location.pathname === item.path ? 'action.selected' : 'action.hover',
                     '&:hover': {
                         bgcolor: 'action.hover',
                     },
-                    }}
+                    }
+                    }
                 >
                     <ListItemText primary={item.name} />
                 </ListItem>
@@ -217,15 +254,30 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
         {/* Mobile: Profile Section */}
         {isMobile && (
             <>
-                <List sx={{ py: 0, mb: 1 }}>
-                    {mobileProfileItems.map((item) => (
+                <List {...iosGroupedListProps}>
+                    {mobileProfileItems.map((item, idx) => (
                     <ListItem 
                         button 
                         key={item.name}
                         onClick={() => handleNavigation(item.path)}
                         selected={location.pathname === item.path}
                         data-tour={item.path === '/profile' ? 'menu-profile-settings' : 'menu-calendar'}
-                        sx={{
+                        secondaryAction={iosChevron}
+                        sx={
+                          isIosMobileDrawer
+                            ? {
+                                py: 1.1,
+                                px: 1.5,
+                                mb: 0,
+                                borderRadius: 0,
+                                borderBottom:
+                                  idx === mobileProfileItems.length - 1 ? 'none' : '1px solid rgba(0,0,0,0.08)',
+                                bgcolor:
+                                  location.pathname === item.path ? 'action.selected' : 'transparent',
+                                pr: iosChevron ? 1 : undefined,
+                                '&:hover': { bgcolor: 'action.hover' },
+                              }
+                            : {
                         bgcolor: location.pathname === item.path ? 'action.selected' : 'transparent',
                         borderRadius: 1,
                         mb: 0.5,
@@ -343,10 +395,21 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
           </>
         )}
 
-        <List sx={{ py: 0 }}>
+        <List {...(isIosMobileDrawer ? iosGroupedListProps : { sx: { py: 0 } })}>
           <ListItem 
             button 
             onClick={() => handleNavigation('/landing')}
+            secondaryAction={iosChevron}
+            sx={
+              isIosMobileDrawer
+                ? {
+                    py: 1.1,
+                    px: 1.5,
+                    borderRadius: 0,
+                    pr: iosChevron ? 1 : undefined,
+                  }
+                : undefined
+            }
           >
             <ListItemText 
               primary="Landing Page" 
@@ -365,9 +428,41 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
         backgroundColor: 'background.paper',
         zIndex: 1
       }}>
-        <List sx={{ py: 0 }}>
+        <List
+          {...(isIosMobileDrawer
+            ? {
+                sx: {
+                  py: 0,
+                  mb: 0,
+                  mx: 0.5,
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  border: '1px solid',
+                  borderColor: 'rgba(0,0,0,0.12)',
+                  bgcolor: 'background.paper',
+                },
+              }
+            : { sx: { py: 0 } })}
+        >
             {/* Sign Out Moved Here */}
-            <ListItem button onClick={() => { if(onLogout) onLogout(); if(onClose) onClose(); }} sx={{ mb: 1 }}>
+            <ListItem
+              button
+              onClick={() => {
+                if (onLogout) onLogout();
+                if (onClose) onClose();
+              }}
+              sx={
+                isIosMobileDrawer
+                  ? {
+                      py: 1.1,
+                      px: 1.5,
+                      borderRadius: 0,
+                      borderBottom: '1px solid rgba(0,0,0,0.08)',
+                      mb: 0,
+                    }
+                  : { mb: 1 }
+              }
+            >
                 <ListItemIcon sx={{ minWidth: 32 }}>
                     <ExitToApp sx={{ color: 'error.main', fontSize: 20 }} />
                 </ListItemIcon>
@@ -387,7 +482,11 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
           <ListItem 
             button 
             onClick={() => handleExternalLink('https://forms.gle/jJzitZf44X4r2EPB8')}
-            sx={{ py: 0.5, px: 1 }}
+            sx={
+              isIosMobileDrawer
+                ? { py: 1.1, px: 1.5, borderRadius: 0, borderBottom: '1px solid rgba(0,0,0,0.08)' }
+                : { py: 0.5, px: 1 }
+            }
           >
             <ListItemIcon sx={{ minWidth: 32 }}>
               <OpenInNew sx={{ color: 'primary.main', fontSize: 16 }} />
@@ -406,7 +505,11 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
           <ListItem 
             button 
             onClick={() => handleExternalLink('https://forms.gle/wawNHs8zAtXvE4NH7')}
-            sx={{ py: 0.5, px: 1 }}
+            sx={
+              isIosMobileDrawer
+                ? { py: 1.1, px: 1.5, borderRadius: 0 }
+                : { py: 0.5, px: 1 }
+            }
           >
             <ListItemIcon sx={{ minWidth: 32 }}>
               <OpenInNew sx={{ color: 'error.main', fontSize: 16 }} />

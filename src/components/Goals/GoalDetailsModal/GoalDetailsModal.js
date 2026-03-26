@@ -31,6 +31,7 @@ import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
 import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
+import IOSConfirmDialog from 'components/IOSConfirmDialog';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
 import MonthlyStreakGrid from 'components/MonthlyStreakGrid';
 import { createPost } from 'services/posts/posts.service';
@@ -1023,20 +1024,16 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         onConfirm={handleShareConfirm}
         completionLabel={shareDialog.label}
       />
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Delete goal?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            This will permanently delete the goal and its entries. This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <IOSConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="Delete goal?"
+        description="This will permanently delete the goal and its entries. This action cannot be undone."
+        cancelLabel="Cancel"
+        confirmLabel="Delete"
+        destructive
+        onConfirm={handleConfirmDelete}
+      />
     </>
   );
 };

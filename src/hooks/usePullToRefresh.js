@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { getPlatform } from 'utils/platformHelpers';
+import { triggerHaptic } from 'utils/haptics';
 
 const DEFAULT_THRESHOLD = 80;
 const BOUNDARY_TOLERANCE = 2;
@@ -29,8 +31,6 @@ export function usePullToRefresh({
   useEffect(() => {
     pullDistanceRef.current = pullDistance;
   }, [pullDistance]);
-
-  const pullProgress = Math.min(pullDistance / threshold, 1);
 
   const isAtBoundary = useCallback(
     (el) => {
@@ -88,6 +88,9 @@ export function usePullToRefresh({
       setPullDistance(0);
 
       if (currentDistance >= threshold) {
+        if (getPlatform() === 'ios') {
+          triggerHaptic('light');
+        }
         const promise = Promise.resolve(onRefresh());
         setIsRefreshing(true);
         promise.finally(() => {

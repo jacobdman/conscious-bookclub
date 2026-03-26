@@ -26,6 +26,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import GoalFormTour from 'components/Tours/GoalFormTour';
+import IOSConfirmDialog from 'components/IOSConfirmDialog';
 
 const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null }) => {
   // Note: onArchive is kept for backward compatibility but actually deletes the goal
@@ -416,20 +417,16 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
             {snackbar.message}
           </Alert>
         </Snackbar>
-        <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-          <DialogTitle>Delete goal?</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2">
-              This will permanently delete the goal and its entries. This action cannot be undone.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-            <Button onClick={handleConfirmDelete} color="error" variant="contained">
-              Delete
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <IOSConfirmDialog
+          open={deleteConfirmOpen}
+          onClose={() => setDeleteConfirmOpen(false)}
+          title="Delete goal?"
+          description="This will permanently delete the goal and its entries. This action cannot be undone."
+          cancelLabel="Cancel"
+          confirmLabel="Delete"
+          destructive
+          onConfirm={handleConfirmDelete}
+        />
       </Dialog>
     </LocalizationProvider>
   );

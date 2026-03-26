@@ -137,7 +137,7 @@ const ThemeSettings = () => {
       setSuccess(true);
       setTimeout(() => setSuccess(false), SUCCESS_MESSAGE_DURATION);
     } catch (saveError) {
-      console.error('Error saving theme preferences:', saveError);
+      console.error('Error saving theme preferences:', saveError?.message || saveError);
       setError(saveError.message || 'Failed to save theme preferences');
     } finally {
       setSaving(false);

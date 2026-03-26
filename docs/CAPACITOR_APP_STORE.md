@@ -12,15 +12,15 @@ npm run cap:android  # Open Android Studio
 
 ## iOS (App Store Connect)
 
-- [ ] **Apple Developer account** – Enroll at [developer.apple.com](https://developer.apple.com) ($99/year).
-- [ ] **App ID** – Create an App ID with bundle ID `com.consciousbookclub.app` and enable Push Notifications capability.
-- [ ] **Provisioning** – Create provisioning profiles (development and distribution) in Apple Developer portal.
-- [ ] **Xcode** – Open `ios/App/App.xcworkspace`, select your Team and signing certificate.
-- [ ] **Push Notifications** – In Xcode: select the **App** target → **Signing & Capabilities** → **+ Capability** → add **Push Notifications**. (Without this you get "no valid aps-environment entitlement" when registering.) Also add to `AppDelegate.swift` the `didRegisterForRemoteNotificationsWithDeviceToken` / `didFailToRegisterForRemoteNotificationsWithError` handlers (see [Capacitor Push Notifications](https://capacitorjs.com/docs/apis/push-notifications)); these are already in the project.
-- [ ] **Firebase** – Add `GoogleService-Info.plist` to `ios/App/App/` (required for FCM and for Google Sign-In). Configure in Firebase Console.
-- [ ] **Google Sign-In (iOS)** – See [GOOGLE_SIGNIN_IOS.md](GOOGLE_SIGNIN_IOS.md). Summary: add `GoogleService-Info.plist`, set the URL scheme in `Info.plist` to your `REVERSED_CLIENT_ID` from that plist (replace `YOUR_REVERSED_CLIENT_ID`), enable Google in Firebase Auth. `AppDelegate.swift` already forwards URL opens to the plugin.
-- [ ] **Privacy** – Add any required usage descriptions to `ios/App/App/Info.plist` (e.g. `NSCameraUsageDescription` if you add camera later).
-- [ ] **Deployment target** – Currently iOS 15.0; increase in Xcode if needed.
+- [x] **Apple Developer account** – Enroll at [developer.apple.com](https://developer.apple.com) ($99/year).
+- [x] **App ID** – Create an App ID with bundle ID `com.consciousbookclub.app` and enable Push Notifications capability.
+- [x] **Provisioning** – Create provisioning profiles (development and distribution) in Apple Developer portal.
+- [x] **Xcode** – Open `ios/App/App.xcworkspace`, select your Team and signing certificate.
+- [x] **Push Notifications** – In Xcode: select the **App** target → **Signing & Capabilities** → **+ Capability** → add **Push Notifications**. (Without this you get "no valid aps-environment entitlement" when registering.) Also add to `AppDelegate.swift` the `didRegisterForRemoteNotificationsWithDeviceToken` / `didFailToRegisterForRemoteNotificationsWithError` handlers (see [Capacitor Push Notifications](https://capacitorjs.com/docs/apis/push-notifications)); these are already in the project.
+- [x] **Firebase** – Add `GoogleService-Info.plist` to `ios/App/App/` (required for FCM and for Google Sign-In). Configure in Firebase Console.
+- [x] **Google Sign-In (iOS)** – See [GOOGLE_SIGNIN_IOS.md](GOOGLE_SIGNIN_IOS.md). Summary: add `GoogleService-Info.plist`, set the URL scheme in `Info.plist` to your `REVERSED_CLIENT_ID` from that plist (replace `YOUR_REVERSED_CLIENT_ID`), enable Google in Firebase Auth. `AppDelegate.swift` already forwards URL opens to the plugin.
+- [x] **Privacy** – `NSCameraUsageDescription` and `NSPhotoLibraryUsageDescription` are set in `ios/App/App/Info.plist` for profile and feed image uploads (`<input type="file" accept="image/*" />`). Add more keys if you add camera/mic/location/tracking features later.
+- [x] **Deployment target** – iOS 15.0 in Xcode matches Capacitor 8’s minimum; raise only if you choose to drop older OS versions or a dependency requires it.
 - [ ] **Archive and upload** – Product → Archive, then Distribute App to App Store Connect.
 - [ ] **Listing** – Screenshots, description, keywords, privacy policy URL, category.
 

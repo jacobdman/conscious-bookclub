@@ -23,6 +23,8 @@ import PostCard from 'components/PostCard';
 import MentionInput from 'components/MentionInput';
 import { uploadPostImages } from 'services/storage';
 import { encodeMentions } from 'utils/mentionHelpers';
+import { getPlatform } from 'utils/platformHelpers';
+import { triggerHaptic } from 'utils/haptics';
 
 const FeedSection = () => {
   const { user } = useAuth();
@@ -396,67 +398,78 @@ const FeedSection = () => {
   return (
     <Box
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
         flex: 1,
-        backgroundColor: 'background.default',
-        overflow: 'hidden',
         position: 'relative',
+        backgroundColor: 'background.default',
       }}
     >
       <Box
         sx={{
-          flex: 1,
-          position: 'relative',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
         }}
       >
-        {/* Messages Feed - Scrollable */}
         <Box
-          ref={scrollContainerRef}
           sx={{
-            height: '100%',
-            overflowY: 'auto',
-            px: 2,
-            py: 1,
-            display: 'flex',
-            flexDirection: 'column',
+            flex: 1,
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          {postsContent}
-          <PullToRefreshIndicator
-            direction="bottom"
-            pullProgress={pullToRefresh.pullProgress}
-            isRefreshing={pullToRefresh.isRefreshing}
-          />
+          {/* Messages Feed - Scrollable */}
+          <Box
+            ref={scrollContainerRef}
+            sx={{
+              height: '100%',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehaviorY: 'auto',
+              px: 2,
+              py: 1,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {postsContent}
+            <PullToRefreshIndicator
+              direction="bottom"
+              pullProgress={pullToRefresh.pullProgress}
+              pullDistance={pullToRefresh.pullDistance}
+              isRefreshing={pullToRefresh.isRefreshing}
+            />
+          </Box>
+
+          {/* Scroll-to-bottom FAB */}
+          {showScrollToBottom && (
+            <Fab
+              size="small"
+              color="primary"
+              onClick={scrollToBottom}
+              sx={{
+                position: 'absolute',
+                bottom: 16,
+                right: 16,
+                zIndex: 11,
+                transition: 'opacity 0.2s, transform 0.2s',
+                '&:hover': {
+                  transform: 'scale(1.1)',
+                },
+              }}
+              aria-label="Scroll to bottom"
+            >
+              <KeyboardArrowDown />
+            </Fab>
+          )}
         </Box>
 
-        {/* Scroll-to-bottom FAB */}
-        {showScrollToBottom && (
-          <Fab
-            size="small"
-            color="primary"
-            onClick={scrollToBottom}
-            sx={{
-              position: 'absolute',
-              bottom: 16,
-              right: 16,
-              zIndex: 11,
-              transition: 'opacity 0.2s, transform 0.2s',
-              '&:hover': {
-                transform: 'scale(1.1)',
-              },
-            }}
-            aria-label="Scroll to bottom"
-          >
-            <KeyboardArrowDown />
-          </Fab>
-        )}
-      </Box>
-
-      {/* Input Area - Sticky at bottom */}
-      <Paper
+        {/* Input Area */}
+        <Paper
         elevation={0}
         sx={{
           p: 2,
@@ -644,7 +657,10 @@ const FeedSection = () => {
                   control={
                     <Switch
                       checked={showActivity}
-                      onChange={(e) => setShowActivity(e.target.checked)}
+                      onChange={(e) => {
+                        if (getPlatform() === 'ios') triggerHaptic('light');
+                        setShowActivity(e.target.checked);
+                      }}
                       color="primary"
                       size="small"
                     />
@@ -656,8 +672,9 @@ const FeedSection = () => {
             </Menu>
           </Box>
         </Box>
-      </Paper>
-              </Box>
+        </Paper>
+      </Box>
+    </Box>
   );
 };
 

@@ -8,10 +8,6 @@ import {
   Checkbox,
   SwipeableDrawer,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   Divider,
   Button,
   Stack,
@@ -30,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import ProfileAvatar from 'components/ProfileAvatar';
+import IOSConfirmDialog from 'components/IOSConfirmDialog';
 import ReplyQuote from 'components/ReplyQuote';
 import EmojiInput from 'components/EmojiInput';
 import MentionInput from 'components/MentionInput';
@@ -38,6 +35,8 @@ import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
 import { triggerHaptic } from 'utils/haptics';
 import { formatSemanticDateTime } from 'utils/dateHelpers';
 import { formatMeetingDisplay } from 'utils/meetingTime';
+import { isIosNativeApp, iosBottomSheetPaperSx, iosSheetGrabberSx } from 'utils/iosNativeUi';
+import { getPlatform } from 'utils/platformHelpers';
 import { renderMentions, encodeMentions, MENTION_REGEX, parseMentions, extractFirstLink } from 'utils/mentionHelpers';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
@@ -1082,12 +1081,23 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         onClose={closeActions}
         onOpen={() => {}}
         PaperProps={{
-          sx: { borderTopLeftRadius: 12, borderTopRightRadius: 12, pb: 2 },
+          sx: (theme) => ({
+            pb: 2,
+            ...(isIosNativeApp()
+              ? iosBottomSheetPaperSx(theme)
+              : { borderTopLeftRadius: 12, borderTopRightRadius: 12 }),
+          }),
         }}
       >
         <Box sx={{ p: 2 }}>
           <Stack direction="row" justifyContent="center" sx={{ mb: 1 }}>
-            <Box sx={{ width: 40, height: 4, backgroundColor: 'divider', borderRadius: 2 }} />
+            <Box
+              sx={
+                isIosNativeApp()
+                  ? iosSheetGrabberSx
+                  : { width: 40, height: 4, backgroundColor: 'divider', borderRadius: 2 }
+              }
+            />
           </Stack>
           <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
             Quick reactions
@@ -1178,31 +1188,17 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         </Box>
         {fullPickerOpen && renderFullEmojiPicker()}
       </SwipeableDrawer>
-      <Dialog
+      <IOSConfirmDialog
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
-        aria-labelledby="delete-post-dialog-title"
-        aria-describedby="delete-post-dialog-description"
-      >
-        <DialogTitle id="delete-post-dialog-title">Delete post</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="delete-post-dialog-description">
-            This will permanently remove the post from the feed.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteConfirm}
-            color="error"
-            disabled={isSubmitting}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title="Delete post"
+        description="This will permanently remove the post from the feed."
+        cancelLabel="Cancel"
+        confirmLabel="Delete"
+        destructive
+        confirmDisabled={isSubmitting}
+        onConfirm={handleDeleteConfirm}
+      />
       <Dialog
         open={Boolean(fullscreenImageUrl)}
         onClose={() => setFullscreenImageUrl(null)}
@@ -1246,7 +1242,14 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         onClose={() => setCopySnackbar({ open: false, message: '' })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setCopySnackbar({ open: false, message: '' })} severity="success">
+        <Alert
+          onClose={
+            getPlatform() === 'ios'
+              ? undefined
+              : () => setCopySnackbar({ open: false, message: '' })
+          }
+          severity="success"
+        >
           {copySnackbar.message}
         </Alert>
       </Snackbar>

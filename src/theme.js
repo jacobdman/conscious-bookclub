@@ -1,6 +1,10 @@
 import { createTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { TYPOGRAPHY_FONT_FAMILY } from 'utils/emojiFont';
+import { EMOJI_FONT_FALLBACK, TYPOGRAPHY_FONT_FAMILY } from 'utils/emojiFont';
+import { getPlatform } from 'utils/platformHelpers';
+
+/** SF Pro / system UI on iOS; keep emoji fallbacks for reactions and pickers. */
+export const IOS_TYPOGRAPHY_FONT_FAMILY = `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, ${EMOJI_FONT_FALLBACK}`;
 
 export const baseThemeOptions = {
   palette: {
@@ -270,6 +274,128 @@ const componentOverrides = {
   },
 };
 
+/** MUI component overrides applied only when running Capacitor iOS (native feel). */
+const iosNativeComponentOverrides = {
+  MuiSwitch: {
+    defaultProps: {
+      disableRipple: true,
+      disableFocusRipple: true,
+      disableTouchRipple: true,
+    },
+    styleOverrides: {
+      root: ({ theme }) => ({
+        width: 51,
+        height: 31,
+        padding: 0,
+        margin: '4px 8px 4px 0',
+        '& .MuiSwitch-switchBase': {
+          padding: 2,
+          margin: 0,
+          transitionDuration: '200ms',
+          '&:hover': { backgroundColor: 'transparent' },
+          '&.Mui-checked': {
+            transform: 'translateX(20px)',
+            color: '#fff',
+            '& + .MuiSwitch-track': {
+              backgroundColor: '#34C759',
+              opacity: 1,
+              border: 0,
+            },
+            '&.Mui-disabled + .MuiSwitch-track': {
+              opacity: 0.5,
+            },
+          },
+          '&.Mui-focusVisible .MuiSwitch-thumb': {
+            color: '#34C759',
+            border: '6px solid #fff',
+          },
+          '&.Mui-disabled .MuiSwitch-thumb': {
+            opacity: 0.5,
+          },
+        },
+        '& .MuiSwitch-thumb': {
+          boxSizing: 'border-box',
+          width: 27,
+          height: 27,
+          backgroundColor: '#fff',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.04)',
+        },
+        '& .MuiSwitch-track': {
+          borderRadius: 31 / 2,
+          backgroundColor:
+            theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.22) : '#E9E9EA',
+          opacity: 1,
+          border: 0,
+          boxSizing: 'border-box',
+          transition: 'background-color 200ms',
+        },
+      }),
+    },
+  },
+  MuiDialog: {
+    styleOverrides: {
+      container: {
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      },
+      paperFullScreen: {
+        height: 'auto',
+        flex: 1,
+        minHeight: 0,
+      },
+    },
+  },
+  MuiSnackbar: {
+    styleOverrides: {
+      root: {
+        '& .MuiPaper-root': {
+          borderRadius: 999,
+          overflow: 'hidden',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+        },
+        '& .MuiAlert-root': {
+          borderRadius: 999,
+          alignItems: 'center',
+        },
+        '& .MuiAlert-icon': {
+          marginRight: 8,
+        },
+        '& .MuiAlert-action': {
+          paddingTop: 0,
+          marginRight: 0,
+        },
+      },
+    },
+  },
+};
+
+const mergeComponentOverrides = (base, extra) => {
+  const keys = new Set([...Object.keys(base), ...Object.keys(extra)]);
+  const merged = { ...base };
+  keys.forEach((key) => {
+    if (!extra[key]) return;
+    if (!merged[key]) {
+      merged[key] = extra[key];
+      return;
+    }
+    merged[key] = {
+      ...merged[key],
+      ...extra[key],
+      styleOverrides: {
+        ...(merged[key].styleOverrides || {}),
+        ...(extra[key].styleOverrides || {}),
+      },
+      defaultProps: {
+        ...(merged[key].defaultProps || {}),
+        ...(extra[key].defaultProps || {}),
+      },
+    };
+  });
+  return merged;
+};
+
 const applyDarkModePaletteDefaults = (palette) => {
   const textPrimary = palette.text?.primary || '#F5F1EA';
   const textSecondary = palette.text?.secondary || alpha(textPrimary, 0.72);
@@ -305,7 +431,18 @@ const applyDarkModePaletteDefaults = (palette) => {
 };
 
 export const buildTheme = (overrides = {}) => {
-  const theme = createTheme({ ...baseThemeOptions, components: componentOverrides }, overrides || {});
+  const isIosNative = getPlatform() === 'ios';
+  const typography = isIosNative
+    ? { ...baseThemeOptions.typography, fontFamily: IOS_TYPOGRAPHY_FONT_FAMILY }
+    : baseThemeOptions.typography;
+  const components = isIosNative
+    ? mergeComponentOverrides(componentOverrides, iosNativeComponentOverrides)
+    : componentOverrides;
+
+  const theme = createTheme(
+    { ...baseThemeOptions, typography, components },
+    overrides || {},
+  );
   const palette = theme.palette || {};
   const augment = palette.augmentColor;
 

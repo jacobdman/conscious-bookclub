@@ -9,22 +9,44 @@ export function isNativePlatform() {
 }
 
 /**
+ * Sync status bar icon style with app light/dark mode (iOS overlay layout).
+ * Call when club/theme palette mode changes (e.g. from Layout).
+ * @param {'light' | 'dark'} paletteMode
+ */
+export async function syncIosStatusBarForTheme(paletteMode) {
+  if (Capacitor.getPlatform() !== 'ios') return;
+
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar');
+    await StatusBar.setStyle({
+      style: paletteMode === 'dark' ? Style.Dark : Style.Light,
+    });
+  } catch (e) {
+    console.warn('syncIosStatusBarForTheme failed:', e);
+  }
+}
+
+/**
  * Initialize native UI: status bar, keyboard behavior, and hide splash screen.
  * Call once when the app is ready (e.g. after auth loading is done).
  */
 export async function initCapacitorNative() {
   if (!Capacitor.isNativePlatform()) return;
 
-  const [{ StatusBar }, { Keyboard }, { SplashScreen }] = await Promise.all([
+  const [{ StatusBar, Style }, { Keyboard }, { SplashScreen }] = await Promise.all([
     import('@capacitor/status-bar'),
     import('@capacitor/keyboard'),
     import('@capacitor/splash-screen'),
   ]);
 
-  // Status bar: match app theme (#BFA480 - light background, use dark content)
   try {
-    await StatusBar.setStyle({ style: 'DARK' });
-    await StatusBar.setBackgroundColor({ color: '#BFA480' });
+    if (Capacitor.getPlatform() === 'ios') {
+      await StatusBar.setOverlaysWebView({ overlay: true });
+      await StatusBar.setStyle({ style: Style.Default });
+    } else {
+      await StatusBar.setStyle({ style: Style.Dark });
+      await StatusBar.setBackgroundColor({ color: '#BFA480' });
+    }
   } catch (e) {
     console.warn('StatusBar config failed:', e);
   }

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Snackbar, Alert, useMediaQuery, useTheme } from '@mui/material';
 import ErrorNotificationContext from './ErrorNotificationContext';
+import { getPlatform } from 'utils/platformHelpers';
 
 // ******************STATE VALUES**********************
 const ErrorNotificationProvider = (props) => {
@@ -52,7 +53,11 @@ const ErrorNotificationProvider = (props) => {
             : undefined
         }
       >
-        <Alert onClose={handleClose} severity="error" sx={{ width: '100%' }}>
+        <Alert
+          onClose={getPlatform() === 'ios' ? undefined : handleClose}
+          severity="error"
+          sx={{ width: '100%' }}
+        >
           {error}
         </Alert>
       </Snackbar>
