@@ -120,16 +120,12 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     const newText = textBefore + '@' + textAfter;
     setReplyText(newText);
     
-    // Focus and set cursor after @
+    // Focus and set cursor after @ (MentionInput syncs suggestions on value change)
     setTimeout(() => {
       if (input) {
         const newCursorPos = start + 1;
         input.setSelectionRange(newCursorPos, newCursorPos);
         input.focus();
-        
-        // Trigger input event to activate mention dropdown
-        const event = new Event('input', { bubbles: true });
-        input.dispatchEvent(event);
       }
     }, 0);
   };
@@ -151,9 +147,6 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         const newCursorPos = start + 1;
         input.setSelectionRange(newCursorPos, newCursorPos);
         input.focus();
-
-        const event = new Event('input', { bubbles: true });
-        input.dispatchEvent(event);
       }
     }, 0);
   };
@@ -1240,15 +1233,40 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         onClose={closeImageGallery}
         fullScreen
         aria-label="Fullscreen images"
-        PaperProps={{
-          sx: {
-            backgroundColor: 'common.black',
-            margin: 0,
-            height: '100%',
-            maxHeight: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
+        slotProps={{
+          container: {
+            sx: {
+              p: 0,
+              alignItems: 'stretch',
+            },
+          },
+          backdrop: {
+            sx: {
+              backgroundColor: 'common.black',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
+            },
+          },
+          paper: {
+            elevation: 0,
+            sx: {
+              m: 0,
+              width: '100%',
+              maxWidth: '100%',
+              height: '100%',
+              maxHeight: '100%',
+              borderRadius: 0,
+              border: 'none',
+              boxShadow: 'none',
+              bgcolor: 'common.black',
+              backgroundImage: 'none',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+              overflow: 'hidden',
+            },
           },
         }}
       >

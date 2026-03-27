@@ -324,16 +324,12 @@ const FeedSection = () => {
     const newText = textBefore + '@' + textAfter;
     setNewPostText(newText);
     
-    // Focus and set cursor after @
+    // Focus and set cursor after @ (MentionInput syncs suggestions on value change)
     setTimeout(() => {
       if (input) {
         const newCursorPos = start + 1;
         input.setSelectionRange(newCursorPos, newCursorPos);
         input.focus();
-        
-        // Trigger input event to activate mention dropdown
-        const event = new Event('input', { bubbles: true });
-        input.dispatchEvent(event);
       }
     }, 0);
   };

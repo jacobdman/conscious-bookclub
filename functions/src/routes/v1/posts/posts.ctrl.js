@@ -1,4 +1,5 @@
 const db = require("../../../../db/models/index");
+const {EVERYONE_MENTION_USER_ID} = require("../../../../utils/mentionHelpers");
 const {sendNotificationsToUser} = require("../../../utils/pushSender");
 
 const FEED_NOTIFICATION_ICON =
@@ -17,6 +18,41 @@ const sanitizeImages = (images) => {
       .map((url) => (typeof url === "string" ? url.trim() : ""))
       .filter((url) => url.length > 0)
       .slice(0, maxImages);
+};
+
+/**
+ * Replace @everyone sentinel with all club member UIDs (except author).
+ * Throws 400 if sentinel present and author is not owner/admin.
+ */
+const expandEveryoneMentionsIfNeeded = async (mentionedUserIds, clubIdInt, authorId) => {
+  if (!mentionedUserIds || !mentionedUserIds.includes(EVERYONE_MENTION_USER_ID)) {
+    return mentionedUserIds;
+  }
+
+  const membership = await db.ClubMember.findOne({
+    where: {clubId: clubIdInt, userId: authorId},
+  });
+  if (!membership || !["owner", "admin"].includes(membership.role)) {
+    const error = new Error("Only club owners and admins can use @everyone");
+    error.status = 400;
+    throw error;
+  }
+
+  const members = await db.ClubMember.findAll({
+    where: {clubId: clubIdInt},
+    include: [{model: db.User, as: "user", attributes: ["uid"]}],
+  });
+
+  const result = mentionedUserIds.filter((id) => id !== EVERYONE_MENTION_USER_ID);
+  const seen = new Set(result);
+  for (const m of members) {
+    const uid = m.user?.uid;
+    if (uid && uid !== authorId && !seen.has(uid)) {
+      seen.add(uid);
+      result.push(uid);
+    }
+  }
+  return result;
 };
 
 // Helper to emit Socket.io events via Cloud Run service
@@ -465,13 +501,19 @@ const createPost = async (req, res, next) => {
       }
     }
 
+    const resolvedMentionedUserIds = await expandEveryoneMentionsIfNeeded(
+        mentionedUserIds,
+        clubIdInt,
+        postData.authorId,
+    );
+
     const post = await db.Post.create({
       ...postData,
       clubId: clubIdInt,
       isSpoiler: postData.isSpoiler || false,
       isActivity: postData.isActivity || false,
       images,
-      mentionedUserIds: mentionedUserIds.length > 0 ? mentionedUserIds : null,
+      mentionedUserIds: resolvedMentionedUserIds.length > 0 ? resolvedMentionedUserIds : null,
     });
 
     // Fetch with associations for Socket.io event
@@ -491,7 +533,7 @@ const createPost = async (req, res, next) => {
     }
     await sendFeedNotificationsForPost(serializedPost, clubIdInt, postData.authorId, {
       postData,
-      mentionedUserIds,
+      mentionedUserIds: resolvedMentionedUserIds,
       parentPostAuthorId,
     });
 
@@ -559,7 +601,13 @@ const updatePost = async (req, res, next) => {
           mentionedUserIds.push(mentionedUserId);
         }
       }
-      updatedFields.mentionedUserIds = mentionedUserIds.length > 0 ? mentionedUserIds : null;
+      const resolvedMentionedUserIds = await expandEveryoneMentionsIfNeeded(
+          mentionedUserIds,
+          parseInt(clubId),
+          userId,
+      );
+      updatedFields.mentionedUserIds =
+        resolvedMentionedUserIds.length > 0 ? resolvedMentionedUserIds : null;
     }
 
     if (typeof postData.isSpoiler === "boolean") {

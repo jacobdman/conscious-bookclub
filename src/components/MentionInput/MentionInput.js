@@ -7,9 +7,18 @@ import {
   ListItemAvatar,
   ListItemText,
   Box,
+  Avatar,
 } from '@mui/material';
+import { Groups as GroupsIcon } from '@mui/icons-material';
 import ProfileAvatar from 'components/ProfileAvatar';
 import useClubContext from 'contexts/Club';
+import { EVERYONE_MENTION_USER_ID } from 'utils/mentionHelpers';
+
+const EVERYONE_PICK_USER = {
+  uid: EVERYONE_MENTION_USER_ID,
+  displayName: 'everyone',
+  email: null,
+};
 
 /**
  * MentionInput - A text input component that supports @mentions with searchable dropdown
@@ -35,7 +44,8 @@ const MentionInput = ({
   inputRef,
   ...props
 }) => {
-  const { clubMembers } = useClubContext();
+  const { clubMembers, currentClub } = useClubContext();
+  const canUseEveryoneMention = ['owner', 'admin'].includes(currentClub?.role);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -44,56 +54,82 @@ const MentionInput = ({
   const textFieldRef = useRef(null);
   const suggestionsRef = useRef(null);
 
-  // Search users based on query
+  // Search users based on query; @everyone for owners/admins only
   const searchUsers = useCallback((query) => {
     const allUsers = clubMembers?.map(member => member.user).filter(Boolean) || [];
-    
-    if (!query.trim()) {
-      return allUsers.slice(0, 10); // Show first 10 users when no query
+    const q = query.toLowerCase().trim();
+    const userCap = canUseEveryoneMention ? 9 : 10;
+
+    let userResults;
+    if (!q) {
+      userResults = allUsers.slice(0, userCap);
+    } else {
+      userResults = allUsers
+        .filter((user) => {
+          const displayName = (user.displayName || user.email || '').toLowerCase();
+          return displayName.includes(q);
+        })
+        .slice(0, userCap);
     }
-    
-    const searchTerm = query.toLowerCase().trim();
-    return allUsers
-      .filter(user => {
-        const displayName = (user.displayName || user.email || '').toLowerCase();
-        return displayName.includes(searchTerm);
-      })
-      .slice(0, 10); // Limit to 10 results
-  }, [clubMembers]);
+
+    const showEveryone =
+      canUseEveryoneMention && (q.length === 0 || 'everyone'.startsWith(q));
+    if (!showEveryone) {
+      return userResults;
+    }
+
+    return [EVERYONE_PICK_USER, ...userResults.filter((u) => u.uid !== EVERYONE_MENTION_USER_ID)].slice(
+      0,
+      10,
+    );
+  }, [clubMembers, canUseEveryoneMention]);
+
+  // Shared: caret + value -> mention dropdown state (used by onChange and when value updates without a synthetic change event, e.g. @ toolbar button)
+  const applyMentionStateAtCaret = useCallback(
+    (newValue, cursorPos) => {
+      const pos = cursorPos ?? newValue.length;
+      const textBeforeCursor = newValue.slice(0, pos);
+      const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+      if (lastAtIndex !== -1) {
+        const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1);
+        const hasSpaceAfterAt = textAfterAt.includes(' ') || textAfterAt.includes('\n');
+
+        if (!hasSpaceAfterAt) {
+          setMentionStartPos(lastAtIndex);
+          setShowSuggestions(true);
+          setSelectedIndex(0);
+          setSuggestions(searchUsers(textAfterAt));
+          return;
+        }
+      }
+      setShowSuggestions(false);
+    },
+    [searchUsers],
+  );
+
+  // Programmatic @ insert (parent setState) does not fire React onChange; defer past parent setTimeout(0) that moves the caret
+  useEffect(() => {
+    const input = textFieldRef.current;
+    if (!input) return;
+
+    const id = window.setTimeout(() => {
+      if (document.activeElement !== input) return;
+      const cursorPos = input.selectionStart ?? value.length;
+      applyMentionStateAtCaret(value, cursorPos);
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, [value, applyMentionStateAtCaret]);
 
   // Handle text change and detect @ mentions
   const handleChange = (e) => {
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart;
-    
+
     onChange(e);
 
-    // Find @ symbol before cursor
-    const textBeforeCursor = newValue.slice(0, cursorPos);
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
-    // Check if we're in a mention context
-    if (lastAtIndex !== -1) {
-      const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1);
-      const hasSpaceAfterAt = textAfterAt.includes(' ') || textAfterAt.includes('\n');
-      
-      if (!hasSpaceAfterAt) {
-        // We're typing a mention
-        setMentionStartPos(lastAtIndex);
-        setShowSuggestions(true);
-        setSelectedIndex(0);
-        
-        // Immediately search (no debounce for better UX)
-        const results = searchUsers(textAfterAt);
-        setSuggestions(results);
-      } else {
-        // Space found, close suggestions
-        setShowSuggestions(false);
-      }
-    } else {
-      // No @ before cursor
-      setShowSuggestions(false);
-    }
+    applyMentionStateAtCaret(newValue, cursorPos);
   };
 
   // Insert mention when user selects from dropdown
@@ -272,15 +308,27 @@ const MentionInput = ({
                 }}
               >
                 <ListItemAvatar>
-                  <ProfileAvatar
-                    user={user}
-                    size={32}
-                    alt={user.displayName || user.email}
-                  />
+                  {user.uid === EVERYONE_MENTION_USER_ID ? (
+                    <Avatar sx={{ width: 32, height: 32 }}>
+                      <GroupsIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                  ) : (
+                    <ProfileAvatar
+                      user={user}
+                      size={32}
+                      alt={user.displayName || user.email}
+                    />
+                  )}
                 </ListItemAvatar>
                 <ListItemText
-                  primary={user.displayName || user.email}
-                  secondary={user.email && user.displayName ? user.email : null}
+                  primary={user.uid === EVERYONE_MENTION_USER_ID ? '@everyone' : user.displayName || user.email}
+                  secondary={
+                    user.uid === EVERYONE_MENTION_USER_ID
+                      ? 'Notify all club members'
+                      : user.email && user.displayName
+                        ? user.email
+                        : null
+                  }
                 />
               </ListItem>
             ))}

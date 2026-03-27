@@ -1,5 +1,4 @@
 import React, {
-  forwardRef,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -8,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 // UI
+import { Close } from '@mui/icons-material';
 import {
   Box,
   Button,
@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  IconButton,
   List,
   ListItemButton,
   Slide,
@@ -42,12 +43,7 @@ import {
   getTodayEntries,
   isGoalPauseCoveringPeriod,
 } from 'utils/goalHelpers';
-
 const getUserId = (user) => user?.uid || user?.id || user?.userId || user?.user_id;
-
-const SlideUpTransition = forwardRef((props, ref) => (
-  <Slide direction="up" ref={ref} {...props} />
-));
 
 const UsersGoalsModal = ({ open, onClose, user }) => {
   const { currentClub } = useClubContext();
@@ -248,27 +244,36 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
     <Dialog
       open={open}
       onClose={onClose}
-      fullWidth
-      maxWidth="sm"
-      TransitionComponent={SlideUpTransition}
+      fullScreen
+      PaperProps={{
+        sx: {
+          backgroundColor: 'background.default',
+        },
+      }}
     >
-      <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
+      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 2, gap: 2 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
           <ProfileAvatar
             user={user}
             size={40}
             disableGoalModal
             showEntryRing={false}
           />
-          <Box>
-            <Typography variant="h6">{displayName}</Typography>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h5" component="div" noWrap>
+              {displayName}
+            </Typography>
             <Typography variant="caption" color="text.secondary">
               Goal activity
             </Typography>
           </Box>
         </Stack>
+        <IconButton onClick={onClose} size="small" aria-label="Close">
+          <Close />
+        </IconButton>
       </DialogTitle>
-      <DialogContent dividers sx={{ pt: 2 }}>
+      <DialogContent sx={{ pt: 0 }}>
+        <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%', pt: 2 }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
             <CircularProgress size={24} />
@@ -491,8 +496,18 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
             </Slide>
           </Box>
         )}
+        </Box>
       </DialogContent>
-      <DialogActions sx={{ justifyContent: 'space-between' }}>
+      <DialogActions
+        sx={{
+          justifyContent: 'space-between',
+          px: 3,
+          pb: 3,
+          flexWrap: 'wrap',
+          gap: 1,
+          '& > .MuiButton-root': { m: 0 },
+        }}
+      >
         {selectedGoal && (
           <Button variant="text" onClick={clearSelection}>
             Back to goals

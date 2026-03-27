@@ -272,6 +272,82 @@ const componentOverrides = {
           : {},
     },
   },
+  MuiDialog: {
+    defaultProps: {
+      slotProps: {
+        paper: {
+          elevation: 0,
+        },
+      },
+    },
+    styleOverrides: {
+      backdrop: ({ theme }) => ({
+        backgroundColor:
+          theme.palette.mode === 'dark'
+            ? alpha(theme.palette.common.black, 0.48)
+            : alpha(theme.palette.common.black, 0.22),
+        backdropFilter: 'blur(28px) saturate(175%)',
+        WebkitBackdropFilter: 'blur(28px) saturate(175%)',
+      }),
+      paper: ({ theme }) => {
+        const isDark = theme.palette.mode === 'dark';
+        return {
+          borderRadius: 3,
+          textAlign: 'left',
+          backgroundColor: isDark
+            ? alpha(theme.palette.background.paper, 0.42)
+            : alpha(theme.palette.background.paper, 0.52),
+          backdropFilter: 'blur(52px) saturate(200%)',
+          WebkitBackdropFilter: 'blur(52px) saturate(200%)',
+          border: `1px solid ${
+            isDark
+              ? alpha(theme.palette.common.white, 0.14)
+              : alpha(theme.palette.common.white, 0.55)
+          }`,
+          boxShadow:
+            theme.palette.mode === 'dark'
+              ? `0 24px 64px ${alpha(theme.palette.common.black, 0.45)}`
+              : `0 20px 56px ${alpha(theme.palette.common.black, 0.1)}, 0 0 0 1px ${alpha(theme.palette.common.black, 0.04)}`,
+          overflowY: 'auto',
+        };
+      },
+      container: {
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'max(20px, env(safe-area-inset-left, 0px))',
+        paddingRight: 'max(20px, env(safe-area-inset-right, 0px))',
+      },
+      paperFullScreen: {
+        height: 'auto',
+        flex: 1,
+        minHeight: 0,
+      },
+    },
+  },
+  MuiSnackbar: {
+    styleOverrides: {
+      root: {
+        '& .MuiPaper-root': {
+          borderRadius: 999,
+          overflow: 'hidden',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+        },
+        '& .MuiAlert-root': {
+          borderRadius: 999,
+          alignItems: 'center',
+        },
+        '& .MuiAlert-icon': {
+          marginRight: 8,
+        },
+        '& .MuiAlert-action': {
+          paddingTop: 0,
+          marginRight: 0,
+        },
+      },
+    },
+  },
 };
 
 /** MUI component overrides applied only when running Capacitor iOS (native feel). */
@@ -330,43 +406,6 @@ const iosNativeComponentOverrides = {
           transition: 'background-color 200ms',
         },
       }),
-    },
-  },
-  MuiDialog: {
-    styleOverrides: {
-      container: {
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      },
-      paperFullScreen: {
-        height: 'auto',
-        flex: 1,
-        minHeight: 0,
-      },
-    },
-  },
-  MuiSnackbar: {
-    styleOverrides: {
-      root: {
-        '& .MuiPaper-root': {
-          borderRadius: 999,
-          overflow: 'hidden',
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-        },
-        '& .MuiAlert-root': {
-          borderRadius: 999,
-          alignItems: 'center',
-        },
-        '& .MuiAlert-icon': {
-          marginRight: 8,
-        },
-        '& .MuiAlert-action': {
-          paddingTop: 0,
-          marginRight: 0,
-        },
-      },
     },
   },
 };
@@ -469,6 +508,37 @@ export const buildTheme = (overrides = {}) => {
   }
 
   return themeWithPalette;
+};
+
+/** Outlined / contained actions for small confirm-style dialogs. */
+export const confirmDialogSecondaryButtonSx = (theme) => ({
+  width: { xs: '100%', sm: 'auto' },
+  minWidth: { sm: 100 },
+  py: 1.35,
+  borderRadius: 2,
+  textTransform: 'none',
+  fontWeight: 600,
+  fontSize: '0.9375rem',
+  borderColor: alpha(theme.palette.divider, 0.55),
+  color: 'text.primary',
+  bgcolor: alpha(theme.palette.action.hover, 0.04),
+  backdropFilter: 'blur(8px)',
+  '&:hover': {
+    borderColor: alpha(theme.palette.divider, 0.85),
+    bgcolor: alpha(theme.palette.action.hover, 0.1),
+  },
+});
+
+export const confirmDialogPrimaryButtonSx = {
+  width: { xs: '100%', sm: 'auto' },
+  minWidth: { sm: 108 },
+  py: 1.35,
+  borderRadius: 2,
+  textTransform: 'none',
+  fontWeight: 600,
+  fontSize: '0.9375rem',
+  boxShadow: 'none',
+  '&:hover': { boxShadow: 'none' },
 };
 
 export const theme = buildTheme();

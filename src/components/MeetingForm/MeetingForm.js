@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import moment from 'moment-timezone';
 // UI
+import { Close } from '@mui/icons-material';
 import {
   Alert,
   Autocomplete,
@@ -12,10 +13,12 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
   TextField,
+  Typography,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -164,12 +167,26 @@ const MeetingForm = ({
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {editingMeeting ? 'Edit Meeting' : 'Create New Meeting'}
+      <Dialog
+        open={open}
+        onClose={onClose}
+        fullScreen
+        PaperProps={{
+          sx: {
+            backgroundColor: 'background.default',
+          },
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 2 }}>
+          <Typography variant="h5" component="div">
+            {editingMeeting ? 'Edit Meeting' : 'Create New Meeting'}
+          </Typography>
+          <IconButton onClick={onClose} size="small" aria-label="Close">
+            <Close />
+          </IconButton>
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             {error && (
               <Alert severity="error" onClose={() => setError(null)}>
                 {error}
@@ -307,7 +324,16 @@ const MeetingForm = ({
             />
           </Box>
         </DialogContent>
-        <DialogActions>
+        <DialogActions
+          sx={{
+            justifyContent: 'flex-end',
+            px: 3,
+            pb: 3,
+            flexWrap: 'wrap',
+            gap: 1,
+            '& > .MuiButton-root': { m: 0 },
+          }}
+        >
           <Button onClick={onClose} disabled={saving}>
             Cancel
           </Button>

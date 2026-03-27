@@ -8,6 +8,9 @@ import FeedLink from 'components/FeedLink';
 // Regex pattern for matching encoded mentions: @[displayName](userId)
 export const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
+/** Reserved mention id for @everyone; must stay in sync with functions/utils/mentionHelpers.js */
+export const EVERYONE_MENTION_USER_ID = '__cbc_everyone__';
+
 // URL pattern for link detection (http/https, trim trailing punctuation when used as href)
 export const URL_REGEX = /https?:\/\/[^\s<>"']+/g;
 
