@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -23,6 +23,7 @@ import {
   DeleteOutline,
   ContentCopy,
   Link as LinkIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import ProfileAvatar from 'components/ProfileAvatar';
@@ -59,7 +60,9 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const [replyMentions, setReplyMentions] = useState([]); // Track mentions in reply
   const [editMentions, setEditMentions] = useState([]); // Track mentions in edit
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [fullscreenImageUrl, setFullscreenImageUrl] = useState(null);
+  const [imageViewer, setImageViewer] = useState(null);
+  const [viewerSlideIndex, setViewerSlideIndex] = useState(0);
+  const imageViewerScrollRef = useRef(null);
   const [copySnackbar, setCopySnackbar] = useState({ open: false, message: '' });
   const postRef = useRef(null);
   const replyInputRef = useRef(null);
@@ -269,11 +272,6 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
     }
   };
 
-  const handleImageOpen = (e, imageUrl) => {
-    e.stopPropagation();
-    setFullscreenImageUrl(imageUrl);
-  };
-
   const handleImagePointerEvent = (e) => {
     e.stopPropagation();
   };
@@ -290,6 +288,44 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
 
   const postImages = Array.isArray(post.images) ? post.images.filter(Boolean) : [];
   const showImages = postImages.length > 0 && (!post.isSpoiler || isRevealed);
+
+  const openImageGallery = useCallback(
+    (e, startIndex) => {
+      e.stopPropagation();
+      if (!postImages.length) return;
+      const safeIndex = Math.min(Math.max(0, startIndex), postImages.length - 1);
+      setViewerSlideIndex(safeIndex);
+      setImageViewer({ urls: postImages, index: safeIndex });
+    },
+    [postImages],
+  );
+
+  const closeImageGallery = useCallback(() => {
+    setImageViewer(null);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!imageViewer || !imageViewerScrollRef.current) return undefined;
+    const el = imageViewerScrollRef.current;
+    const applyScroll = () => {
+      const w = el.clientWidth;
+      if (w > 0) {
+        el.scrollLeft = imageViewer.index * w;
+        setViewerSlideIndex(imageViewer.index);
+      }
+    };
+    applyScroll();
+    const ro = new ResizeObserver(applyScroll);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [imageViewer]);
+
+  const handleViewerScroll = useCallback((e) => {
+    const el = e.currentTarget;
+    const w = el.clientWidth;
+    if (w <= 0) return;
+    setViewerSlideIndex(Math.round(el.scrollLeft / w));
+  }, []);
 
   const relatedRecord = post.relatedRecord || null;
   const isMeetingActivity = post.text?.includes('{meeting_post}') && relatedRecord?.type === 'meeting';
@@ -907,7 +943,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
                   component="img"
                   src={url}
                   alt={`Post image ${index + 1}`}
-                  onClick={(e) => handleImageOpen(e, url)}
+                  onClick={(e) => openImageGallery(e, index)}
                   onPointerDown={handleImagePointerEvent}
                   onPointerMove={handleImagePointerEvent}
                   onPointerUp={handleImagePointerEvent}
@@ -1200,39 +1236,141 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         onConfirm={handleDeleteConfirm}
       />
       <Dialog
-        open={Boolean(fullscreenImageUrl)}
-        onClose={() => setFullscreenImageUrl(null)}
+        open={Boolean(imageViewer)}
+        onClose={closeImageGallery}
         fullScreen
-        aria-label="Fullscreen image"
+        aria-label="Fullscreen images"
+        PaperProps={{
+          sx: {
+            backgroundColor: 'common.black',
+            margin: 0,
+            height: '100%',
+            maxHeight: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+          },
+        }}
       >
-        {fullscreenImageUrl && (
+        {imageViewer && (
           <Box
             sx={{
+              position: 'relative',
               width: '100%',
-              height: '100%',
-              backgroundColor: 'common.black',
+              flex: 1,
+              minHeight: 0,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              p: 2,
+              flexDirection: 'column',
+              backgroundColor: 'common.black',
             }}
-            onClick={() => setFullscreenImageUrl(null)}
           >
-            <Box
-              component="img"
-              src={fullscreenImageUrl}
-              alt="Fullscreen post"
-              onClick={(event) => event.stopPropagation()}
+            <IconButton
+              type="button"
+              onClick={closeImageGallery}
+              aria-label="Close image viewer"
               sx={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-                userSelect: 'auto',
-                WebkitUserSelect: 'auto',
-                WebkitTouchCallout: 'default',
-                touchAction: 'auto',
+                position: 'fixed',
+                top: (theme) => `calc(${theme.spacing(1)} + env(safe-area-inset-top, 0px))`,
+                right: (theme) => `calc(${theme.spacing(1)} + env(safe-area-inset-right, 0px))`,
+                zIndex: (theme) => theme.zIndex.modal + 1,
+                color: 'common.white',
+                backgroundColor: 'rgba(0,0,0,0.45)',
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.6)' },
               }}
-            />
+            >
+              <CloseIcon />
+            </IconButton>
+            {imageViewer.urls.length > 1 && (
+              <Typography
+                component="div"
+                role="status"
+                aria-live="polite"
+                sx={{
+                  position: 'fixed',
+                  bottom: (theme) => `calc(${theme.spacing(2)} + env(safe-area-inset-bottom, 0px))`,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: (theme) => theme.zIndex.modal + 1,
+                  color: 'common.white',
+                  typography: 'body2',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(0,0,0,0.45)',
+                }}
+              >
+                {viewerSlideIndex + 1} / {imageViewer.urls.length}
+              </Typography>
+            )}
+            <Box
+              ref={imageViewerScrollRef}
+              onScroll={handleViewerScroll}
+              sx={{
+                width: '100%',
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'stretch',
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-x',
+                overscrollBehaviorX: 'contain',
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': { display: 'none' },
+              }}
+            >
+              {imageViewer.urls.map((url, slideIdx) => (
+                <Box
+                  key={`${url}-${slideIdx}`}
+                  sx={{
+                    flex: '0 0 100%',
+                    width: '100%',
+                    minWidth: '100%',
+                    maxWidth: '100%',
+                    height: '100%',
+                    minHeight: '100%',
+                    alignSelf: 'stretch',
+                    scrollSnapAlign: 'start',
+                    scrollSnapStop: 'always',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                    p: 2,
+                  }}
+                  onClick={(event) => {
+                    if (event.target === event.currentTarget) {
+                      closeImageGallery();
+                    }
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={url}
+                    alt={`Post image ${slideIdx + 1} of ${imageViewer.urls.length}`}
+                    onClick={(event) => event.stopPropagation()}
+                    sx={{
+                      display: 'block',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      width: 'auto',
+                      height: 'auto',
+                      objectFit: 'contain',
+                      objectPosition: 'center',
+                      flexShrink: 0,
+                      userSelect: 'auto',
+                      WebkitUserSelect: 'auto',
+                      WebkitTouchCallout: 'default',
+                      touchAction: 'manipulation',
+                    }}
+                  />
+                </Box>
+              ))}
+            </Box>
           </Box>
         )}
       </Dialog>
