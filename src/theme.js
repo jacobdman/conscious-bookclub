@@ -312,15 +312,16 @@ const componentOverrides = {
         };
       },
       container: {
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingTop: 'max(20px, env(safe-area-inset-top, 0px))',
+        paddingBottom: 'max(20px, env(safe-area-inset-bottom, 0px))',
         paddingLeft: 'max(20px, env(safe-area-inset-left, 0px))',
         paddingRight: 'max(20px, env(safe-area-inset-right, 0px))',
       },
       paperFullScreen: {
         height: 'auto',
-        flex: 1,
-        minHeight: 0,
+        maxHeight: '100%',
+        display: 'block',
+        overflowY: 'auto',
       },
     },
   },

@@ -1,8 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
+const root = path.join(__dirname, '..');
+
 // Read version from package.json (source of truth)
-const packageJsonPath = path.join(__dirname, '..', 'package.json');
+const packageJsonPath = path.join(root, 'package.json');
 const packageData = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const version = packageData.version;
 
@@ -11,14 +13,74 @@ if (!version) {
   process.exit(1);
 }
 
-// Update version.json to match package.json
-const versionJsonPath = path.join(__dirname, '..', 'public', 'version.json');
+const versionJsonPath = path.join(root, 'public', 'version.json');
+let previousIosBuild;
+if (fs.existsSync(versionJsonPath)) {
+  try {
+    const prev = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
+    if (prev.iosBuild != null && prev.iosBuild !== '') {
+      previousIosBuild = String(prev.iosBuild);
+    }
+  } catch {
+    // ignore corrupt version.json
+  }
+}
+
 const versionJsonData = { version };
+if (previousIosBuild != null) {
+  versionJsonData.iosBuild = previousIosBuild;
+}
 fs.writeFileSync(versionJsonPath, JSON.stringify(versionJsonData, null, 2) + '\n', 'utf8');
 console.log(`✓ Synced version.json to ${version} from package.json`);
 
+/** CFBundleVersion when iosBuild is omitted — stable per marketing version (bump iosBuild in version.json to resubmit same version). */
+function defaultIosBuildFromSemver(v) {
+  const m = String(v).match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return '1';
+  const major = parseInt(m[1], 10);
+  const minor = parseInt(m[2], 10);
+  const patch = parseInt(m[3], 10);
+  return String(major * 10000 + minor * 100 + patch);
+}
+
+function syncIosXcodeVersions(marketingVersion, currentProjectVersion) {
+  const pbxprojPath = path.join(
+    root,
+    'ios',
+    'App',
+    'App.xcodeproj',
+    'project.pbxproj'
+  );
+  if (!fs.existsSync(pbxprojPath)) {
+    console.warn('⚠ Skipping iOS version sync (project.pbxproj not found)');
+    return;
+  }
+  let content = fs.readFileSync(pbxprojPath, 'utf8');
+  const marketingPbx =
+    /^[\d.]+$/.test(String(marketingVersion)) ? marketingVersion : `"${String(marketingVersion).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  const buildPbx = /^[\d]+$/.test(String(currentProjectVersion))
+    ? currentProjectVersion
+    : `"${String(currentProjectVersion).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+  const next = content
+    .replace(/MARKETING_VERSION = [^;\n]+;/g, `MARKETING_VERSION = ${marketingPbx};`)
+    .replace(/CURRENT_PROJECT_VERSION = [^;\n]+;/g, `CURRENT_PROJECT_VERSION = ${buildPbx};`);
+
+  if (next === content) {
+    console.warn('⚠ iOS project.pbxproj: no MARKETING_VERSION / CURRENT_PROJECT_VERSION lines updated');
+    return;
+  }
+  fs.writeFileSync(pbxprojPath, next, 'utf8');
+  console.log(
+    `✓ Set iOS MARKETING_VERSION=${marketingVersion} CURRENT_PROJECT_VERSION=${currentProjectVersion}`
+  );
+}
+
+const iosBuild = previousIosBuild ?? defaultIosBuildFromSemver(version);
+syncIosXcodeVersions(version, iosBuild);
+
 // Read service worker template
-const swTemplatePath = path.join(__dirname, '..', 'public', 'service-worker.js');
+const swTemplatePath = path.join(root, 'public', 'service-worker.js');
 let swContent = fs.readFileSync(swTemplatePath, 'utf8');
 
 // Replace version in CACHE_NAME
@@ -36,4 +98,3 @@ if (cacheNamePattern.test(swContent)) {
 fs.writeFileSync(swTemplatePath, swContent, 'utf8');
 
 console.log(`✓ Injected version ${version} into service worker`);
-

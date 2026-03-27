@@ -23,6 +23,9 @@ const sanitizeImages = (images) => {
 /**
  * Replace @everyone sentinel with all club member UIDs (except author).
  * Throws 400 if sentinel present and author is not owner/admin.
+ * @param {string[]} mentionedUserIds - Mentioned user ids (may include EVERYONE sentinel)
+ * @param {number} clubIdInt - Club id
+ * @param {string} authorId - Post author uid
  */
 const expandEveryoneMentionsIfNeeded = async (mentionedUserIds, clubIdInt, authorId) => {
   if (!mentionedUserIds || !mentionedUserIds.includes(EVERYONE_MENTION_USER_ID)) {
