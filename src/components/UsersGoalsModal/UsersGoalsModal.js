@@ -28,16 +28,19 @@ import useClubContext from 'contexts/Club';
 // Components
 import GoalTypeChip from 'components/GoalTypeChip';
 import MonthlyStreakGrid from 'components/MonthlyStreakGrid';
+import PausedGoalChip from 'components/PausedGoalChip';
 import ProfileAvatar from 'components/ProfileAvatar';
 // Services
 import { getGoalEntries, getGoals } from 'services/goals/goals.service';
 // Utils
+import { formatLocalDate } from 'utils/dateHelpers';
 import {
   formatDate,
   getGoalStreakSummary,
   getGoalTargetValue,
   getPeriodBoundaries,
   getTodayEntries,
+  isGoalPauseCoveringPeriod,
 } from 'utils/goalHelpers';
 
 const getUserId = (user) => user?.uid || user?.id || user?.userId || user?.user_id;
@@ -199,6 +202,28 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
     selectedGoal ? getGoalStreakSummary(selectedGoal, allEntries) : null
   ), [selectedGoal, allEntries]);
 
+  const pausedDateKeys = useMemo(() => {
+    const set = new Set();
+    const pauses = selectedGoal?.goalPauses;
+    if (!pauses?.length || !monthCursor) return set;
+    const normalized = pauses.map((p) => ({
+      pausedAt: p.pausedAt || p.paused_at,
+      resumedAt: p.resumedAt ?? p.resumed_at ?? null,
+    }));
+    const y = monthCursor.getFullYear();
+    const m = monthCursor.getMonth();
+    const dim = new Date(y, m + 1, 0).getDate();
+    const now = new Date();
+    for (let d = 1; d <= dim; d += 1) {
+      const dayStart = new Date(y, m, d, 0, 0, 0, 0);
+      const dayEnd = new Date(y, m, d + 1, 0, 0, 0, 0);
+      if (isGoalPauseCoveringPeriod(dayStart, dayEnd, normalized, now)) {
+        set.add(formatLocalDate(dayStart));
+      }
+    }
+    return set;
+  }, [selectedGoal?.goalPauses, monthCursor]);
+
   const showDetail = Boolean(selectedGoal);
 
   useLayoutEffect(() => {
@@ -285,7 +310,10 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                             <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
                               {goal.title || 'Goal'}
                             </Typography>
-                            <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                              <GoalTypeChip goal={goal} />
+                              {goal.isPaused && <PausedGoalChip />}
+                            </Box>
                           </Box>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {goal.summaryLabel}
@@ -316,7 +344,10 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                             <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
                               {goal.title || 'Goal'}
                             </Typography>
-                            <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                              <GoalTypeChip goal={goal} />
+                              {goal.isPaused && <PausedGoalChip />}
+                            </Box>
                           </Box>
                           <Typography variant="caption" color="text.secondary">
                             —
@@ -347,7 +378,10 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                         <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
                           {goal.title || 'Goal'}
                         </Typography>
-                        <GoalTypeChip goal={goal} sx={{ mt: 0.5 }} />
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                          <GoalTypeChip goal={goal} />
+                          {goal.isPaused && <PausedGoalChip />}
+                        </Box>
                       </Box>
                       <Typography variant="caption" color="text.secondary">
                         {formatDate(goal.completedAt || goal.completed_at)}
@@ -380,7 +414,10 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                       </Typography>
                     )}
                   </Box>
-                  <GoalTypeChip goal={selectedGoal} />
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end' }}>
+                    <GoalTypeChip goal={selectedGoal} />
+                    {selectedGoal?.isPaused && <PausedGoalChip />}
+                  </Box>
                 </Stack>
 
                 {selectedGoal?.type === 'one_time' ? (
@@ -446,6 +483,8 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                     progressPercent={monthProgressPercent}
                     weeklyProgressByRow={weeklyProgressByRow}
                     streakSummary={streakSummary}
+                    pausedDateKeys={pausedDateKeys}
+                    isGoalPaused={Boolean(selectedGoal?.isPaused)}
                   />
                 )}
               </Box>

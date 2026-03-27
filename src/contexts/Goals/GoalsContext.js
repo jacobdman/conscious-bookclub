@@ -6,6 +6,8 @@ export default React.createContext({
   error: null,
   addGoal: async () => {},
   updateGoal: async () => {},
+  pauseGoal: async () => {},
+  resumeGoal: async () => {},
   deleteGoal: async () => {},
   refreshGoals: async () => {},
   createEntry: async () => {},

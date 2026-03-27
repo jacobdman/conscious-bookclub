@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, ButtonBase, CircularProgress, IconButton, Paper, Typography } from '@mui/material';
-import { ChevronLeft, ChevronRight } from '@mui/icons-material';
+import { alpha } from '@mui/material/styles';
+import { ChevronLeft, ChevronRight, PauseRounded } from '@mui/icons-material';
 import { formatLocalDate } from 'utils/dateHelpers';
 
 const MonthlyStreakGrid = ({
@@ -13,11 +14,23 @@ const MonthlyStreakGrid = ({
   progressPercent = null,
   weeklyProgressByRow = null,
   streakSummary = null,
+  /** @type {Set<string>|null} local date keys (YYYY-MM-DD) fully covered by a goal pause */
+  pausedDateKeys = null,
+  /**
+   * When true, today's cell is shown paused if the goal is still paused (fixes open-pause / end-of-day mismatch).
+   * Must be false after resume so today clears immediately even late in the day; past days still use pausedDateKeys.
+   */
+  isGoalPaused = false,
 }) => {
   const monthValue = monthDate ? new Date(monthDate) : new Date();
   const year = monthValue.getFullYear();
   const monthIndex = monthValue.getMonth();
   const firstDayOfMonth = new Date(year, monthIndex, 1).getDay();
+
+  const calToday = new Date();
+  const todayY = calToday.getFullYear();
+  const todayM = calToday.getMonth();
+  const todayD = calToday.getDate();
 
   const entryDates = useMemo(() => {
     const dateSet = new Set();
@@ -198,40 +211,100 @@ const MonthlyStreakGrid = ({
 
                 const dateKey = formatLocalDate(cellDate);
                 const hasEntry = entryDates.has(dateKey);
+                const isTodayCell = (
+                  cellDate.getFullYear() === todayY
+                  && cellDate.getMonth() === todayM
+                  && cellDate.getDate() === todayD
+                );
+                const isPausedDay = (
+                  (pausedDateKeys instanceof Set && pausedDateKeys.has(dateKey))
+                  || (isTodayCell && isGoalPaused)
+                );
                 const isFuture = cellDate > today;
                 const isOutsideMonth = cellDate.getMonth() !== monthIndex;
-                const backgroundColor = hasEntry
+                const plainFuture = isFuture && !isPausedDay;
+
+                let backgroundColor = hasEntry
                   ? 'primary.main'
-                  : isFuture
+                  : plainFuture
                     ? 'action.disabledBackground'
                     : 'background.paper';
-                const borderColor = hasEntry ? 'primary.main' : isFuture ? 'transparent' : 'divider';
-                const baseTextColor = hasEntry ? 'common.white' : isFuture ? 'text.disabled' : 'text.primary';
+                if (isPausedDay && !hasEntry) {
+                  backgroundColor = (theme) => alpha(
+                      theme.palette.warning.main,
+                      isFuture ? 0.1 : 0.2,
+                  );
+                }
+                const borderColor = hasEntry
+                  ? 'primary.main'
+                  : isPausedDay
+                    ? 'warning.main'
+                    : plainFuture
+                      ? 'transparent'
+                      : 'divider';
+                const baseTextColor = hasEntry
+                  ? 'common.white'
+                  : plainFuture
+                    ? 'text.disabled'
+                    : 'text.primary';
                 const textColor = isOutsideMonth && !hasEntry ? 'text.disabled' : baseTextColor;
-                const isClickable = typeof onDayClick === 'function';
+                const isClickable = typeof onDayClick === 'function' && !isPausedDay;
+
+                const dayLabel = cellDate.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                });
 
                 return (
                   <ButtonBase
                     key={dateKey}
                     onClick={isClickable ? () => onDayClick(cellDate) : undefined}
+                    disabled={isPausedDay}
+                    aria-label={
+                      isPausedDay
+                        ? `${dayLabel}, goal paused`
+                        : undefined
+                    }
                     sx={{
                       width: '100%',
                       minHeight: 28,
                       aspectRatio: '1 / 1',
                       borderRadius: '999px',
+                      position: 'relative',
                       backgroundColor,
-                      border: isFuture ? 'none' : '1px solid',
+                      backgroundImage: isPausedDay && !hasEntry
+                        ? 'repeating-linear-gradient(135deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px)'
+                        : undefined,
+                      border: plainFuture ? 'none' : '1px solid',
                       borderColor,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      gap: 0,
+                      pt: isPausedDay ? 0.25 : 0,
+                      pb: isPausedDay ? 0.125 : 0,
                       fontSize: '0.65rem',
                       color: textColor,
-                      opacity: isOutsideMonth ? 0.6 : isFuture ? 0.75 : 1,
+                      opacity: isOutsideMonth ? 0.6 : plainFuture ? 0.75 : 1,
                       cursor: isClickable ? 'pointer' : 'default',
                     }}
                   >
-                    {cellDate.getDate()}
+                    <Box component="span" sx={{ lineHeight: 1 }}>
+                      {cellDate.getDate()}
+                    </Box>
+                    {isPausedDay && (
+                      <PauseRounded
+                        sx={{
+                          fontSize: '11px',
+                          color: hasEntry ? 'common.white' : 'warning.dark',
+                          opacity: hasEntry ? 0.95 : 1,
+                          mt: -0.125,
+                        }}
+                        aria-hidden
+                      />
+                    )}
                   </ButtonBase>
                 );
               })

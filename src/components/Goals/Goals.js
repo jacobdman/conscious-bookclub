@@ -27,6 +27,7 @@ import useGoalsContext from 'contexts/Goals';
 import GoalFormModal from 'components/Goals/GoalFormModal';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
+import PausedGoalChip from 'components/PausedGoalChip';
 import PersonalGoalsReport from 'components/PersonalGoalsReport';
 import ClubGoalsReport from 'components/ClubGoalsReport';
 import Layout from 'components/Layout';
@@ -281,11 +282,14 @@ const Goals = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={getGoalTypeLabel(goal)}
-                          color={getGoalTypeColor(goal.type)}
-                          size="small"
-                        />
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                          <Chip
+                            label={getGoalTypeLabel(goal)}
+                            color={getGoalTypeColor(goal.type)}
+                            size="small"
+                          />
+                          {goal.isPaused && <PausedGoalChip />}
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">

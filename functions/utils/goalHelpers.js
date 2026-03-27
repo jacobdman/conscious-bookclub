@@ -170,9 +170,41 @@ const getImplicitSuccessCount = (
   return implicitCount;
 };
 
+/**
+ * True when a cadence period is fully covered by a pause (not scored).
+ * Open pauses use `now` as the effective end of the pause range.
+ * @param {Date} periodStart Period start.
+ * @param {Date} periodEnd Period end.
+ * @param {Array<Object>} pausePeriods Rows with pausedAt/paused_at and optional resumedAt.
+ * @param {Date} [now] Reference time for open pauses.
+ * @return {boolean} Whether the full period is inside a pause.
+ */
+const isPeriodPaused = (periodStart, periodEnd, pausePeriods, now = new Date()) => {
+  if (!pausePeriods || pausePeriods.length === 0) return false;
+  const ps = new Date(periodStart).getTime();
+  const pe = new Date(periodEnd).getTime();
+  return pausePeriods.some((p) => {
+    const pauseStart = new Date(p.pausedAt || p.paused_at).getTime();
+    const rawEnd = p.resumedAt ?? p.resumed_at;
+    const pauseEnd = rawEnd ? new Date(rawEnd).getTime() : now.getTime();
+    return pauseStart <= ps && pauseEnd >= pe;
+  });
+};
+
+const normalizePausePeriodsFromGoal = (goal, pausePeriodsOverride) => {
+  const raw = Array.isArray(pausePeriodsOverride) ?
+    pausePeriodsOverride :
+    (goal.goalPauses || []);
+  return raw.map((p) => ({
+    pausedAt: p.pausedAt || p.paused_at,
+    resumedAt: p.resumedAt ?? p.resumed_at ?? null,
+  }));
+};
+
 // Calculate consistency score for a habit goal over date range
 // includeStreak: if true, calculates streak (consecutive completed periods
 // from most recent)
+// pausePeriodsOverride: optional list of pauses; if omitted, uses goal.goalPauses
 const calculateHabitConsistency = async (
     userId,
     goal,
@@ -180,6 +212,7 @@ const calculateHabitConsistency = async (
     endDate,
     includeStreak = true,
     timezone = null,
+    pausePeriodsOverride = undefined,
 ) => {
   if (goal.type !== "habit" || !goal.cadence) {
     return null;
@@ -200,30 +233,40 @@ const calculateHabitConsistency = async (
       new Date(),
   );
 
+  const pausePeriodsList = normalizePausePeriodsFromGoal(goal, pausePeriodsOverride);
+  const nowForPause = new Date();
+
   // Start from current period and go back until we're before startDate
   let periodIndex = 0;
   while (currentBoundaries.start >= goalStartDate) {
     // Only include periods that overlap with the date range
     if (currentBoundaries.end > goalStartDate &&
         currentBoundaries.start <= effectiveEndDate) {
-      const entries = await getGoalEntries(
-          userId,
-          goal.id,
+      if (!isPeriodPaused(
           currentBoundaries.start,
           currentBoundaries.end,
-      );
+          pausePeriodsList,
+          nowForPause,
+      )) {
+        const entries = await getGoalEntries(
+            userId,
+            goal.id,
+            currentBoundaries.start,
+            currentBoundaries.end,
+        );
 
-      const completed = goal.measure === "count" ?
-        entries.length >= goal.targetCount :
-        entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
-          parseFloat(goal.targetQuantity);
+        const completed = goal.measure === "count" ?
+          entries.length >= goal.targetCount :
+          entries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
+            parseFloat(goal.targetQuantity);
 
-      periods.push({
-        period: periodIndex,
-        start: currentBoundaries.start,
-        end: currentBoundaries.end,
-        completed,
-      });
+        periods.push({
+          period: periodIndex,
+          start: currentBoundaries.start,
+          end: currentBoundaries.end,
+          completed,
+        });
+      }
     }
 
     currentBoundaries = getPreviousPeriodBoundaries(
@@ -277,6 +320,7 @@ module.exports = {
   calculateHabitWeight,
   getGoalStartDate,
   getImplicitSuccessCount,
+  isPeriodPaused,
   calculateHabitConsistency,
 };
 

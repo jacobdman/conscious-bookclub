@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 // Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -13,6 +14,8 @@ import {
   createMilestone,
   deleteMilestone,
   updateMilestone,
+  pauseGoal as pauseGoalApi,
+  resumeGoal as resumeGoalApi,
 } from 'services/goals/goals.service';
 // Hooks
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from 'hooks/useGoals';
@@ -100,6 +103,7 @@ let _goalsRestoreCache = null;
 const GoalsProvider = ({ children }) => {
   const { user } = useAuth();
   const { currentClub, refreshClubMembers } = useClubContext();
+  const queryClient = useQueryClient();
   const [goals, setGoals] = useState(() => {
     if (!_goalsRestoreCache) _goalsRestoreCache = getStoredGoalsList();
     return _goalsRestoreCache?.goals ?? [];
@@ -239,6 +243,74 @@ const GoalsProvider = ({ children }) => {
       throw err;
     }
   }, [user, currentClub, deleteGoalMutation]);
+
+  const handlePauseGoal = useCallback(async (goalId) => {
+    if (!user || !currentClub) return;
+
+    try {
+      setError(null);
+      const result = await pauseGoalApi(user.uid, currentClub.id, goalId);
+      const updatedGoal = normalizeGoal(result, result.id, true);
+      let updatedGoalResult = null;
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          updatedGoalResult = {
+            ...updatedGoal,
+            entries: goal.entries || updatedGoal.entries || [],
+            entriesPagination: goal.entriesPagination || updatedGoal.entriesPagination || {
+              hasMore: true,
+              offset: 0,
+              limit: 10,
+            },
+          };
+          return updatedGoalResult;
+        }
+        return goal;
+      }));
+      queryClient.invalidateQueries({ queryKey: ['goals', user.uid, currentClub.id] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      refreshClubMembers(currentClub.id, true);
+      return updatedGoalResult || updatedGoal;
+    } catch (err) {
+      setError('Failed to pause goal');
+      console.error('Error pausing goal:', err);
+      throw err;
+    }
+  }, [user, currentClub, queryClient, refreshClubMembers]);
+
+  const handleResumeGoal = useCallback(async (goalId) => {
+    if (!user || !currentClub) return;
+
+    try {
+      setError(null);
+      const result = await resumeGoalApi(user.uid, currentClub.id, goalId);
+      const updatedGoal = normalizeGoal(result, result.id, true);
+      let updatedGoalResult = null;
+      setGoals(prev => prev.map(goal => {
+        if (goal.id === goalId) {
+          updatedGoalResult = {
+            ...updatedGoal,
+            entries: goal.entries || updatedGoal.entries || [],
+            entriesPagination: goal.entriesPagination || updatedGoal.entriesPagination || {
+              hasMore: true,
+              offset: 0,
+              limit: 10,
+            },
+          };
+          return updatedGoalResult;
+        }
+        return goal;
+      }));
+      queryClient.invalidateQueries({ queryKey: ['goals', user.uid, currentClub.id] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      refreshClubMembers(currentClub.id, true);
+      return updatedGoalResult || updatedGoal;
+    } catch (err) {
+      setError('Failed to resume goal');
+      console.error('Error resuming goal:', err);
+      throw err;
+    }
+  }, [user, currentClub, queryClient, refreshClubMembers]);
 
   // ******************ENTRY OPERATIONS**********************
   const clearGoalEntriesCache = useCallback((goalId) => {
@@ -721,6 +793,8 @@ const GoalsProvider = ({ children }) => {
         error,
         addGoal: handleAddGoal,
         updateGoal: handleUpdateGoal,
+        pauseGoal: handlePauseGoal,
+        resumeGoal: handleResumeGoal,
         deleteGoal: handleDeleteGoal,
         refreshGoals,
         createEntry: handleCreateEntry,

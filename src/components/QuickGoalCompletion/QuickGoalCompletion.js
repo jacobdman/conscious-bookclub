@@ -9,7 +9,6 @@ import {
   CircularProgress,
   LinearProgress,
   Alert,
-  Chip,
   Divider,
   Collapse,
   IconButton,
@@ -25,7 +24,9 @@ import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
 import GoalTypeChip from 'components/GoalTypeChip';
+import PausedGoalChip from 'components/PausedGoalChip';
 import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
+import IOSConfirmDialog from 'components/IOSConfirmDialog';
 import { createPost } from 'services/posts/posts.service';
 import { updateUserProfile } from 'services/users/users.service';
 import { getGoalProgress } from 'services/goals/goals.service';
@@ -33,6 +34,7 @@ import { formatSemanticDate } from 'utils/dateHelpers';
 import {
   filterGoalsForQuickCompletion,
   sortGoalsByPriority,
+  goalIsPaused,
   getTodayBoundaries,
   hasEntryToday,
   getProgressText,
@@ -48,6 +50,7 @@ const QuickGoalCompletion = () => {
   const { 
     goals: allGoals, 
     updateGoal,
+    resumeGoal,
     createEntry,
     deleteEntry,
     updateMilestone,
@@ -60,6 +63,8 @@ const QuickGoalCompletion = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
   const [visibleCount, setVisibleCount] = useState(5);
+  const [resumeConfirmGoalId, setResumeConfirmGoalId] = useState(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
   const longPressTimeoutRef = useRef(null);
   const longPressTriggeredRef = useRef(false);
 
@@ -196,6 +201,7 @@ const QuickGoalCompletion = () => {
 
   const handleGoalToggle = async (goal) => {
     if (!user) return;
+    if (goalIsPaused(goal)) return;
 
     const goalId = goal.id;
     
@@ -374,6 +380,10 @@ const QuickGoalCompletion = () => {
 
   const handleQuickAdd = async (goal) => {
     if (!user || !goal) return;
+    if (goalIsPaused(goal)) {
+      setResumeConfirmGoalId(goal.id);
+      return;
+    }
 
     const goalId = goal.id;
     if (updating[goalId]) {
@@ -408,7 +418,25 @@ const QuickGoalCompletion = () => {
       longPressTriggeredRef.current = false;
       return;
     }
+    if (goalIsPaused(goal)) {
+      setResumeConfirmGoalId(goal.id);
+      return;
+    }
     handleQuickAdd(goal);
+  };
+
+  const handleConfirmResume = async () => {
+    if (!resumeConfirmGoalId) return;
+    try {
+      setResumeLoading(true);
+      await resumeGoal(resumeConfirmGoalId);
+      setResumeConfirmGoalId(null);
+    } catch (err) {
+      console.error('Failed to resume goal:', err);
+      setError('Failed to resume goal');
+    } finally {
+      setResumeLoading(false);
+    }
   };
 
   const handleTouchStart = (goal, canDelete) => {
@@ -517,6 +545,7 @@ const QuickGoalCompletion = () => {
         {filteredGoals.map((goal, index) => {
           // Get the latest goal from context to ensure we have current entries
           const latestGoal = allGoals.find(g => g.id === goal.id) || goal;
+          const isPaused = goalIsPaused(latestGoal);
           const isComplete = getCompletionState(latestGoal);
           const isUpdating = updating[goal.id] || false;
           const displayItems = getGoalDisplayItems(latestGoal);
@@ -605,7 +634,7 @@ const QuickGoalCompletion = () => {
                       handleRowClick(latestGoal);
                     }
                   }}
-                  onTouchStart={() => handleTouchStart(latestGoal, hasTodayEntry)}
+                  onTouchStart={() => !isPaused && handleTouchStart(latestGoal, hasTodayEntry)}
                   onTouchEnd={handleTouchEnd}
                   onTouchMove={handleTouchEnd}
                   sx={{
@@ -617,6 +646,7 @@ const QuickGoalCompletion = () => {
                     px: 0.5,
                     py: 0.75,
                     borderRadius: 1,
+                    opacity: isPaused ? 0.85 : 1,
                     '&:hover': {
                       backgroundColor: 'action.hover',
                     },
@@ -632,8 +662,9 @@ const QuickGoalCompletion = () => {
                       )}
                     </Typography>
                     <GoalTypeChip goal={latestGoal} />
+                    {isPaused && <PausedGoalChip />}
                     {isUpdating && <CircularProgress size={16} />}
-                    {hasTodayEntry && (
+                    {!isPaused && hasTodayEntry && (
                       <IconButton
                         size="small"
                         aria-label="Delete latest entry"
@@ -646,7 +677,12 @@ const QuickGoalCompletion = () => {
                       </IconButton>
                     )}
                   </Box>
-                  {(lastActivityLabel || hasTodayEntry) && (
+                  {isPaused && (
+                    <Typography variant="caption" color="text.secondary">
+                      Tap to resume this goal
+                    </Typography>
+                  )}
+                  {(lastActivityLabel || hasTodayEntry) && !isPaused && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {lastActivityLabel && (
                         <Typography variant="caption" color="text.secondary">
@@ -784,6 +820,17 @@ const QuickGoalCompletion = () => {
         onClose={closeShareDialog}
         onConfirm={handleShareConfirm}
         completionLabel={shareDialog.label}
+      />
+
+      <IOSConfirmDialog
+        open={resumeConfirmGoalId != null}
+        onClose={() => !resumeLoading && setResumeConfirmGoalId(null)}
+        title="Resume this goal?"
+        description="Are you sure you want to un-pause this goal? You'll be able to log entries again."
+        cancelLabel="Cancel"
+        confirmLabel="Resume"
+        confirmDisabled={resumeLoading}
+        onConfirm={handleConfirmResume}
       />
     </>
   );

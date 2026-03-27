@@ -15,6 +15,40 @@ export const normalizeGoalType = (type) => {
 };
 
 /**
+ * Whether the goal is currently paused (habit/metric).
+ * @param {Object} goal
+ * @returns {boolean}
+ */
+export const goalIsPaused = (goal) => Boolean(goal?.isPaused);
+
+/**
+ * True when a pause interval fully covers [periodStart, periodEnd) (matches server reporting).
+ * @param {Date} periodStart
+ * @param {Date} periodEnd
+ * @param {Array<{ pausedAt?: Date|string, paused_at?: Date|string, resumedAt?: Date|string|null, resumed_at?: Date|string|null }>} goalPauses
+ * @param {Date} [now]
+ */
+export const isGoalPauseCoveringPeriod = (periodStart, periodEnd, goalPauses = [], now = new Date()) => {
+  if (!goalPauses?.length) return false;
+  const ps = new Date(periodStart).getTime();
+  const pe = new Date(periodEnd).getTime();
+  return goalPauses.some((p) => {
+    const pauseStart = new Date(p.pausedAt || p.paused_at).getTime();
+    const rawEnd = p.resumedAt ?? p.resumed_at;
+    const pauseEnd = rawEnd ? new Date(rawEnd).getTime() : now.getTime();
+    return pauseStart <= ps && pauseEnd >= pe;
+  });
+};
+
+const getNormalizedGoalPauses = (goal) => {
+  const raw = goal?.goalPauses || [];
+  return raw.map((p) => ({
+    pausedAt: p.pausedAt || p.paused_at,
+    resumedAt: p.resumedAt ?? p.resumed_at ?? null,
+  }));
+};
+
+/**
  * Get the current period identifier for a given cadence
  * @param {string} cadence - The goal's cadence ('day', 'week', 'month', 'quarter')
  * @returns {string|null} - The period identifier or null if not applicable
@@ -107,6 +141,24 @@ export const getGoalStreakSummary = (goal, entries = []) => {
   const targetValue = getGoalTargetValue(goal);
   if (!targetValue) return null;
 
+  const pauses = getNormalizedGoalPauses(goal);
+  const now = new Date();
+
+  const intermediateDaysAllPaused = (prevDate, currentDate) => {
+    const d = new Date(prevDate);
+    d.setDate(d.getDate() + 1);
+    while (d < currentDate) {
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      if (!isGoalPauseCoveringPeriod(dayStart, dayEnd, pauses, now)) {
+        return false;
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return true;
+  };
+
   if (goal.cadence === 'day') {
     const dailyActual = {};
     entries.forEach((entry) => {
@@ -135,6 +187,8 @@ export const getGoalStreakSummary = (goal, entries = []) => {
       const diffDays = Math.round((current - prev) / 86400000);
       if (diffDays === 1) {
         streak += 1;
+      } else if (diffDays > 1 && intermediateDaysAllPaused(prev, current)) {
+        streak += 1;
       } else {
         streak = 1;
       }
@@ -146,11 +200,27 @@ export const getGoalStreakSummary = (goal, entries = []) => {
     let currentStreak = 0;
     let cursor = currentDate;
     const completedSet = new Set(completedDates);
-    while (completedSet.has(formatLocalDate(cursor))) {
-      currentStreak += 1;
-      const next = new Date(cursor);
-      next.setDate(next.getDate() - 1);
-      cursor = next;
+    const maxWalk = 400;
+    let steps = 0;
+    while (steps < maxWalk) {
+      steps += 1;
+      const dayStart = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      if (isGoalPauseCoveringPeriod(dayStart, dayEnd, pauses, now)) {
+        const prev = new Date(cursor);
+        prev.setDate(prev.getDate() - 1);
+        cursor = prev;
+        continue;
+      }
+      if (completedSet.has(formatLocalDate(cursor))) {
+        currentStreak += 1;
+        const next = new Date(cursor);
+        next.setDate(next.getDate() - 1);
+        cursor = next;
+        continue;
+      }
+      break;
     }
 
     return {
@@ -190,10 +260,12 @@ export const getGoalStreakSummary = (goal, entries = []) => {
       const weekKey = formatLocalDate(cursor);
       const actual = weeklyActual[weekKey] || 0;
       const completed = actual >= targetValue;
+      const { start: wStart, end: wEnd } = getPeriodBoundaries('week', cursor);
+      const weekFullyPaused = isGoalPauseCoveringPeriod(wStart, wEnd, pauses, now);
       if (completed) {
         streak += 1;
         completedWeeks.add(weekKey);
-      } else {
+      } else if (!weekFullyPaused) {
         streak = 0;
       }
       longest = Math.max(longest, streak);
@@ -201,13 +273,23 @@ export const getGoalStreakSummary = (goal, entries = []) => {
     }
 
     let currentStreak = 0;
-    const currentCursor = new Date(currentWeek);
-    if (!completedWeeks.has(formatLocalDate(currentCursor))) {
-      currentCursor.setDate(currentCursor.getDate() - 7);
-    }
-    while (completedWeeks.has(formatLocalDate(currentCursor))) {
-      currentStreak += 1;
-      currentCursor.setDate(currentCursor.getDate() - 7);
+    let wc = new Date(currentWeek);
+    let weekWalk = 0;
+    while (weekWalk < 100) {
+      weekWalk += 1;
+      const { start: ws, end: we } = getPeriodBoundaries('week', wc);
+      const wk = formatLocalDate(ws);
+      if (isGoalPauseCoveringPeriod(ws, we, pauses, now)) {
+        wc.setDate(wc.getDate() - 7);
+        continue;
+      }
+      const actual = weeklyActual[wk] || 0;
+      if (actual >= targetValue) {
+        currentStreak += 1;
+        wc.setDate(wc.getDate() - 7);
+        continue;
+      }
+      break;
     }
 
     return {
@@ -247,10 +329,12 @@ export const getGoalStreakSummary = (goal, entries = []) => {
       const monthKey = formatLocalDate(cursor);
       const actual = monthlyActual[monthKey] || 0;
       const completed = actual >= targetValue;
+      const { start: mStart, end: mEnd } = getPeriodBoundaries('month', cursor);
+      const monthFullyPaused = isGoalPauseCoveringPeriod(mStart, mEnd, pauses, now);
       if (completed) {
         streak += 1;
         completedMonths.add(monthKey);
-      } else {
+      } else if (!monthFullyPaused) {
         streak = 0;
       }
       longest = Math.max(longest, streak);
@@ -258,13 +342,23 @@ export const getGoalStreakSummary = (goal, entries = []) => {
     }
 
     let currentStreak = 0;
-    const currentCursor = new Date(currentMonth);
-    if (!completedMonths.has(formatLocalDate(currentCursor))) {
-      currentCursor.setMonth(currentCursor.getMonth() - 1);
-    }
-    while (completedMonths.has(formatLocalDate(currentCursor))) {
-      currentStreak += 1;
-      currentCursor.setMonth(currentCursor.getMonth() - 1);
+    let mc = new Date(currentMonth);
+    let monthWalk = 0;
+    while (monthWalk < 100) {
+      monthWalk += 1;
+      const { start: ms, end: me } = getPeriodBoundaries('month', mc);
+      const mk = formatLocalDate(ms);
+      if (isGoalPauseCoveringPeriod(ms, me, pauses, now)) {
+        mc.setMonth(mc.getMonth() - 1);
+        continue;
+      }
+      const actual = monthlyActual[mk] || 0;
+      if (actual >= targetValue) {
+        currentStreak += 1;
+        mc.setMonth(mc.getMonth() - 1);
+        continue;
+      }
+      break;
     }
 
     return {
@@ -355,7 +449,8 @@ const getCadenceRank = (goal) => {
  * @returns {Array} - Sorted goals array
  */
 export const sortGoalsByPriority = (goals) => {
-  return goals.sort((a, b) => {
+  const copy = [...goals];
+  copy.sort((a, b) => {
     const aType = normalizeGoalType(a.type);
     const bType = normalizeGoalType(b.type);
 
@@ -388,6 +483,9 @@ export const sortGoalsByPriority = (goals) => {
     if (aPriority !== bPriority) return aPriority - bPriority;
     return new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0);
   });
+  const active = copy.filter((g) => !goalIsPaused(g));
+  const paused = copy.filter((g) => goalIsPaused(g));
+  return [...active, ...paused];
 };
 
 /**

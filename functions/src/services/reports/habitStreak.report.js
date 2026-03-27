@@ -3,6 +3,7 @@ const {
   getGoalEntries,
   getPeriodBoundaries,
   getPreviousPeriodBoundaries,
+  isPeriodPaused,
 } = require("../../../utils/goalHelpers");
 
 /**
@@ -51,6 +52,15 @@ const getHabitStreakReport = async (userId, clubId, startDate = null, endDate = 
       archived: false,
       type: "habit",
     },
+    include: [
+      {
+        model: db.GoalPause,
+        as: "goalPauses",
+        attributes: ["id", "pausedAt", "resumedAt"],
+        separate: true,
+        order: [["paused_at", "ASC"]],
+      },
+    ],
     order: [["created_at", "ASC"]],
   });
 
@@ -75,6 +85,10 @@ const getHabitStreakReport = async (userId, clubId, startDate = null, endDate = 
         }
 
         const periods = [];
+        const pausePeriodsList = (goal.goalPauses || []).map((p) => ({
+          pausedAt: p.pausedAt || p.paused_at,
+          resumedAt: p.resumedAt ?? p.resumed_at ?? null,
+        }));
         let currentBoundaries = getPeriodBoundaries(goal.cadence);
 
         // Start from current period and go back until we're before startDate
@@ -90,11 +104,22 @@ const getHabitStreakReport = async (userId, clubId, startDate = null, endDate = 
           currentBoundaries.start <= effectiveEndDate &&
           currentBoundaries.end <= now // EXCLUDE incomplete periods
           ) {
-          // SQL Query 2: Get entries for this period
-          // SELECT * FROM goal_entry
-          // WHERE goal_id = ? AND user_id = ?
-          // AND occurred_at >= ? AND occurred_at < ?
-          // ORDER BY occurred_at DESC
+            const periodStart = currentBoundaries.start;
+            const periodEnd = currentBoundaries.end;
+            if (isPeriodPaused(periodStart, periodEnd, pausePeriodsList, now)) {
+              currentBoundaries = getPreviousPeriodBoundaries(
+                  goal.cadence,
+                  currentBoundaries.start,
+              );
+              periodIndex++;
+              if (periodIndex > 100) break;
+              continue;
+            }
+            // SQL Query 2: Get entries for this period
+            // SELECT * FROM goal_entry
+            // WHERE goal_id = ? AND user_id = ?
+            // AND occurred_at >= ? AND occurred_at < ?
+            // ORDER BY occurred_at DESC
             const entries = await getGoalEntries(
                 userId,
                 goal.id,

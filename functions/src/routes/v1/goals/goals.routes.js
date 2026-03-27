@@ -3,6 +3,8 @@ const {
   getGoals,
   createGoal,
   updateGoal,
+  pauseGoal,
+  resumeGoal,
   deleteGoal,
   markGoalComplete,
   markGoalIncomplete,
@@ -26,6 +28,8 @@ router
     .get("/report", getPersonalGoalsReport)
     .post("/", createGoal)
     .patch("/:goalId", updateGoal)
+    .post("/:goalId/pause", pauseGoal)
+    .post("/:goalId/resume", resumeGoal)
     .delete("/:goalId", deleteGoal)
     .post("/:goalId/complete", markGoalComplete)
     .delete("/:goalId/complete", markGoalIncomplete)

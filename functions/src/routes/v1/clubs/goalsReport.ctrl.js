@@ -91,6 +91,13 @@ const getClubGoalsReport = async (req, res, next) => {
             as: "milestones",
             attributes: ["id", "title", "done", "doneAt"],
           },
+          {
+            model: db.GoalPause,
+            as: "goalPauses",
+            attributes: ["id", "pausedAt", "resumedAt"],
+            separate: true,
+            order: [["paused_at", "ASC"]],
+          },
         ],
       });
 
@@ -276,6 +283,13 @@ const getClubGoalsReport = async (req, res, next) => {
             model: db.Milestone,
             as: "milestones",
             attributes: ["id", "title", "done", "doneAt"],
+          },
+          {
+            model: db.GoalPause,
+            as: "goalPauses",
+            attributes: ["id", "pausedAt", "resumedAt"],
+            separate: true,
+            order: [["paused_at", "ASC"]],
           },
         ],
       });

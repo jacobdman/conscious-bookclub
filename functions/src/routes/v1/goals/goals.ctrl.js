@@ -12,6 +12,52 @@ const getMilestones = async (goalId) => {
   return milestones.map((m) => ({id: m.id, ...m.toJSON()}));
 };
 
+const goalPausesInclude = {
+  model: db.GoalPause,
+  as: "goalPauses",
+  attributes: ["id", "pausedAt", "resumedAt"],
+  separate: true,
+  order: [["paused_at", "ASC"]],
+};
+
+const enrichGoalWithPauseFields = (goalData) => {
+  const raw = goalData.goalPauses || [];
+  const pauses = raw.map((p) => {
+    const json = p && typeof p.toJSON === "function" ? p.toJSON() : p;
+    return {
+      id: json.id,
+      pausedAt: json.pausedAt || json.paused_at,
+      resumedAt: json.resumedAt ?? json.resumed_at ?? null,
+    };
+  });
+  const open = pauses.find((p) => !p.resumedAt);
+  return {
+    ...goalData,
+    goalPauses: pauses,
+    isPaused: !!open,
+    pausedAt: open ? open.pausedAt : null,
+  };
+};
+
+const getOpenGoalPause = async (goalId) => {
+  return db.GoalPause.findOne({
+    where: {goalId: parseInt(goalId, 10), resumedAt: null},
+  });
+};
+
+const assertHabitMetricNotPaused = async (goalId) => {
+  const goal = await db.Goal.findByPk(parseInt(goalId, 10));
+  if (!goal || (goal.type !== "habit" && goal.type !== "metric")) {
+    return;
+  }
+  const open = await getOpenGoalPause(goalId);
+  if (open) {
+    const err = new Error("Goal is paused");
+    err.status = 409;
+    throw err;
+  }
+};
+
 const syncMilestoneGoalCompletion = async (goalId) => {
   const parsedGoalId = parseInt(goalId);
   const goal = await db.Goal.findByPk(parsedGoalId);
@@ -244,6 +290,7 @@ const getGoals = async (req, res, next) => {
           attributes: ["id", "title", "done", "doneAt", "order"],
           order: [["order", "ASC"], ["created_at", "ASC"]],
         },
+        goalPausesInclude,
       ],
     });
 
@@ -310,9 +357,10 @@ const getGoals = async (req, res, next) => {
             }
           }
 
+          const enriched = enrichGoalWithPauseFields(goalData);
           return {
             id: goal.id,
-            ...goalData,
+            ...enriched,
             progress,
             entries: todayEntries, // Include today's entries for habit/metric goals
           };
@@ -402,10 +450,12 @@ const createGoal = async (req, res, next) => {
           attributes: ["id", "title", "done", "doneAt", "order"],
           order: [["order", "ASC"], ["created_at", "ASC"]],
         },
+        goalPausesInclude,
       ],
     });
 
-    res.status(201).json({id: completeGoal.id, ...completeGoal.toJSON()});
+    const createdJson = enrichGoalWithPauseFields(completeGoal.toJSON());
+    res.status(201).json({id: completeGoal.id, ...createdJson});
   } catch (e) {
     next(e);
   }
@@ -440,8 +490,11 @@ const updateGoal = async (req, res, next) => {
       throw error;
     }
 
-    // Remove milestones from updates if present (we'll handle them separately)
+    // Remove milestones / pause-derived fields from updates (not DB columns on goals)
     const {milestones, ...goalUpdates} = updates;
+    delete goalUpdates.goalPauses;
+    delete goalUpdates.isPaused;
+    delete goalUpdates.pausedAt;
 
     const isMilestoneGoal = updates.type === "milestone" || goal.type === "milestone";
 
@@ -475,6 +528,7 @@ const updateGoal = async (req, res, next) => {
           attributes: ["id", "title", "done", "doneAt", "order"],
           order: [["order", "ASC"], ["created_at", "ASC"]],
         },
+        goalPausesInclude,
       ],
     });
 
@@ -488,11 +542,145 @@ const updateGoal = async (req, res, next) => {
       console.error(`Error calculating progress for goal ${goalId}:`, err);
     }
 
+    const updatedJson = enrichGoalWithPauseFields(updatedGoal.toJSON());
     res.json({
       id: updatedGoal.id,
-      ...updatedGoal.toJSON(),
+      ...updatedJson,
       progress,
     });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// POST /v1/goals/:goalId/pause - Pause goal (habit/metric)
+const pauseGoal = async (req, res, next) => {
+  try {
+    const userId = req.query.userId;
+    const clubId = req.query.clubId;
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const {goalId} = req.params;
+    const goal = await db.Goal.findOne({
+      where: {id: goalId, userId, clubId: parseInt(clubId, 10)},
+    });
+    if (!goal) {
+      const error = new Error("Goal not found");
+      error.status = 404;
+      throw error;
+    }
+    if (goal.type !== "habit" && goal.type !== "metric") {
+      const error = new Error("Only habit and metric goals can be paused");
+      error.status = 400;
+      throw error;
+    }
+
+    const existing = await getOpenGoalPause(goalId);
+    if (existing) {
+      const error = new Error("Goal is already paused");
+      error.status = 409;
+      throw error;
+    }
+
+    await db.GoalPause.create({
+      goalId: parseInt(goalId, 10),
+      userId,
+      pausedAt: new Date(),
+    });
+
+    const updatedGoal = await db.Goal.findByPk(goalId, {
+      include: [
+        {
+          model: db.Milestone,
+          as: "milestones",
+          attributes: ["id", "title", "done", "doneAt", "order"],
+          order: [["order", "ASC"], ["created_at", "ASC"]],
+        },
+        goalPausesInclude,
+      ],
+    });
+
+    let progress = null;
+    try {
+      const userTimezone = await getUserTimezone(userId, req.query.timezone);
+      progress = await evaluateGoal(userId, goalId, "current", null, userTimezone);
+    } catch (err) {
+      console.error(`Error calculating progress for goal ${goalId}:`, err);
+    }
+
+    const body = enrichGoalWithPauseFields(updatedGoal.toJSON());
+    res.json({id: updatedGoal.id, ...body, progress});
+  } catch (e) {
+    next(e);
+  }
+};
+
+// POST /v1/goals/:goalId/resume - Resume paused goal
+const resumeGoal = async (req, res, next) => {
+  try {
+    const userId = req.query.userId;
+    const clubId = req.query.clubId;
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const {goalId} = req.params;
+    const goal = await db.Goal.findOne({
+      where: {id: goalId, userId, clubId: parseInt(clubId, 10)},
+    });
+    if (!goal) {
+      const error = new Error("Goal not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const openPause = await getOpenGoalPause(goalId);
+    if (!openPause) {
+      const error = new Error("Goal is not paused");
+      error.status = 400;
+      throw error;
+    }
+
+    await openPause.update({resumedAt: new Date()});
+
+    const updatedGoal = await db.Goal.findByPk(goalId, {
+      include: [
+        {
+          model: db.Milestone,
+          as: "milestones",
+          attributes: ["id", "title", "done", "doneAt", "order"],
+          order: [["order", "ASC"], ["created_at", "ASC"]],
+        },
+        goalPausesInclude,
+      ],
+    });
+
+    let progress = null;
+    try {
+      const userTimezone = await getUserTimezone(userId, req.query.timezone);
+      progress = await evaluateGoal(userId, goalId, "current", null, userTimezone);
+    } catch (err) {
+      console.error(`Error calculating progress for goal ${goalId}:`, err);
+    }
+
+    const body = enrichGoalWithPauseFields(updatedGoal.toJSON());
+    res.json({id: updatedGoal.id, ...body, progress});
   } catch (e) {
     next(e);
   }
@@ -665,6 +853,8 @@ const createGoalEntry = async (req, res, next) => {
       throw error;
     }
 
+    await assertHabitMetricNotPaused(goalId);
+
     const entry = await db.GoalEntry.create({
       goalId: parseInt(goalId),
       userId,
@@ -728,6 +918,7 @@ const updateGoalEntry = async (req, res, next) => {
       error.status = 404;
       throw error;
     }
+    await assertHabitMetricNotPaused(entry.goalId);
     await entry.update({
       occurredAt: updates.occurred_at || entry.occurredAt,
       quantity: updates.quantity !== undefined ? updates.quantity : entry.quantity,
@@ -878,6 +1069,8 @@ module.exports = {
   getGoals,
   createGoal,
   updateGoal,
+  pauseGoal,
+  resumeGoal,
   deleteGoal,
   markGoalComplete,
   markGoalIncomplete,

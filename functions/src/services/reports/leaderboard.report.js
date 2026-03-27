@@ -6,6 +6,7 @@ const {
   calculateHabitWeight,
   getGoalStartDate,
   getImplicitSuccessCount,
+  isPeriodPaused,
 } = require("../../../utils/goalHelpers");
 const {Op} = db;
 
@@ -122,6 +123,13 @@ const getLeaderboardReport = async (
           as: "milestones",
           attributes: ["id", "title", "done", "doneAt"],
         },
+        {
+          model: db.GoalPause,
+          as: "goalPauses",
+          attributes: ["id", "pausedAt", "resumedAt"],
+          separate: true,
+          order: [["paused_at", "ASC"]],
+        },
       ],
       order: [["created_at", "ASC"]],
     });
@@ -179,6 +187,11 @@ const getLeaderboardReport = async (
             };
           }
 
+          const pausePeriodsList = (goal.goalPauses || []).map((p) => ({
+            pausedAt: p.pausedAt || p.paused_at,
+            resumedAt: p.resumedAt ?? p.resumed_at ?? null,
+          }));
+
           const periods = [];
           const goalStartDate = getGoalStartDate(goal, effectiveStartDate);
           const implicitSuccessCount = getImplicitSuccessCount(
@@ -218,6 +231,16 @@ const getLeaderboardReport = async (
             ) {
               const periodStart = currentBoundaries.start;
               const periodEnd = currentBoundaries.end;
+              if (isPeriodPaused(periodStart, periodEnd, pausePeriodsList, now)) {
+                currentBoundaries = getPreviousPeriodBoundaries(
+                    goal.cadence,
+                    currentBoundaries.start,
+                    memberTimezone,
+                );
+                periodIndex++;
+                if (periodIndex > 100) break;
+                continue;
+              }
               const periodEntries = entries.filter((entry) => {
                 const occurredAt = new Date(entry.occurredAt || entry.occurred_at);
                 return occurredAt >= periodStart && occurredAt < periodEnd;

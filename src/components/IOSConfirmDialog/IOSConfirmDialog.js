@@ -1,23 +1,52 @@
 import React from 'react';
 import {
+  Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Modal,
   Paper,
   Typography,
-  Divider,
-  Box,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { getPlatform } from 'utils/platformHelpers';
 import { triggerHaptic } from 'utils/haptics';
 
+const glassBackdropSx = (theme) => ({
+  backgroundColor:
+    theme.palette.mode === 'dark'
+      ? alpha(theme.palette.common.black, 0.48)
+      : alpha(theme.palette.common.black, 0.22),
+  backdropFilter: 'blur(28px) saturate(175%)',
+  WebkitBackdropFilter: 'blur(28px) saturate(175%)',
+});
+
+const glassPaperSx = (theme) => {
+  const isDark = theme.palette.mode === 'dark';
+  return {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 3,
+    overflow: 'hidden',
+    textAlign: 'left',
+    backgroundColor: isDark
+      ? alpha(theme.palette.background.paper, 0.42)
+      : alpha(theme.palette.background.paper, 0.52),
+    backdropFilter: 'blur(52px) saturate(200%)',
+    WebkitBackdropFilter: 'blur(52px) saturate(200%)',
+    border: `1px solid ${
+      isDark
+        ? alpha(theme.palette.common.white, 0.14)
+        : alpha(theme.palette.common.white, 0.55)
+    }`,
+    boxShadow:
+      theme.palette.mode === 'dark'
+        ? `0 24px 64px ${alpha(theme.palette.common.black, 0.45)}`
+        : `0 20px 56px ${alpha(theme.palette.common.black, 0.1)}, 0 0 0 1px ${alpha(theme.palette.common.black, 0.04)}`,
+  };
+};
+
 /**
- * Confirmation dialog: iOS UIAlert-style on Capacitor iOS, standard MUI Dialog elsewhere.
+ * Confirmation dialog with a shared liquid-glass shell on all platforms.
+ * iOS native builds still get light haptic feedback on actions.
  */
 const IOSConfirmDialog = ({
   open,
@@ -30,6 +59,7 @@ const IOSConfirmDialog = ({
   confirmDisabled = false,
   destructive = false,
 }) => {
+  const theme = useTheme();
   const isIosNative = getPlatform() === 'ios';
 
   const handleCancel = () => {
@@ -42,76 +72,40 @@ const IOSConfirmDialog = ({
     onConfirm?.();
   };
 
-  if (!isIosNative) {
-    return (
-      <Dialog
-        open={open}
-        onClose={onClose}
-        aria-labelledby="ios-confirm-fallback-title"
-        aria-describedby="ios-confirm-fallback-desc"
-      >
-        <DialogTitle id="ios-confirm-fallback-title">{title}</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="ios-confirm-fallback-desc">{description}</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancel}>{cancelLabel}</Button>
-          <Button
-            onClick={handleConfirm}
-            color={destructive ? 'error' : 'primary'}
-            variant={destructive ? 'contained' : 'text'}
-            disabled={confirmDisabled}
-          >
-            {confirmLabel}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    );
-  }
-
   return (
     <Modal
       open={open}
       onClose={handleCancel}
       closeAfterTransition
+      aria-labelledby="ios-confirm-title"
+      aria-describedby={description ? 'ios-confirm-desc' : undefined}
       slotProps={{
         backdrop: {
-          sx: {
-            backgroundColor: alpha('#000000', 0.32),
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-          },
+          sx: glassBackdropSx,
         },
       }}
       sx={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        p: 2.5,
+        pl: 'max(20px, env(safe-area-inset-left, 0px))',
+        pr: 'max(20px, env(safe-area-inset-right, 0px))',
+        py: 2.5,
+        pt: 'max(20px, env(safe-area-inset-top, 0px))',
+        pb: 'max(20px, env(safe-area-inset-bottom, 0px))',
+        outline: 0,
       }}
     >
-      <Paper
-        elevation={24}
-        sx={{
-          width: '100%',
-          maxWidth: 270,
-          borderRadius: '14px',
-          overflow: 'hidden',
-          textAlign: 'center',
-          backgroundColor: (theme) =>
-            theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.94) : alpha('#f2f2f7', 0.94),
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-        }}
-      >
-        <Box sx={{ px: 2, pt: 2.5, pb: 2 }}>
+      <Paper elevation={0} sx={glassPaperSx}>
+        <Box sx={{ px: 2.5, pt: 2.75, pb: description ? 0.5 : 2 }}>
           <Typography
             id="ios-confirm-title"
+            component="h2"
             sx={{
-              fontWeight: 600,
-              fontSize: '1.0625rem',
-              lineHeight: 1.3,
-              mb: description ? 0.75 : 0,
+              fontWeight: 700,
+              fontSize: '1.125rem',
+              lineHeight: 1.35,
+              letterSpacing: '-0.01em',
               color: 'text.primary',
             }}
           >
@@ -122,9 +116,10 @@ const IOSConfirmDialog = ({
               id="ios-confirm-desc"
               variant="body2"
               sx={{
+                mt: 1.25,
                 color: 'text.secondary',
-                fontSize: '0.8125rem',
-                lineHeight: 1.35,
+                fontSize: '0.9375rem',
+                lineHeight: 1.5,
               }}
             >
               {description}
@@ -132,41 +127,62 @@ const IOSConfirmDialog = ({
           ) : null}
         </Box>
 
-        <Divider sx={{ borderColor: (theme) => alpha(theme.palette.divider, 0.5) }} />
-
-        <Button
-          fullWidth
-          onClick={handleConfirm}
-          disabled={confirmDisabled}
+        <Box
           sx={{
-            py: 1.35,
-            borderRadius: 0,
-            textTransform: 'none',
-            fontSize: '1.0625rem',
-            fontWeight: 600,
-            color: destructive ? '#ff3b30' : '#007aff',
-            '&:disabled': { color: 'action.disabled' },
+            display: 'flex',
+            flexDirection: { xs: 'column-reverse', sm: 'row' },
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'flex-end',
+            gap: 1,
+            px: 2.5,
+            pb: 2.5,
+            pt: 1.25,
           }}
         >
-          {confirmLabel}
-        </Button>
-
-        <Divider sx={{ borderColor: (theme) => alpha(theme.palette.divider, 0.5) }} />
-
-        <Button
-          fullWidth
-          onClick={handleCancel}
-          sx={{
-            py: 1.35,
-            borderRadius: 0,
-            textTransform: 'none',
-            fontSize: '1.0625rem',
-            fontWeight: 600,
-            color: '#007aff',
-          }}
-        >
-          {cancelLabel}
-        </Button>
+          <Button
+            variant="outlined"
+            onClick={handleCancel}
+            sx={{
+              width: { xs: '100%', sm: 'auto' },
+              minWidth: { sm: 100 },
+              py: 1.1,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.9375rem',
+              borderColor: alpha(theme.palette.divider, 0.55),
+              color: 'text.primary',
+              bgcolor: alpha(theme.palette.action.hover, 0.04),
+              backdropFilter: 'blur(8px)',
+              '&:hover': {
+                borderColor: alpha(theme.palette.divider, 0.85),
+                bgcolor: alpha(theme.palette.action.hover, 0.1),
+              },
+            }}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={handleConfirm}
+            disabled={confirmDisabled}
+            color={destructive ? 'error' : 'primary'}
+            sx={{
+              width: { xs: '100%', sm: 'auto' },
+              minWidth: { sm: 108 },
+              py: 1.1,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.9375rem',
+              boxShadow: 'none',
+              '&:hover': { boxShadow: 'none' },
+            }}
+          >
+            {confirmLabel}
+          </Button>
+        </Box>
       </Paper>
     </Modal>
   );

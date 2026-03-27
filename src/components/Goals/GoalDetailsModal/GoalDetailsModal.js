@@ -34,16 +34,19 @@ import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
 import IOSConfirmDialog from 'components/IOSConfirmDialog';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
 import MonthlyStreakGrid from 'components/MonthlyStreakGrid';
+import PausedGoalChip from 'components/PausedGoalChip';
 import { createPost } from 'services/posts/posts.service';
 import { getGoalProgress } from 'services/goals/goals.service';
 import { 
   getProgressText, 
   getProgressBarValue,
   formatDate,
+  formatPauseStartForDisplay,
   getPeriodBoundaries,
   getGoalTargetValue,
   getGoalStreakSummary,
   getGoalStreakValue,
+  isGoalPauseCoveringPeriod,
 } from 'utils/goalHelpers';
 import { formatLocalDate } from 'utils/dateHelpers';
 
@@ -54,6 +57,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     goals, 
     updateGoal,
     deleteGoal,
+    pauseGoal,
+    resumeGoal,
     createEntry,
     updateEntry,
     deleteEntry,
@@ -90,6 +95,8 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const [allEntries, setAllEntries] = useState([]);
   const [shareDialog, setShareDialog] = useState({ open: false, goal: null, label: '' });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [pauseConfirmOpen, setPauseConfirmOpen] = useState(false);
+  const [pauseResumeLoading, setPauseResumeLoading] = useState(false);
   const observerTarget = useRef(null);
   const initialEntriesLoaded = useRef({});
   const INITIAL_LIMIT = 20;
@@ -308,11 +315,16 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
   };
 
+  const isHabitOrMetric = goal?.type === 'habit' || goal?.type === 'metric';
+  const isGoalPaused = Boolean(goal?.isPaused && isHabitOrMetric);
+
   const handleAddEntry = () => {
+    if (isGoalPaused) return;
     setEntryDialog({ open: true, entry: null, saving: false, error: null, initialDate: null });
   };
 
   const handleEditEntry = (entry) => {
+    if (isGoalPaused) return;
     setEntryDialog({ open: true, entry, saving: false, error: null, initialDate: null });
   };
 
@@ -327,6 +339,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   }, [monthEntriesPool]);
 
   const handleDayEntry = (dateValue) => {
+    if (isGoalPaused) return;
     const entryForDay = getEntryForDate(dateValue);
     if (entryForDay) {
       handleDeleteEntry(entryForDay);
@@ -340,7 +353,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   };
 
   const handleDeleteEntry = async (entry) => {
-    if (!user || !window.confirm('Are you sure you want to delete this entry?')) return;
+    if (!user || isGoalPaused || !window.confirm('Are you sure you want to delete this entry?')) return;
 
     try {
       await deleteEntry(goal.id, entry.id);
@@ -353,7 +366,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   };
 
   const handleSaveEntry = async (entryData) => {
-    if (!user || !goal) return;
+    if (!user || !goal || isGoalPaused) return;
 
     const isUpdate = !!entryDialog.entry;
     if (entryDialog.saving) return;
@@ -595,6 +608,31 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     }
   };
 
+  const handleConfirmPause = async () => {
+    if (!user || !goal || pauseResumeLoading) return;
+    try {
+      setPauseResumeLoading(true);
+      await pauseGoal(goal.id);
+      setPauseConfirmOpen(false);
+    } catch (err) {
+      console.error('Failed to pause goal:', err);
+    } finally {
+      setPauseResumeLoading(false);
+    }
+  };
+
+  const handleResumeFromModal = async () => {
+    if (!user || !goal || pauseResumeLoading) return;
+    try {
+      setPauseResumeLoading(true);
+      await resumeGoal(goal.id);
+    } catch (err) {
+      console.error('Failed to resume goal:', err);
+    } finally {
+      setPauseResumeLoading(false);
+    }
+  };
+
   const formatDateTime = (dateString) => {
     if (!dateString) return 'No date';
     try {
@@ -643,6 +681,28 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
     goal?.cadence === 'month' ? getPercentForEntries(monthEntries) : null
   ), [goal?.cadence, getPercentForEntries, monthEntries]);
 
+  const pausedDateKeys = useMemo(() => {
+    const set = new Set();
+    const pauses = goal?.goalPauses;
+    if (!pauses?.length || !monthCursor) return set;
+    const normalized = pauses.map((p) => ({
+      pausedAt: p.pausedAt || p.paused_at,
+      resumedAt: p.resumedAt ?? p.resumed_at ?? null,
+    }));
+    const y = monthCursor.getFullYear();
+    const m = monthCursor.getMonth();
+    const dim = new Date(y, m + 1, 0).getDate();
+    const now = new Date();
+    for (let d = 1; d <= dim; d += 1) {
+      const dayStart = new Date(y, m, d, 0, 0, 0, 0);
+      const dayEnd = new Date(y, m, d + 1, 0, 0, 0, 0);
+      if (isGoalPauseCoveringPeriod(dayStart, dayEnd, normalized, now)) {
+        set.add(formatLocalDate(dayStart));
+      }
+    }
+    return set;
+  }, [goal?.goalPauses, monthCursor]);
+
   const streakSummary = useMemo(() => (
     getGoalStreakSummary(goal, allEntries)
   ), [goal, allEntries]);
@@ -680,7 +740,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
           <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
             {/* Goal Info */}
             <Paper sx={{ p: 3, mb: 3 }}>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
                 <Chip
                   label={goal.type === 'habit' ? 'Habit' : goal.type === 'metric' ? 'Metric' : goal.type === 'milestone' ? 'Milestone' : 'One-Time'}
                   color="primary"
@@ -691,7 +751,18 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                     {goal.cadence.charAt(0).toUpperCase() + goal.cadence.slice(1)}
                   </Typography>
                 )}
+                {isGoalPaused && <PausedGoalChip />}
+                {isGoalPaused && goal.pausedAt && (
+                  <Typography variant="caption" color="text.secondary">
+                    Paused since {formatPauseStartForDisplay(goal.pausedAt)}
+                  </Typography>
+                )}
               </Box>
+              {isGoalPaused && (goal.type === 'habit' || goal.type === 'metric') && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Entries are disabled while this goal is paused. Resume to log progress again.
+                </Typography>
+              )}
 
               {/* Progress for habit/metric goals */}
               {hasProgress && (
@@ -874,6 +945,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                     variant="contained"
                     startIcon={<Add />}
                     onClick={handleAddEntry}
+                    disabled={isGoalPaused}
                   >
                     Add Entry
                   </Button>
@@ -884,11 +956,13 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                   monthDate={monthCursor}
                   onPrevMonth={handlePrevMonth}
                   onNextMonth={handleNextMonth}
-                  onDayClick={handleDayEntry}
+                  onDayClick={isGoalPaused ? null : handleDayEntry}
                   cadence={goal.cadence}
                   progressPercent={monthProgressPercent}
                   weeklyProgressByRow={weeklyProgressByRow}
                   streakSummary={streakSummary}
+                  pausedDateKeys={pausedDateKeys}
+                  isGoalPaused={isGoalPaused}
                 />
 
                 <Accordion defaultExpanded={false} sx={{ boxShadow: 1 }}>
@@ -932,6 +1006,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                                     size="small"
                                     onClick={() => handleEditEntry(entry)}
                                     color="primary"
+                                    disabled={isGoalPaused}
                                   >
                                     <Edit fontSize="small" />
                                   </IconButton>
@@ -939,6 +1014,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                                     size="small"
                                     onClick={() => handleDeleteEntry(entry)}
                                     color="error"
+                                    disabled={isGoalPaused}
                                   >
                                     <Delete fontSize="small" />
                                   </IconButton>
@@ -965,10 +1041,31 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
             )}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 3 }}>
-          <Button onClick={handleDeleteGoal} color="error">
-            Delete Goal
-          </Button>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 3, flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Button onClick={handleDeleteGoal} color="error">
+              Delete Goal
+            </Button>
+            {isHabitOrMetric && !isGoalPaused && (
+              <Button
+                onClick={() => setPauseConfirmOpen(true)}
+                color="warning"
+                variant="outlined"
+              >
+                Pause goal
+              </Button>
+            )}
+            {isHabitOrMetric && isGoalPaused && (
+              <Button
+                onClick={handleResumeFromModal}
+                color="success"
+                variant="contained"
+                disabled={pauseResumeLoading}
+              >
+                {pauseResumeLoading ? 'Resuming…' : 'Resume goal'}
+              </Button>
+            )}
+          </Box>
           <Button onClick={onClose}>Close</Button>
         </DialogActions>
       </Dialog>
@@ -1033,6 +1130,16 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         confirmLabel="Delete"
         destructive
         onConfirm={handleConfirmDelete}
+      />
+      <IOSConfirmDialog
+        open={pauseConfirmOpen}
+        onClose={() => !pauseResumeLoading && setPauseConfirmOpen(false)}
+        title="Pause this goal?"
+        description="While paused, this period won't count against you on leaderboards. You won't be able to add or edit entries until you resume."
+        cancelLabel="Cancel"
+        confirmLabel="Pause"
+        confirmDisabled={pauseResumeLoading}
+        onConfirm={handleConfirmPause}
       />
     </>
   );

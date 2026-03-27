@@ -48,6 +48,24 @@ export const deleteGoal = async (userId, clubId, goalId) => {
   });
 };
 
+export const pauseGoal = async (userId, clubId, goalId) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
+  const timezone = getClientTimezone();
+  if (timezone) params.append('timezone', timezone);
+  return apiCall(`/v1/goals/${goalId}/pause?${params}`, {
+    method: 'POST',
+  });
+};
+
+export const resumeGoal = async (userId, clubId, goalId) => {
+  const params = new URLSearchParams({ userId, clubId: clubId.toString() });
+  const timezone = getClientTimezone();
+  if (timezone) params.append('timezone', timezone);
+  return apiCall(`/v1/goals/${goalId}/resume?${params}`, {
+    method: 'POST',
+  });
+};
+
 // Goal completion functions
 export const checkGoalCompletion = async (userId, goalId, periodId) => {
   const params = new URLSearchParams({ userId, periodId });

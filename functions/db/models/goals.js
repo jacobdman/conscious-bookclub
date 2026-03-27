@@ -92,6 +92,10 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "goal_id",
       as: "milestones",
     });
+    Goal.hasMany(models.GoalPause, {
+      foreignKey: "goal_id",
+      as: "goalPauses",
+    });
   };
 
   return Goal;

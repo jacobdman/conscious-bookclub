@@ -48,6 +48,13 @@ const getPersonalGoalsReport = async (req, res, next) => {
           as: "milestones",
           attributes: ["id", "title", "done", "doneAt"],
         },
+        {
+          model: db.GoalPause,
+          as: "goalPauses",
+          attributes: ["id", "pausedAt", "resumedAt"],
+          separate: true,
+          order: [["paused_at", "ASC"]],
+        },
       ],
       order: [["created_at", "ASC"]],
     });
