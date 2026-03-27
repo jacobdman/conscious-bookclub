@@ -10,6 +10,8 @@ npm run cap:ios      # Open Xcode
 npm run cap:android  # Open Android Studio
 ```
 
+**Xcode Cloud:** Capacitor’s iOS Swift package points at `node_modules` (see `ios/App/CapApp-SPM/Package.swift`). The clone must run `npm ci` before `xcodebuild` resolves packages, or you get missing-folder errors for `@capacitor/*`. The repo includes [ios/App/ci_scripts/ci_post_clone.sh](ios/App/ci_scripts/ci_post_clone.sh) next to `App.xcworkspace`, which runs `npm ci` and `npm run cap:build`. Keep that script executable in git (`chmod +x`). If the build log says `npm: command not found`, configure your workflow to use an environment that includes Node/npm (see Apple’s *Writing custom build scripts* for Xcode Cloud).
+
 ## iOS (App Store Connect)
 
 - [x] **Apple Developer account** – Enroll at [developer.apple.com](https://developer.apple.com) ($99/year).
