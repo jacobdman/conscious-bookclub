@@ -7,6 +7,7 @@ import PullToRefreshIndicator from 'UI/PullToRefreshIndicator';
 // Context
 import useClubContext from 'contexts/Club';
 import ClubReportingProvider from 'contexts/ClubReporting/ClubReportingProvider';
+import useKeyboardContext from 'contexts/Keyboard';
 // Components
 import BottomNav from 'components/BottomNav';
 import Header from 'components/Header';
@@ -40,6 +41,7 @@ const IOS_FADE_CLASS = 'ios-page-fade';
 const Layout = ({ children, onRefresh }) => {
   const { user, userProfile, logout } = useAuth();
   const { currentClub } = useClubContext();
+  const { keyboardVisible } = useKeyboardContext();
   const location = useLocation();
   
   // Get user's theme override for current club or global settings
@@ -217,8 +219,11 @@ const Layout = ({ children, onRefresh }) => {
               flex: 1,
               overflow: 'scroll',
               minHeight: 0,
-              // Mobile: space for BottomNav (56px) + safe area insetBottom
-              paddingBottom: { xs: 'calc(56px + env(safe-area-inset-bottom))', md: 0 },
+              // Mobile: space for fixed BottomNav; drop when keyboard is open (native) so content meets keyboard
+              paddingBottom: {
+                xs: keyboardVisible ? 0 : 'calc(56px + env(safe-area-inset-bottom))',
+                md: 0,
+              },
             }}
           >
             {onRefresh && (

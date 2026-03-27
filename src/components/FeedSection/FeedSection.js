@@ -23,7 +23,8 @@ import PostCard from 'components/PostCard';
 import MentionInput from 'components/MentionInput';
 import { uploadPostImages } from 'services/storage';
 import { encodeMentions } from 'utils/mentionHelpers';
-import { getPlatform } from 'utils/platformHelpers';
+import { Keyboard } from '@capacitor/keyboard';
+import { getPlatform, isNativeApp } from 'utils/platformHelpers';
 import { triggerHaptic } from 'utils/haptics';
 
 const FeedSection = () => {
@@ -76,6 +77,19 @@ const FeedSection = () => {
     const behavior = options.behavior ?? 'smooth';
     messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
+
+  // iOS native: after keyboard opens and layout reflows, keep latest messages above the composer
+  useEffect(() => {
+    if (!isNativeApp() || getPlatform() !== 'ios') return undefined;
+
+    const showPromise = Keyboard.addListener('keyboardDidShow', () => {
+      scrollToBottom({ behavior: 'smooth' });
+    });
+
+    return () => {
+      showPromise.then((handle) => handle.remove());
+    };
+  }, [scrollToBottom]);
 
   // Scroll to bottom when new posts arrive (but not when loading more at top)
   useEffect(() => {
