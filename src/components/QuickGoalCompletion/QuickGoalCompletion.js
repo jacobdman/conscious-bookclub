@@ -19,10 +19,11 @@ import {
   Button,
   TextField,
 } from '@mui/material';
-import { ExpandMore, DeleteOutline } from '@mui/icons-material';
+import { ExpandMore, DeleteOutline, OpenInNew } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
+import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import GoalTypeChip from 'components/GoalTypeChip';
 import PausedGoalChip from 'components/PausedGoalChip';
 import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
@@ -65,6 +66,7 @@ const QuickGoalCompletion = () => {
   const [visibleCount, setVisibleCount] = useState(5);
   const [resumeConfirmGoalId, setResumeConfirmGoalId] = useState(null);
   const [resumeLoading, setResumeLoading] = useState(false);
+  const [detailsGoal, setDetailsGoal] = useState(null);
   const longPressTimeoutRef = useRef(null);
   const longPressTriggeredRef = useRef(false);
 
@@ -425,6 +427,11 @@ const QuickGoalCompletion = () => {
     handleQuickAdd(goal);
   };
 
+  const openGoalDetails = (goal) => {
+    const latest = allGoals.find((g) => g.id === goal.id) || goal;
+    setDetailsGoal(latest);
+  };
+
   const handleConfirmResume = async () => {
     if (!resumeConfirmGoalId) return;
     try {
@@ -564,6 +571,16 @@ const QuickGoalCompletion = () => {
           if (latestGoal.type === 'milestone') {
             return (
               <Box key={latestGoal.id}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    aria-label="View goal details"
+                    onClick={() => openGoalDetails(latestGoal)}
+                  >
+                    <OpenInNew fontSize="inherit" />
+                  </IconButton>
+                </Box>
                 {displayItems.map((item, itemIndex) => {
                   const itemComplete = item.completed || false;
                   const isLastItem = itemIndex === displayItems.length - 1;
@@ -664,6 +681,17 @@ const QuickGoalCompletion = () => {
                     <GoalTypeChip goal={latestGoal} />
                     {isPaused && <PausedGoalChip />}
                     {isUpdating && <CircularProgress size={16} />}
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      aria-label="View goal details"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openGoalDetails(latestGoal);
+                      }}
+                    >
+                      <OpenInNew fontSize="inherit" />
+                    </IconButton>
                     {!isPaused && hasTodayEntry && (
                       <IconButton
                         size="small"
@@ -738,6 +766,18 @@ const QuickGoalCompletion = () => {
                     </Typography>
                     <GoalTypeChip goal={latestGoal} />
                     {isUpdating && <CircularProgress size={16} />}
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      aria-label="View goal details"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openGoalDetails(latestGoal);
+                      }}
+                    >
+                      <OpenInNew fontSize="inherit" />
+                    </IconButton>
                   </Box>
                 }
                 sx={{ width: '100%', m: 0 }}
@@ -831,6 +871,12 @@ const QuickGoalCompletion = () => {
         confirmLabel="Resume"
         confirmDisabled={resumeLoading}
         onConfirm={handleConfirmResume}
+      />
+
+      <GoalDetailsModal
+        open={Boolean(detailsGoal)}
+        onClose={() => setDetailsGoal(null)}
+        goal={detailsGoal}
       />
     </>
   );
