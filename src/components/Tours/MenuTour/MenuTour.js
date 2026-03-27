@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { Joyride, STATUS } from 'react-joyride';
+import { Joyride } from 'react-joyride';
 import useTutorial from 'contexts/Tutorial';
+import { shouldCompleteTutorialFromJoyrideEvent } from 'utils/joyrideOnEvent';
 
 const MenuTour = ({ open, steps = [] }) => {
   const { shouldShowTutorial, completeTutorial, activeTutorialId } = useTutorial();
@@ -20,9 +21,8 @@ const MenuTour = ({ open, steps = [] }) => {
     shouldShowTutorial(tutorialId) || activeTutorialId === tutorialId
   );
 
-  const handleCallback = (data) => {
-    const { status } = data;
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+  const handleEvent = (data) => {
+    if (shouldCompleteTutorialFromJoyrideEvent(data)) {
       completeTutorial(tutorialId);
     }
   };
@@ -39,7 +39,7 @@ const MenuTour = ({ open, steps = [] }) => {
           zIndex: 1500,
         },
       }}
-      callback={handleCallback}
+      onEvent={handleEvent}
     />
   );
 };

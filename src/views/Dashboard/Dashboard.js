@@ -14,6 +14,8 @@ import NotificationPrompt from 'components/NotificationPrompt';
 import HabitConsistencyLeaderboardWithData from 'components/HabitConsistencyLeaderboard/HabitConsistencyLeaderboardWithData';
 import QuoteOfWeek from 'components/QuoteOfWeek';
 import DashboardTour from 'components/Tours/DashboardTour';
+import GoalPauseReleaseDialog from 'components/Tours/GoalPauseReleaseDialog';
+import GoalPauseReleaseTour from 'components/Tours/GoalPauseReleaseTour';
 import { useMeetings } from 'hooks/useMeetings';
 import { parseLocalDate } from 'utils/dateHelpers';
 import { sanitizeDashboardConfig, isSectionEnabled } from 'utils/dashboardConfig';
@@ -117,6 +119,8 @@ const Dashboard = () => {
     <GoalsProvider>
       <Layout onRefresh={handleRefresh}>
           <DashboardTour />
+          <GoalPauseReleaseDialog />
+          <GoalPauseReleaseTour />
           <Box 
             sx={{ 
               p: 2, 

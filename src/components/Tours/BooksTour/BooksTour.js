@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { Joyride, STATUS } from 'react-joyride';
+import { Joyride } from 'react-joyride';
 import useTutorial from 'contexts/Tutorial';
+import { shouldCompleteTutorialFromJoyrideEvent } from 'utils/joyrideOnEvent';
 
 const BooksTour = () => {
   const { shouldShowTutorial, completeTutorial, activeTutorialId } = useTutorial();
@@ -46,9 +47,8 @@ const BooksTour = () => {
 
   const run = shouldShowTutorial(tutorialId) || activeTutorialId === tutorialId;
 
-  const handleCallback = (data) => {
-    const { status } = data;
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+  const handleEvent = (data) => {
+    if (shouldCompleteTutorialFromJoyrideEvent(data)) {
       completeTutorial(tutorialId);
     }
   };
@@ -67,7 +67,7 @@ const BooksTour = () => {
           zIndex: 1500,
         },
       }}
-      callback={handleCallback}
+      onEvent={handleEvent}
     />
   );
 };

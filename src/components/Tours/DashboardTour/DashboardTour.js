@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { Joyride, STATUS } from 'react-joyride';
+import { Joyride } from 'react-joyride';
 import { useMediaQuery, useTheme } from '@mui/material';
 import useTutorial from 'contexts/Tutorial';
+import { shouldCompleteTutorialFromJoyrideEvent } from 'utils/joyrideOnEvent';
 
 const DashboardTour = () => {
   const { shouldShowTutorial, completeTutorial, activeTutorialId } = useTutorial();
@@ -62,11 +63,13 @@ const DashboardTour = () => {
     return baseSteps;
   }, [isMobile]);
 
-  const run = shouldShowTutorial(tutorialId) || activeTutorialId === tutorialId;
+  const run = (
+    (shouldShowTutorial(tutorialId) || activeTutorialId === tutorialId)
+    && activeTutorialId !== 'goalPauseRelease'
+  );
 
-  const handleCallback = (data) => {
-    const { status } = data;
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+  const handleEvent = (data) => {
+    if (shouldCompleteTutorialFromJoyrideEvent(data)) {
       completeTutorial(tutorialId);
     }
   };
@@ -84,7 +87,7 @@ const DashboardTour = () => {
           zIndex: 1500,
         },
       }}
-      callback={handleCallback}
+      onEvent={handleEvent}
     />
   );
 };

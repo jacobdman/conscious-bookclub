@@ -878,6 +878,7 @@ const QuickGoalCompletion = () => {
         onClose={() => setDetailsGoal(null)}
         goal={detailsGoal}
       />
+
     </>
   );
 };
