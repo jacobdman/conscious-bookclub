@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import Joyride, { STATUS } from 'react-joyride';
+import { Joyride, STATUS } from 'react-joyride';
 import { useMediaQuery, useTheme } from '@mui/material';
 import useTutorial from 'contexts/Tutorial';
 

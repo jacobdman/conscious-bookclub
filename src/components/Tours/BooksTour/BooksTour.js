@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import Joyride, { STATUS } from 'react-joyride';
+import { Joyride, STATUS } from 'react-joyride';
 import useTutorial from 'contexts/Tutorial';
 
 const BooksTour = () => {

@@ -745,6 +745,31 @@ export const formatDate = (timestamp) => {
 };
 
 /**
+ * Label for "paused since" aligned with MonthlyStreakGrid: first local calendar day fully covered
+ * by the pause. Plain formatDate(pausedAt) shifts a day behind for UTC-midnight timestamps in US TZs.
+ * @param {Date|string|number} pausedAt
+ * @param {Date} [now]
+ * @returns {string}
+ */
+export const formatPauseStartForDisplay = (pausedAt, now = new Date()) => {
+  if (!pausedAt) return '';
+  const pauseStart = new Date(pausedAt);
+  if (Number.isNaN(pauseStart.getTime())) return formatDate(pausedAt);
+  const openPause = [{ pausedAt: pauseStart, resumedAt: null, resumed_at: null }];
+  let probe = new Date(pauseStart.getFullYear(), pauseStart.getMonth(), pauseStart.getDate(), 0, 0, 0, 0);
+  probe.setDate(probe.getDate() - 1);
+  for (let i = 0; i < 370; i += 1) {
+    const dayStart = new Date(probe.getFullYear(), probe.getMonth(), probe.getDate(), 0, 0, 0, 0);
+    const dayEnd = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1, 0, 0, 0, 0);
+    if (isGoalPauseCoveringPeriod(dayStart, dayEnd, openPause, now)) {
+      return formatDate(dayStart);
+    }
+    probe.setDate(probe.getDate() + 1);
+  }
+  return formatDate(pauseStart);
+};
+
+/**
  * Get progress info text for a goal
  * @param {Object} goal - Goal object with progress
  * @returns {string} - Formatted progress info text
