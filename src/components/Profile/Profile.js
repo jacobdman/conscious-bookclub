@@ -25,6 +25,7 @@ import Layout from 'components/Layout';
 import ProfileAvatar from 'components/ProfileAvatar';
 import NotificationSettings from 'components/Settings/NotificationSettings';
 import ThemeSettings from 'components/Settings/ThemeSettings';
+import VacationModeSettings from 'components/Settings/VacationModeSettings';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -308,10 +309,12 @@ const Profile = () => {
           >
             <Tab label="Notifications" />
             <Tab label="Theme" />
+            <Tab label="Goals" />
           </Tabs>
 
           {currentTab === 0 && <NotificationSettings />}
           {currentTab === 1 && <ThemeSettings />}
+          {currentTab === 2 && <VacationModeSettings />}
         </Paper>
       </Box>
     </Layout>

@@ -426,6 +426,23 @@ const createGoal = async (req, res, next) => {
       createdAt: new Date(),
     });
 
+    // Vacation mode: new habit/metric goals start paused
+    if (type === "habit" || type === "metric") {
+      const owner = await db.User.findByPk(userId);
+      if (owner?.settings?.vacationMode) {
+        const existingPause = await db.GoalPause.findOne({
+          where: {goalId: goal.id, resumedAt: null},
+        });
+        if (!existingPause) {
+          await db.GoalPause.create({
+            goalId: goal.id,
+            userId,
+            pausedAt: new Date(),
+          });
+        }
+      }
+    }
+
     // Create milestones if provided
     if (type === "milestone" && goalData.milestones && Array.isArray(goalData.milestones)) {
       for (const [i, milestoneData] of goalData.milestones.entries()) {

@@ -41,3 +41,11 @@ export const updateUserProfile = async (userId, profileData) => {
   return user;
 };
 
+export const setVacationMode = async (userId, enabled) => {
+  const params = new URLSearchParams({ userId: userId.toString() });
+  return apiCall(`/v1/users/${userId}/vacation-mode?${params}`, {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  });
+};
+

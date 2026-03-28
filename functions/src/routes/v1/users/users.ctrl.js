@@ -226,11 +226,119 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+// POST /v1/users/:userId/vacation-mode - Bulk pause/resume habit & metric goals + settings.vacationMode
+const setVacationMode = async (req, res, next) => {
+  try {
+    const {userId} = req.params;
+    const requestUserId = req.query.userId;
+    if (!requestUserId) {
+      const error = new Error("userId is required in query");
+      error.status = 400;
+      throw error;
+    }
+    if (userId !== requestUserId) {
+      const error = new Error("You can only update your own profile");
+      error.status = 403;
+      throw error;
+    }
+
+    const {enabled} = req.body;
+    if (typeof enabled !== "boolean") {
+      const error = new Error("enabled must be a boolean");
+      error.status = 400;
+      throw error;
+    }
+
+    const counts = await db.sequelize.transaction(async (transaction) => {
+      const user = await db.User.findByPk(userId, {transaction});
+      if (!user) {
+        const error = new Error("User not found");
+        error.status = 404;
+        throw error;
+      }
+
+      const existingSettings = user.settings || {};
+      const nextSettings = {...existingSettings, vacationMode: enabled};
+
+      if (enabled) {
+        const goals = await db.Goal.findAll({
+          where: {
+            userId,
+            archived: false,
+            type: {[db.Op.in]: ["habit", "metric"]},
+          },
+          transaction,
+        });
+
+        let pausedCount = 0;
+        const now = new Date();
+        for (const goal of goals) {
+          const open = await db.GoalPause.findOne({
+            where: {goalId: goal.id, resumedAt: null},
+            transaction,
+          });
+          if (!open) {
+            await db.GoalPause.create(
+                {
+                  goalId: goal.id,
+                  userId,
+                  pausedAt: now,
+                },
+                {transaction},
+            );
+            pausedCount++;
+          }
+        }
+
+        await user.update({settings: nextSettings}, {transaction});
+        return {pausedCount, resumedCount: 0};
+      }
+
+      const openPauses = await db.GoalPause.findAll({
+        where: {userId, resumedAt: null},
+        include: [
+          {
+            model: db.Goal,
+            as: "goal",
+            required: true,
+            where: {
+              userId,
+              type: {[db.Op.in]: ["habit", "metric"]},
+            },
+          },
+        ],
+        transaction,
+      });
+
+      const now = new Date();
+      let resumedCount = 0;
+      for (const pause of openPauses) {
+        await pause.update({resumedAt: now}, {transaction});
+        resumedCount++;
+      }
+
+      await user.update({settings: nextSettings}, {transaction});
+      return {pausedCount: 0, resumedCount};
+    });
+
+    const user = await db.User.findByPk(userId);
+    res.json({
+      id: userId,
+      ...user.toJSON(),
+      pausedCount: counts.pausedCount,
+      resumedCount: counts.resumedCount,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   getUsers,
   getUser,
   createUser,
   updateNotificationPreferences,
   updateProfile,
+  setVacationMode,
 };
 
