@@ -24,6 +24,19 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.TEXT,
           field: "cover_image",
         },
+        description: {
+          type: DataTypes.TEXT,
+          allowNull: true,
+        },
+        genre: {
+          type: DataTypes.STRING(500),
+          allowNull: true,
+        },
+        fiction: {
+          type: DataTypes.BOOLEAN,
+          allowNull: false,
+          defaultValue: false,
+        },
         theme: {
           type: DataTypes.JSONB,
           defaultValue: [],
@@ -46,6 +59,11 @@ module.exports = function(sequelize, DataTypes) {
           type: DataTypes.STRING,
           field: "uploaded_by",
           allowNull: false,
+        },
+        suggesterNotes: {
+          type: DataTypes.TEXT,
+          field: "suggester_notes",
+          allowNull: true,
         },
         clubId: {
           type: DataTypes.INTEGER,

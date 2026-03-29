@@ -40,6 +40,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     coverImage: '',
     fiction: false,
     description: '',
+    suggesterNotes: '',
     externalApiId: null
   });
 
@@ -67,6 +68,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         coverImage: editingBook.coverImage || '',
         fiction: Boolean(editingBook.fiction),
         description: editingBook.description || '',
+        suggesterNotes: editingBook.suggesterNotes ?? editingBook.suggester_notes ?? '',
         externalApiId: editingBook.externalApiId ?? null
       };
       setFormData(newFormData);
@@ -91,6 +93,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         coverImage: '',
         fiction: false,
         description: '',
+        suggesterNotes: '',
         externalApiId: null
       });
       setSelectedBook(null);
@@ -288,6 +291,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         coverImage: formData.coverImage.trim() || null,
         fiction: formData.fiction || false, // Ensure it's always a boolean
         description: formData.description.trim() || null,
+        suggesterNotes: formData.suggesterNotes.trim() || null,
         externalApiId: formData.externalApiId || null
       };
 
@@ -315,6 +319,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         coverImage: '',
         fiction: false,
         description: '',
+        suggesterNotes: '',
         externalApiId: null
       });
       setSelectedBook(null);
@@ -364,6 +369,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         fiction: false,
         discussionDate: '',
         description: '',
+        suggesterNotes: '',
         externalApiId: null
       });
       setSelectedBook(null);
@@ -544,6 +550,17 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
               rows={3}
               disabled={loading}
               helperText="Optional: Book description or summary"
+            />
+
+            <TextField
+              label="Suggester's notes"
+              value={formData.suggesterNotes}
+              onChange={handleChange('suggesterNotes')}
+              fullWidth
+              multiline
+              rows={3}
+              disabled={loading}
+              helperText="Optional: Why you're suggesting this book, context for the club, etc."
             />
 
             <FormControlLabel

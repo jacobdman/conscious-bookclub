@@ -45,7 +45,7 @@ export const deleteBook = async (clubId, bookId) => {
 };
 
 // Books pagination and filtering
-export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '') => {
+export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '', uploadedBy = null) => {
   const params = new URLSearchParams({
     clubId: clubId.toString(),
     page: pageNumber.toString(),
@@ -62,10 +62,13 @@ export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderB
   if (search) {
     params.append('search', search);
   }
+  if (uploadedBy && uploadedBy !== 'all') {
+    params.append('uploadedBy', uploadedBy);
+  }
   return apiCall(`/v1/books?${params}`);
 };
 
-export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '') => {
+export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '', uploadedBy = null) => {
   const params = new URLSearchParams({
     clubId: clubId.toString(),
     theme,
@@ -82,6 +85,9 @@ export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSi
   }
   if (search) {
     params.append('search', search);
+  }
+  if (uploadedBy && uploadedBy !== 'all') {
+    params.append('uploadedBy', uploadedBy);
   }
   return apiCall(`/v1/books/filtered?${params}`);
 };

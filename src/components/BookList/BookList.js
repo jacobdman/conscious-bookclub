@@ -58,7 +58,7 @@ const BookList = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentClub } = useClubContext();
+  const { currentClub, clubMembers } = useClubContext();
   const { 
     books, 
     loading: contextLoading, 
@@ -134,6 +134,20 @@ const BookList = () => {
     ? currentClub.themes
     : ['Classy', 'Creative', 'Curious'];
 
+  const sortedClubMembers = useMemo(() => {
+    const list = Array.isArray(clubMembers) ? [...clubMembers] : [];
+    list.sort((a, b) => {
+      const nameA = (a.user?.displayName || a.user?.email || a.userId || '').toLowerCase();
+      const nameB = (b.user?.displayName || b.user?.email || b.userId || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+    return list;
+  }, [clubMembers]);
+
+  const suggestedByFilterUnknown =
+    filters.suggestedBy !== 'all' &&
+    !sortedClubMembers.some((m) => m.userId === filters.suggestedBy);
+
   useEffect(() => {
     if (!themesEnabled && filters.theme !== 'all') {
       setFilters({ theme: 'all' });
@@ -151,6 +165,10 @@ const BookList = () => {
 
   const handleFilterChange = (event) => {
     setFilters({ status: event.target.value });
+  };
+
+  const handleSuggestedByChange = (event) => {
+    setFilters({ suggestedBy: event.target.value });
   };
 
   const handlePageSizeChange = (event) => {
@@ -504,7 +522,7 @@ const BookList = () => {
                     startIcon={<FilterListIcon />}
                     endIcon={showFilters ? <CloseIcon fontSize="small" /> : null}
                     onClick={toggleFilters}
-                    color={showFilters || filters.theme !== 'all' || filters.status !== 'all' ? "primary" : "inherit"}
+                    color={showFilters || filters.theme !== 'all' || filters.status !== 'all' || filters.suggestedBy !== 'all' ? "primary" : "inherit"}
                     data-tour="books-filter"
                     sx={{ 
                         textTransform: 'none',
@@ -575,6 +593,28 @@ const BookList = () => {
                             <MenuItem value="read">Books I've Read</MenuItem>
                         </Select>
                     </FormControl>
+
+                    <FormControl sx={{ minWidth: 220 }} size="small">
+                        <InputLabel>Suggested By</InputLabel>
+                        <Select
+                            value={filters.suggestedBy || 'all'}
+                            onChange={handleSuggestedByChange}
+                            label="Suggested By"
+                            sx={{ borderRadius: 2 }}
+                        >
+                            <MenuItem value="all">All members</MenuItem>
+                            {suggestedByFilterUnknown && (
+                              <MenuItem value={filters.suggestedBy}>
+                                Former / unknown member
+                              </MenuItem>
+                            )}
+                            {sortedClubMembers.map((member) => (
+                              <MenuItem key={member.userId} value={member.userId}>
+                                {member.user?.displayName || member.user?.email || member.userId}
+                              </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                 </Box>
             </Paper>
         </Collapse>
@@ -593,7 +633,7 @@ const BookList = () => {
 
         <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'right', mb: 1 }}>
           Showing {books.length} of {totalCount} books
-          {filters.theme !== 'all' && ' (filtered)'}
+          {(filters.theme !== 'all' || filters.status !== 'all' || filters.suggestedBy !== 'all') && ' (filtered)'}
         </Typography>
 
         {/* Loading overlay for list refresh */}
@@ -665,9 +705,10 @@ const BookList = () => {
                     direction={sort.field === 'createdAt' ? sort.direction : 'desc'}
                     onClick={() => handleSort('createdAt', 'desc')}
                   >
-                    Added
+                    Suggested At
                   </TableSortLabel>
                 </TableCell>
+                <TableCell>Suggested By</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -801,6 +842,11 @@ const BookList = () => {
                   <TableCell>
                     <Typography variant="caption" color="text.secondary">
                       {formatCreatedDate(book.createdAt || book.created_at)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {book.uploader?.displayName || book.uploadedBy || book.uploaded_by || 'Unknown'}
                     </Typography>
                   </TableCell>
                   <TableCell>

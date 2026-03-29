@@ -8,7 +8,7 @@ const BooksContext = React.createContext({
   totalCount: 0,
   totalPages: 0,
   pagination: { page: 1, pageSize: 10 },
-  filters: { theme: 'all', status: 'all' },
+  filters: { theme: 'all', status: 'all', suggestedBy: 'all' },
   search: '',
   sort: { field: 'createdAt', direction: 'desc' },
 

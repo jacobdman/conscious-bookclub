@@ -67,6 +67,17 @@ const buildLikesSummary = async (bookIds, userId) => {
   return {likesByBookId, likedBookIds};
 };
 
+const normalizeUploadedByFilter = (uploadedBy) => {
+  if (uploadedBy == null || uploadedBy === "") {
+    return null;
+  }
+  const s = String(uploadedBy).trim();
+  if (!s || s === "all") {
+    return null;
+  }
+  return s;
+};
+
 // Helper function to get books page
 const getBooksPage = async (
     pageNumber,
@@ -77,6 +88,7 @@ const getBooksPage = async (
     clubId,
     readStatus,
     search,
+    filterUploadedBy,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
 
@@ -103,6 +115,10 @@ const getBooksPage = async (
         ),
       ],
     };
+  }
+
+  if (filterUploadedBy) {
+    whereClause = {...whereClause, uploadedBy: filterUploadedBy};
   }
 
   const includeOptions = [
@@ -181,6 +197,7 @@ const getBooksPageFiltered = async (
     clubId,
     readStatus,
     search,
+    filterUploadedBy,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
   let whereClause = {};
@@ -239,6 +256,10 @@ const getBooksPageFiltered = async (
         ...searchCondition,
       };
     }
+  }
+
+  if (filterUploadedBy) {
+    whereClause = {...whereClause, uploadedBy: filterUploadedBy};
   }
 
   const includeOptions = [
@@ -318,6 +339,7 @@ const getBooks = async (req, res, next) => {
       clubId,
       readStatus,
       search,
+      uploadedBy,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -325,6 +347,7 @@ const getBooks = async (req, res, next) => {
       throw error;
     }
     const mappedOrderBy = mapOrderByField(orderBy);
+    const filterUploadedBy = normalizeUploadedByFilter(uploadedBy);
     const result = await getBooksPage(
         parseInt(page),
         parseInt(pageSize),
@@ -334,6 +357,7 @@ const getBooks = async (req, res, next) => {
         clubId,
         readStatus || null,
         search,
+        filterUploadedBy,
     );
     res.json(result);
   } catch (e) {
@@ -390,6 +414,7 @@ const getFilteredBooks = async (req, res, next) => {
       clubId,
       readStatus,
       search,
+      uploadedBy,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -397,6 +422,7 @@ const getFilteredBooks = async (req, res, next) => {
       throw error;
     }
     const mappedOrderBy = mapOrderByField(orderBy);
+    const filterUploadedBy = normalizeUploadedByFilter(uploadedBy);
     const result = await getBooksPageFiltered(
         theme,
         parseInt(page),
@@ -407,6 +433,7 @@ const getFilteredBooks = async (req, res, next) => {
         clubId,
         readStatus || null,
         search,
+        filterUploadedBy,
     );
     res.json(result);
   } catch (e) {

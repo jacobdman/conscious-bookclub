@@ -16,7 +16,7 @@ const BooksTour = () => {
       },
       {
         target: '[data-tour="books-filter"]',
-        content: 'Filter by theme, status, or meeting schedule.',
+        content: 'Filter by theme, status, meeting schedule, or who suggested the book.',
         disableBeacon: true,
       },
       {

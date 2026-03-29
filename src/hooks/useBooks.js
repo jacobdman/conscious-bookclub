@@ -49,13 +49,14 @@ const fetchBooks = async (clubId, userId, options = {}) => {
   const {
     page = 1,
     pageSize = 10,
-    filters = { theme: 'all', status: 'all' },
+    filters = { theme: 'all', status: 'all', suggestedBy: 'all' },
     search = '',
     sort = { field: 'createdAt', direction: 'desc' },
   } = options;
 
-  const { theme, status } = filters;
+  const { theme, status, suggestedBy } = filters;
   const readStatus = status === 'read' ? 'finished' : null;
+  const uploadedByFilter = suggestedBy && suggestedBy !== 'all' ? suggestedBy : null;
 
   if (status === 'scheduled') {
     let allScheduledBooks = await getAllDiscussedBooks(clubId, userId);
@@ -76,6 +77,12 @@ const fetchBooks = async (clubId, userId, options = {}) => {
       allScheduledBooks = allScheduledBooks.filter(book =>
         book.title.toLowerCase().includes(lowerSearch) ||
         book.author.toLowerCase().includes(lowerSearch),
+      );
+    }
+
+    if (uploadedByFilter) {
+      allScheduledBooks = allScheduledBooks.filter(
+        (book) => (book.uploadedBy || book.uploaded_by) === uploadedByFilter,
       );
     }
 
@@ -118,6 +125,7 @@ const fetchBooks = async (clubId, userId, options = {}) => {
       userId,
       readStatus,
       search,
+      uploadedByFilter,
     );
   }
 
@@ -130,6 +138,7 @@ const fetchBooks = async (clubId, userId, options = {}) => {
     userId,
     readStatus,
     search,
+    uploadedByFilter,
   );
 };
 
