@@ -74,17 +74,189 @@ export const normalizeOlSubjects = (raw) => {
       .filter(Boolean);
 };
 
-/** First subject line from Open Library — used as genre text in the form. */
+/** True if any subject uses Open Library's genre: namespace (authoritative for our genre field). */
+export const olSubjectsIncludeGenreTag = (rawSubjects) =>
+  normalizeOlSubjects(rawSubjects).some((s) => /^genre:\s*\S/i.test(s));
+
+/**
+ * Display label for OL-sourced genre: trim, collapse whitespace, title-case each word (space- or hyphen-separated).
+ */
+export const normalizeOlGenreDisplayLabel = (raw) => {
+  const s = String(raw || '')
+      .trim()
+      .replace(/\s+/g, ' ');
+  if (!s) return '';
+  return s
+      .split(/[\s-]+/)
+      .filter(Boolean)
+      .map(
+          (w) =>
+            w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+      )
+      .join(' ');
+};
+
+const PLAIN_SUBJECT_NOISE =
+  /englisch|espa[nñ]ol|fran[cç]ais|deutsch|italiano|juvenil|pour la jeunesse|nouvelles,\s*etc|amerikanisches/i;
+
+const pickPlainOlGenreSubject = (list) => {
+  const plains = list.filter(
+      (s) =>
+        s &&
+        !/^genre:\s*/i.test(s) &&
+        !/^form:\s*/i.test(s) &&
+        !/^(franchise|series):/i.test(s) &&
+        !/^(place|time|person|event):/i.test(s) &&
+        s.length <= 120 &&
+        !PLAIN_SUBJECT_NOISE.test(s),
+  );
+  if (plains.length === 0) return '';
+
+  const specificWord =
+    /\b(fantasy|dystopia|dystopian|romance|thriller|mystery|horror|adventure|biography|memoir|history|science\b|philosophy|poetry|young adult)\b/i;
+
+  for (const p of plains) {
+    if (/^fiction$/i.test(p.trim())) continue;
+    return p;
+  }
+  const hit = plains.find((p) => specificWord.test(p));
+  if (hit) return hit;
+  return plains[0];
+};
+
+/**
+ * Best Open Library–derived genre string for the form: prefer genre:, then a plain subject, then form:.
+ * Values are normalized for display (e.g. science fiction → Science Fiction).
+ */
 export const primaryOlGenreFromSubjects = (subjects) => {
   const list = normalizeOlSubjects(subjects);
-  return list[0] || '';
+
+  for (const s of list) {
+    const gm = s.match(/^genre:\s*(.+)$/i);
+    if (gm) {
+      const inner = gm[1].trim();
+      if (inner) return normalizeOlGenreDisplayLabel(inner);
+    }
+  }
+
+  const plain = pickPlainOlGenreSubject(list);
+  if (plain) return normalizeOlGenreDisplayLabel(plain);
+
+  for (const s of list) {
+    const fm = s.match(/^form:\s*(.+)$/i);
+    if (fm) {
+      const inner = fm[1].trim();
+      if (inner) return normalizeOlGenreDisplayLabel(inner);
+    }
+  }
+
+  return '';
+};
+
+/** Re-order subjects so theme heuristics see genre/plain terms before franchise/series noise. */
+const orderOlSubjectsForThemeInference = (rawSubjects) => {
+  const list = normalizeOlSubjects(rawSubjects);
+  const head = [];
+  const mid = [];
+  const tail = [];
+  for (const s of list) {
+    if (/^genre:\s*/i.test(s) || /^form:\s*/i.test(s)) head.push(s);
+    else if (/^(franchise|series):/i.test(s)) tail.push(s);
+    else mid.push(s);
+  }
+  return [...head, ...mid, ...tail];
+};
+
+/**
+ * Map Open Library subjects to club genre presets when there is no genre: subject.
+ * Returns null if no confident match (caller keeps primaryOlGenreFromSubjects / prior value).
+ */
+export const mapOlSubjectsToGenrePreset = (rawSubjects) => {
+  if (olSubjectsIncludeGenreTag(rawSubjects)) return null;
+  const subjects = normalizeOlSubjects(rawSubjects);
+  if (subjects.length === 0) return null;
+  const text = subjects.slice(0, 20).join(' | ').toLowerCase();
+
+  const rules = [
+    [
+      /(meditation|mindfulness|spiritual|spirituality|buddhis|taoism|religion|theology|prayer\b|sacred\b)/,
+      'Mindfulness & Spirituality',
+    ],
+    [
+      /(philosophy|stoic|stoicism|ethics|existential|bildungsroman)/,
+      'Philosophy & Resilience',
+    ],
+    [
+      /(psychology|cognitive|behavioral science|neuroscience|decision making)/,
+      'Psychology & Decision Making',
+    ],
+    [
+      /(leadership|productivity|time management|habits?\b|discipline\b|executive coach)/,
+      'Leadership & Productivity',
+    ],
+    [
+      /(self[- ]?help|personal development|self[- ]?improvement|motivation\b)/,
+      'Personal Development',
+    ],
+    [
+      /(business|entrepreneur|startup|marketing|economics|finance\b|investing)/,
+      'Business & Entrepreneurship',
+    ],
+    [
+      /(health|wellness|nutrition|fitness|medicine|diet\b|longevity)/,
+      'Health & Wellness',
+    ],
+    [
+      /(relationship|marriage|parenting|communication skills|interpersonal)/,
+      'Relationships & Communication',
+    ],
+    [
+      /(creativity|innovation|design thinking|art\b|music\b|film\b)/,
+      'Creativity & Innovation',
+    ],
+    [
+      /(history|biography|memoir|war\b|ancient|medieval|civil war)/,
+      'History & Biography',
+    ],
+    [
+      /(science\b|technology|physics|mathematics|astronomy|engineering|computer)/,
+      'Science & Technology',
+    ],
+    [
+      /(education|textbook|reference|encyclopedia|study skills)/,
+      'Education & Reference',
+    ],
+    [
+      /(fiction|novel|fantasy|romance|science fiction|sci-fi|poetry|literary|dystopia|young adult)/,
+      'Literature & Fiction',
+    ],
+  ];
+
+  for (const [re, preset] of rules) {
+    if (re.test(text)) return preset;
+  }
+
+  return null;
+};
+
+/**
+ * Genre string for the add-book form: OL genre: wins (normalized); otherwise preset map, else primary OL string.
+ */
+export const resolveOlGenreForBookForm = (rawSubjects, searchParsedGenre) => {
+  const list = normalizeOlSubjects(rawSubjects);
+  const hasTag = olSubjectsIncludeGenreTag(list);
+  const primary = primaryOlGenreFromSubjects(list);
+  if (hasTag) return (searchParsedGenre || primary).trim();
+  const preset = mapOlSubjectsToGenrePreset(list);
+  const merged = (preset ?? searchParsedGenre ?? primary).trim();
+  return merged;
 };
 
 /**
  * Map Open Library subjects to Classy / Creative / Curious when the club uses the default trio.
  */
 export const mapOlSubjectsToDefaultClubThemes = (rawSubjects) => {
-  const subjects = normalizeOlSubjects(rawSubjects);
+  const subjects = orderOlSubjectsForThemeInference(rawSubjects);
   if (subjects.length === 0) return [];
   const text = subjects.slice(0, 15).join(' | ').toLowerCase();
   const out = new Set();

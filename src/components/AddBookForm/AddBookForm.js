@@ -22,6 +22,7 @@ import {
   DEFAULT_CLUB_THEMES,
   mapOlSubjectsToDefaultClubThemes,
   fetchWorkEnrichment,
+  resolveOlGenreForBookForm,
 } from 'services/openLibraryService';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
@@ -195,12 +196,14 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
           ? mapOlSubjectsToDefaultClubThemes(categories)
           : null;
 
+      const genreFromOl = resolveOlGenreForBookForm(categories, value.genre);
+
       setFormData(prev => ({
         ...prev,
         title: value.title,
         author: value.author,
         coverImage: value.coverImage,
-        genre: value.genre || prev.genre,
+        genre: genreFromOl || prev.genre,
         description: value.description || prev.description,
         externalApiId: olId,
         ...(themesFromOl && themesFromOl.length > 0 ? { theme: themesFromOl } : {}),
@@ -209,10 +212,11 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       if (olId) {
         fetchWorkEnrichment(olId).then((en) => {
           if (!en) return;
+          const genreResolved = resolveOlGenreForBookForm(en.subjects, en.genre);
           setFormData((prev) => ({
             ...prev,
             description: en.description || prev.description,
-            genre: en.genre || prev.genre,
+            genre: genreResolved || prev.genre,
             ...(usesDefaultThemeSet && en.subjects.length > 0
               ? { theme: mapOlSubjectsToDefaultClubThemes(en.subjects) }
               : {}),
@@ -527,7 +531,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
                   {...params}
                   label="Genre"
                   fullWidth
-                  helperText="Open Library subject when you pick a book; edit or choose a preset"
+                  helperText="Filled from Open Library (genre tag, subjects, or preset match); edit or choose below"
                 />
               )}
             />
