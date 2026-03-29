@@ -1,14 +1,35 @@
 // Open Library API — https://openlibrary.org/developers/api
-// Identified requests (User-Agent with app name + contact) get 3 req/s vs 1 req/s.
+// Web: plain fetch (no custom headers) so GET stays CORS-simple.
+// Native (Capacitor): same-origin requests to our API proxy; server adds User-Agent for OL rate limits.
+
+import { isNativeApp } from 'utils/platformHelpers';
+import { getApiBase } from 'services/apiHelpers';
 
 const OPEN_LIBRARY_ORIGIN = 'https://openlibrary.org';
 const SEARCH_URL = `${OPEN_LIBRARY_ORIGIN}/search.json`;
 
-const OL_FETCH_HEADERS = {
-  'User-Agent': 'ConsciousBookClub (jacobtdayton@gmail.com)',
+const DEBOUNCE_MS = 750;
+
+const openLibrarySearchUrl = (queryString) => {
+  if (isNativeApp()) {
+    return `${getApiBase()}/v1/open-library/search?${queryString}`;
+  }
+  return `${SEARCH_URL}?${queryString}`;
 };
 
-const DEBOUNCE_MS = 750;
+const openLibraryWorkJsonUrl = (workKeyNormalized) => {
+  if (isNativeApp()) {
+    return `${getApiBase()}/v1/open-library/work?key=${encodeURIComponent(workKeyNormalized)}`;
+  }
+  return `${OPEN_LIBRARY_ORIGIN}${workKeyNormalized}.json`;
+};
+
+const openLibraryAuthorJsonUrl = (authorKey) => {
+  if (isNativeApp()) {
+    return `${getApiBase()}/v1/open-library/author?key=${encodeURIComponent(authorKey)}`;
+  }
+  return `${OPEN_LIBRARY_ORIGIN}${authorKey}.json`;
+};
 
 const debounce = (func, wait) => {
   let timeout;
@@ -245,8 +266,8 @@ export const searchBooks = async (title = '', author = '', maxResults = 10) => {
     if (trimmedTitle) params.set('title', trimmedTitle);
     if (trimmedAuthor) params.set('author', trimmedAuthor);
 
-    const url = `${SEARCH_URL}?${params.toString()}`;
-    const response = await fetch(url, { headers: OL_FETCH_HEADERS });
+    const url = openLibrarySearchUrl(params.toString());
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`Open Library API error: ${response.status}`);
@@ -306,8 +327,8 @@ export const fetchWorkEnrichment = async (workKey) => {
     const key = normalizeWorkKey(workKey);
     if (!key) return null;
 
-    const url = `${OPEN_LIBRARY_ORIGIN}${key}.json`;
-    const response = await fetch(url, { headers: OL_FETCH_HEADERS });
+    const url = openLibraryWorkJsonUrl(key);
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`Open Library API error: ${response.status}`);
@@ -339,8 +360,8 @@ export const getBookById = async (workKey) => {
     const key = normalizeWorkKey(workKey);
     if (!key) return null;
 
-    const url = `${OPEN_LIBRARY_ORIGIN}${key}.json`;
-    const response = await fetch(url, { headers: OL_FETCH_HEADERS });
+    const url = openLibraryWorkJsonUrl(key);
+    const response = await fetch(url);
 
     if (!response.ok) {
       throw new Error(`Open Library API error: ${response.status}`);
@@ -357,8 +378,8 @@ export const getBookById = async (workKey) => {
     const firstAuthorKey = firstAuthorEntry?.author?.key;
     if (firstAuthorKey) {
       try {
-        const authorUrl = `${OPEN_LIBRARY_ORIGIN}${firstAuthorKey}.json`;
-        const ar = await fetch(authorUrl, { headers: OL_FETCH_HEADERS });
+        const authorUrl = openLibraryAuthorJsonUrl(firstAuthorKey);
+        const ar = await fetch(authorUrl);
         if (ar.ok) {
           const aj = await ar.json();
           if (aj.name) authors.push(aj.name);

@@ -12,6 +12,7 @@ const support = require("./support");
 const feed = require("./feed");
 const reports = require("./reports");
 const quotes = require("./quotes");
+const openLibrary = require("./openLibrary");
 
 const router = express.Router(); // eslint-disable-line new-cap
 
@@ -28,6 +29,7 @@ router.use("/support", support);
 router.use("/feed", feed);
 router.use("/reports", reports);
 router.use("/quotes", quotes);
+router.use("/open-library", openLibrary);
 
 module.exports = router;
 
