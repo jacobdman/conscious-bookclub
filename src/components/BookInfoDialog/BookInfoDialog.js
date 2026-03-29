@@ -14,6 +14,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import {
+  Close,
   ThumbUp as ThumbUpIcon,
   ThumbUpOffAlt as ThumbUpOffAltIcon,
 } from '@mui/icons-material';
@@ -129,16 +130,39 @@ const BookInfoDialog = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        <Typography variant="h6" component="div">
-          {book.title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {book.author || 'Unknown Author'}
-        </Typography>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullScreen
+      PaperProps={{
+        sx: {
+          backgroundColor: 'background.default',
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 2,
+          pb: 2,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h5" component="div">
+            {book.title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {book.author || 'Unknown Author'}
+          </Typography>
+        </Box>
+        <IconButton onClick={onClose} size="small" aria-label="Close">
+          <Close />
+        </IconButton>
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent sx={{ pt: 0 }}>
+        <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
           <Avatar
             src={
@@ -228,6 +252,7 @@ const BookInfoDialog = ({
           onProgressUpdated={onBookProgressUpdated}
           showStatusLine={false}
         />
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} variant="outlined">

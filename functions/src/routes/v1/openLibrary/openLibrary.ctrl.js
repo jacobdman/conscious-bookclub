@@ -15,7 +15,11 @@ const isValidOlKey = (key) =>
   !key.includes("..") &&
   /^(?:\/works\/OL[0-9]+W|\/authors\/OL[0-9]+A)$/i.test(key.trim());
 
-/** Edition record key, e.g. /books/OL24663544M */
+/**
+ * SSRF guard: only Open Library edition keys.
+ * @param {string} key Path such as /books/OL24663544M
+ * @return {boolean}
+ */
 const isValidOlEditionKey = (key) =>
   typeof key === "string" &&
   !key.includes("..") &&

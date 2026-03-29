@@ -31,22 +31,16 @@ const getMyProgressChip = (chosenForBookclub, progress) => {
   return { label: 'Not started', color: 'default', variant: 'outlined' };
 };
 
-const formatClubFinishBlurb = (finishedCount, totalMembers) => {
+const formatClubFinishBlurb = (finishedCount) => {
   if (finishedCount === 0) {
-    if (totalMembers > 0) {
-      return `No one finished yet · ${totalMembers} in club`;
-    }
     return 'No one finished yet';
-  }
-  if (totalMembers > 0) {
-    return `${finishedCount} of ${totalMembers} members finished`;
   }
   return `${finishedCount} ${finishedCount === 1 ? 'member' : 'members'} finished`;
 };
 
 const CurrentBooksSection = ({ books }) => {
   const { user } = useAuth();
-  const { currentClub, clubMembers } = useClubContext();
+  const { currentClub } = useClubContext();
   const queryClient = useQueryClient();
   const [bookProgress, setBookProgress] = useState({});
   const [clubFinishedByBookId, setClubFinishedByBookId] = useState({});
@@ -211,8 +205,6 @@ const CurrentBooksSection = ({ books }) => {
       }
     : null;
 
-  const totalMembers = Array.isArray(clubMembers) ? clubMembers.length : 0;
-
   return (
     <Box>
       <Typography variant="h6" gutterBottom data-tour="dashboard-books-title">
@@ -231,7 +223,7 @@ const CurrentBooksSection = ({ books }) => {
           const finishBlurb =
             finishedCount === undefined
               ? null
-              : formatClubFinishBlurb(finishedCount, totalMembers);
+              : formatClubFinishBlurb(finishedCount);
 
           return (
             <Card
