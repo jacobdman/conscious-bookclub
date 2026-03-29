@@ -1,6 +1,11 @@
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const db = require("../../../db/models/index");
 const {sendNotificationsToUser, DEFAULT_APP_ICON} = require("../../utils/pushSender");
+const {
+  meetingsNotificationsEnabled,
+  meetingsOneDayBeforeEnabled,
+  meetingsOneWeekBeforeEnabled,
+} = require("../../utils/defaultNotificationSettings");
 
 // Helper function to format date
 const formatDate = (date) => {
@@ -164,25 +169,26 @@ exports.meetingReminder = onSchedule(
               `(${daysText} away, ${timeInfo})`,
           );
 
-          // Build SQL filter for users with appropriate notification preferences
-          // For 1 day: enabled=true AND oneDayBefore=true
-          // For 7 days: enabled=true AND oneWeekBefore=true
-          const notificationFilter = db.Sequelize.literal(
-              "(notification_settings->'meetings'->>'enabled' = 'true' AND " +
-              `notification_settings->'meetings'->>'${reminderType}' = 'true')`,
-          );
-
-          // Get club members with notifications enabled (filtered at SQL level)
-          const clubMembers = await db.ClubMember.findAll({
+          // Get club members; filter by meeting prefs (undefined = enabled per product defaults)
+          const allMembers = await db.ClubMember.findAll({
             where: {clubId: meeting.clubId},
             include: [
               {
                 model: db.User,
                 as: "user",
-                where: notificationFilter,
-                required: true, // INNER JOIN - only get members with matching notification settings
+                required: true,
               },
             ],
+          });
+
+          const clubMembers = allMembers.filter((member) => {
+            if (!member.user) return false;
+            const m = member.user.notificationSettings?.meetings || {};
+            if (!meetingsNotificationsEnabled(m)) return false;
+            if (reminderType === "oneDayBefore") {
+              return meetingsOneDayBeforeEnabled(m);
+            }
+            return meetingsOneWeekBeforeEnabled(m);
           });
 
           const memberCount = clubMembers.length;

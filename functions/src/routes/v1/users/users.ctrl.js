@@ -1,4 +1,7 @@
 const db = require("../../../../db/models/index");
+const {
+  DEFAULT_NOTIFICATION_SETTINGS,
+} = require("../../../utils/defaultNotificationSettings");
 
 // GET /v1/users - Get all users
 const getUsers = async (req, res, next) => {
@@ -39,6 +42,15 @@ const createUser = async (req, res, next) => {
       photoUrl: userData.photoURL,
       lastLoginAt: new Date(),
     });
+
+    if (created) {
+      await user.update({
+        notificationSettings: DEFAULT_NOTIFICATION_SETTINGS,
+        dailyGoalNotificationsEnabled: DEFAULT_NOTIFICATION_SETTINGS.goals.enabled,
+        dailyGoalNotificationTime: DEFAULT_NOTIFICATION_SETTINGS.goals.time,
+      });
+      await user.reload();
+    }
 
     // If this is a new user, check for pending club requests
     if (created && userData.email) {
@@ -226,7 +238,8 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
-// POST /v1/users/:userId/vacation-mode - Bulk pause/resume habit & metric goals + settings.vacationMode
+// POST /v1/users/:userId/vacation-mode
+// Bulk pause/resume habit & metric goals + settings.vacationMode
 const setVacationMode = async (req, res, next) => {
   try {
     const {userId} = req.params;

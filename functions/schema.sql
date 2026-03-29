@@ -14,7 +14,7 @@ CREATE TABLE users (
 -- Books table
 CREATE TABLE books (
     id SERIAL PRIMARY KEY,
-    google_books_id VARCHAR(255) UNIQUE,
+    external_api_id VARCHAR(255) UNIQUE,
     title VARCHAR(500) NOT NULL,
     author VARCHAR(500),
     cover_image TEXT,
@@ -107,7 +107,7 @@ CREATE TABLE book_progress (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_books_google_books_id ON books(google_books_id);
+CREATE INDEX idx_books_external_api_id ON books(external_api_id);
 CREATE INDEX idx_books_status ON books(status);
 CREATE INDEX idx_books_discussion_date ON books(discussion_date);
 CREATE INDEX idx_meetings_date ON meetings(date);

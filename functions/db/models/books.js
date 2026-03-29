@@ -8,9 +8,9 @@ module.exports = function(sequelize, DataTypes) {
           primaryKey: true,
           autoIncrement: true,
         },
-        googleBooksId: {
+        externalApiId: {
           type: DataTypes.STRING,
-          field: "google_books_id",
+          field: "external_api_id",
           unique: true,
         },
         title: {

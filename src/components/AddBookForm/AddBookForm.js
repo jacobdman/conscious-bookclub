@@ -10,10 +10,6 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Alert,
   FormControlLabel,
   Checkbox,
@@ -21,7 +17,12 @@ import {
   CircularProgress,
   Avatar
 } from '@mui/material';
-import { debouncedSearchBooks, isGoogleBooksSearchAvailable } from 'services/googleBooksService';
+import {
+  debouncedSearchBooks,
+  DEFAULT_CLUB_THEMES,
+  mapOlSubjectsToDefaultClubThemes,
+  fetchWorkEnrichment,
+} from 'services/openLibraryService';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
 
@@ -38,7 +39,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     genre: '',
     coverImage: '',
     fiction: false,
-    description: ''
+    description: '',
+    externalApiId: null
   });
 
   // Update form data when editingBook changes
@@ -64,13 +66,15 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: editingBook.genre || '',
         coverImage: editingBook.coverImage || '',
         fiction: Boolean(editingBook.fiction),
-        description: editingBook.description || ''
+        description: editingBook.description || '',
+        externalApiId: editingBook.externalApiId ?? null
       };
       setFormData(newFormData);
       
       // Set selectedBook for Autocomplete when editing
       if (editingBook.title) {
         setSelectedBook({
+          id: editingBook.externalApiId,
           title: editingBook.title,
           author: editingBook.author,
           coverImage: editingBook.coverImage,
@@ -86,7 +90,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: '',
         coverImage: '',
         fiction: false,
-        description: ''
+        description: '',
+        externalApiId: null
       });
       setSelectedBook(null);
     }
@@ -105,6 +110,10 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     ? currentClub.themes
     : ['Classy', 'Creative', 'Curious'];
   const themesEnabled = currentClub?.themesEnabled !== false;
+  const usesDefaultThemeSet =
+    themesEnabled &&
+    themeOptions.length === DEFAULT_CLUB_THEMES.length &&
+    DEFAULT_CLUB_THEMES.every((t) => themeOptions.includes(t));
   
   const genres = [
     'Personal Development',
@@ -166,28 +175,62 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
 
   const handleBookSelect = (event, value) => {
     if (value) {
+      if (typeof value === 'string') {
+        setSelectedBook(null);
+        setFormData(prev => ({
+          ...prev,
+          title: value,
+          externalApiId: null
+        }));
+        return;
+      }
       setSelectedBook(value);
+      const olId = typeof value.id === 'string' && value.id ? value.id : null;
+      const categories = value.categories || [];
+      const themesFromOl =
+        usesDefaultThemeSet && categories.length > 0
+          ? mapOlSubjectsToDefaultClubThemes(categories)
+          : null;
+
       setFormData(prev => ({
         ...prev,
         title: value.title,
         author: value.author,
         coverImage: value.coverImage,
         genre: value.genre || prev.genre,
-        description: value.description || prev.description
+        description: value.description || prev.description,
+        externalApiId: olId,
+        ...(themesFromOl && themesFromOl.length > 0 ? { theme: themesFromOl } : {}),
       }));
+
+      if (olId) {
+        fetchWorkEnrichment(olId).then((en) => {
+          if (!en) return;
+          setFormData((prev) => ({
+            ...prev,
+            description: en.description || prev.description,
+            genre: en.genre || prev.genre,
+            ...(usesDefaultThemeSet && en.subjects.length > 0
+              ? { theme: mapOlSubjectsToDefaultClubThemes(en.subjects) }
+              : {}),
+          }));
+        });
+      }
     } else {
       setSelectedBook(null);
+      setFormData(prev => ({ ...prev, externalApiId: null }));
     }
   };
 
-  const handleTitleInputChange = (event, value) => {
+  const handleTitleInputChange = (event, value, reason) => {
+    if (reason === 'input') {
+      setSelectedBook(null);
+    }
     setFormData(prev => {
-      // Search with both title and current author value
       handleBookSearch(value, prev.author);
       return { ...prev, title: value };
     });
-    
-    // Clear error when user starts typing
+
     if (errors.title) {
       setErrors(prev => ({ ...prev, title: '' }));
     }
@@ -244,7 +287,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: formData.genre || null,
         coverImage: formData.coverImage.trim() || null,
         fiction: formData.fiction || false, // Ensure it's always a boolean
-        description: formData.description.trim() || null
+        description: formData.description.trim() || null,
+        externalApiId: formData.externalApiId || null
       };
 
       if (!currentClub) {
@@ -270,7 +314,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: '',
         coverImage: '',
         fiction: false,
-        description: ''
+        description: '',
+        externalApiId: null
       });
       setSelectedBook(null);
       setBookSuggestions([]);
@@ -318,7 +363,8 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         coverImage: '',
         fiction: false,
         discussionDate: '',
-        description: ''
+        description: '',
+        externalApiId: null
       });
       setSelectedBook(null);
       setBookSuggestions([]);
@@ -356,43 +402,56 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
             </Alert>
           )}
 
-          {!isGoogleBooksSearchAvailable() && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Enter title and author below. Use the web app to search for books by name.
-            </Alert>
-          )}
-
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Autocomplete
               freeSolo
               options={bookSuggestions}
-              value={selectedBook}
+              value={selectedBook != null ? selectedBook : formData.title}
               onInputChange={handleTitleInputChange}
               onChange={handleBookSelect}
+              filterOptions={(options) => options}
+              isOptionEqualToValue={(option, val) => {
+                if (val == null || typeof val === 'string') return false;
+                return option.id === val.id;
+              }}
               getOptionLabel={(option) => {
                 if (typeof option === 'string') return option;
                 return option.title || '';
               }}
-              renderOption={(props, option) => (
-                <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {option.coverImage && (
-                    <Avatar
-                      src={option.coverImage}
-                      alt={option.title}
-                      sx={{ width: 32, height: 48, borderRadius: 1 }}
-                      variant="rounded"
-                    />
-                  )}
-                  <Box>
-                    <Typography variant="body2" fontWeight="medium">
-                      {option.title}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {option.author}
-                    </Typography>
+              getOptionKey={(option) =>
+                typeof option === 'string'
+                  ? option
+                  : option.id || `${option.title || ''}::${option.author || ''}::${option.coverImage || ''}`
+              }
+              renderOption={(props, option) => {
+                const { key, ...optionProps } = props;
+                return (
+                  <Box
+                    key={key}
+                    component="li"
+                    {...optionProps}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  >
+                    {option.coverImage && (
+                      <Avatar
+                        src={option.coverImage}
+                        alt={option.title}
+                        sx={{ width: 32, height: 48, borderRadius: 1 }}
+                        variant="rounded"
+                      />
+                    )}
+                    <Box>
+                      <Typography variant="body2" fontWeight="medium">
+                        {option.title}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {option.author}
+                        {option.publishedDate ? ` · ${option.publishedDate}` : ''}
+                      </Typography>
+                    </Box>
                   </Box>
-                </Box>
-              )}
+                );
+              }}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -444,23 +503,28 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
               />
             )}
 
-            <FormControl fullWidth disabled={loading}>
-              <InputLabel>Genre</InputLabel>
-              <Select
-                value={formData.genre}
-                onChange={handleChange('genre')}
-                label="Genre"
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {genres.map((genre) => (
-                  <MenuItem key={genre} value={genre}>
-                    {genre}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              freeSolo
+              options={genres}
+              value={formData.genre}
+              onChange={(e, newValue) => {
+                setFormData((prev) => ({ ...prev, genre: newValue ?? '' }));
+              }}
+              onInputChange={(e, newInputValue, reason) => {
+                if (reason === 'input' || reason === 'clear') {
+                  setFormData((prev) => ({ ...prev, genre: newInputValue }));
+                }
+              }}
+              disabled={loading}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Genre"
+                  fullWidth
+                  helperText="Open Library subject when you pick a book; edit or choose a preset"
+                />
+              )}
+            />
 
             <TextField
               label="Cover Image URL"

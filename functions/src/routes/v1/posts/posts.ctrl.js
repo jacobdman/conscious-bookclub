@@ -1,6 +1,11 @@
 const db = require("../../../../db/models/index");
 const {EVERYONE_MENTION_USER_ID} = require("../../../../utils/mentionHelpers");
 const {sendNotificationsToUser} = require("../../../utils/pushSender");
+const {
+  feedNotificationsEnabled,
+  feedMode,
+  feedReactionsEnabled,
+} = require("../../../utils/defaultNotificationSettings");
 
 const FEED_NOTIFICATION_ICON =
   "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
@@ -305,18 +310,19 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
       const user = member.user;
       const settings = user.notificationSettings || {};
       const feedSettings = settings.feed || {};
-      if (!feedSettings.enabled) continue;
+      if (!feedNotificationsEnabled(feedSettings)) continue;
       if (user.uid === authorId) continue;
 
+      const mode = feedMode(feedSettings);
       let shouldNotify = false;
       if (hasMentions && mentionedUserIds.includes(user.uid)) {
         shouldNotify = true;
         mentionNotifications.add(user.uid);
       } else if (isActivityCompletion) {
         shouldNotify = true;
-      } else if (feedSettings.mode === "all") {
+      } else if (mode === "all") {
         shouldNotify = true;
-      } else if (feedSettings.mode === "mentions_replies") {
+      } else if (mode === "mentions_replies") {
         if (isReply && parentPostAuthorId === user.uid) shouldNotify = true;
       }
 
@@ -330,13 +336,14 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
       const user = member.user;
       const settings = user.notificationSettings || {};
       const feedSettings = settings.feed || {};
-      if (!feedSettings.enabled) continue;
+      if (!feedNotificationsEnabled(feedSettings)) continue;
       if (user.uid === authorId) continue;
       if (usersInRoom.has(user.uid)) {
         console.log(`Skipping notification for user ${user.uid} - actively viewing feed`);
         continue;
       }
 
+      const mode = feedMode(feedSettings);
       let shouldNotify = false;
       let notificationTitle = "Feed · New post";
       let notificationBody = "";
@@ -358,9 +365,9 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
           notificationTitle = "Feed · Goal completed";
           notificationBody = `${authorName} completed a goal`;
         }
-      } else if (feedSettings.mode === "all") {
+      } else if (mode === "all") {
         shouldNotify = true;
-      } else if (feedSettings.mode === "mentions_replies") {
+      } else if (mode === "mentions_replies") {
         if (isReply && parentPostAuthorId === user.uid) shouldNotify = true;
       }
 
@@ -389,6 +396,56 @@ const sendFeedNotificationsForPost = async (post, clubIdInt, authorId, options =
     }
   } catch (error) {
     console.error("Error sending feed notifications:", error);
+  }
+};
+
+/**
+ * Push to post author when someone adds a new reaction (not duplicate emoji).
+ */
+const sendReactionPushIfNeeded = async ({
+  post,
+  clubIdInt,
+  reactorUserId,
+  emoji,
+  created,
+}) => {
+  if (!created) return;
+  const authorId = post.authorId;
+  if (!authorId || reactorUserId === authorId) return;
+
+  try {
+    const authorUser = await db.User.findByPk(authorId);
+    if (!authorUser) return;
+
+    const settings = authorUser.notificationSettings || {};
+    const feedSettings = settings.feed || {};
+    if (!feedNotificationsEnabled(feedSettings)) return;
+    if (!feedReactionsEnabled(feedSettings)) return;
+
+    const usersInRoom = await checkUsersInRoom(clubIdInt, [authorId]);
+    if (usersInRoom.has(authorId)) {
+      console.log(
+          `Skipping reaction notification for ${authorId} - actively viewing feed`,
+      );
+      return;
+    }
+
+    const reactor = await db.User.findByPk(reactorUserId, {
+      attributes: ["displayName"],
+    });
+    const reactorName = reactor?.displayName || "Someone";
+    const title = "Feed · New reaction";
+    const body = `${reactorName} reacted with ${emoji} to your post`;
+
+    await sendNotificationsToUser(
+        authorId,
+        title,
+        body,
+        {route: "/feed", type: "feed", clubId: clubIdInt},
+        {icon: FEED_NOTIFICATION_ICON, badge: FEED_NOTIFICATION_ICON},
+    );
+  } catch (err) {
+    console.error("Error sending reaction notification:", err);
   }
 };
 
@@ -745,6 +802,14 @@ const addReaction = async (req, res, next) => {
       postId: parseInt(postId),
       reaction: reaction.toJSON(),
       reactions: reactions.map((r) => r.toJSON()),
+    });
+
+    void sendReactionPushIfNeeded({
+      post,
+      clubIdInt: parseInt(clubId, 10),
+      reactorUserId: userId,
+      emoji,
+      created,
     });
 
     res.status(created ? 201 : 200).json(reaction.toJSON());

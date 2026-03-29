@@ -35,17 +35,18 @@ const NotificationSettings = () => {
   const [testResult, setTestResult] = useState(null);
   
   // Goal notifications
-  const [goalNotificationsEnabled, setGoalNotificationsEnabled] = useState(false);
+  const [goalNotificationsEnabled, setGoalNotificationsEnabled] = useState(true);
   const [notificationHour, setNotificationHour] = useState(9); // Default to 9 AM
   
   // Feed notifications
-  const [feedNotificationsEnabled, setFeedNotificationsEnabled] = useState(false);
+  const [feedNotificationsEnabled, setFeedNotificationsEnabled] = useState(true);
   const [feedNotificationMode, setFeedNotificationMode] = useState('all'); // 'all' or 'mentions_replies'
+  const [feedNotifyOnReactions, setFeedNotifyOnReactions] = useState(true);
   
   // Meeting notifications
-  const [meetingNotificationsEnabled, setMeetingNotificationsEnabled] = useState(false);
-  const [meetingOneWeekBefore, setMeetingOneWeekBefore] = useState(false);
-  const [meetingOneDayBefore, setMeetingOneDayBefore] = useState(false);
+  const [meetingNotificationsEnabled, setMeetingNotificationsEnabled] = useState(true);
+  const [meetingOneWeekBefore, setMeetingOneWeekBefore] = useState(true);
+  const [meetingOneDayBefore, setMeetingOneDayBefore] = useState(true);
   
   const [timezone, setTimezone] = useState('UTC');
   const [hasSubscription, setHasSubscription] = useState(false);
@@ -60,9 +61,11 @@ const NotificationSettings = () => {
       // Load from notificationSettings JSON if available, otherwise fall back to legacy fields
       const settings = userData.notificationSettings || {};
       
-      // Goal notifications
+      // Goal notifications (undefined = on per server semantics)
       const goalSettings = settings.goals || {};
-      setGoalNotificationsEnabled(goalSettings.enabled || userData.dailyGoalNotificationsEnabled || false);
+      setGoalNotificationsEnabled(
+        goalSettings.enabled ?? userData.dailyGoalNotificationsEnabled ?? true,
+      );
       
       if (goalSettings.time) {
         const [hours] = goalSettings.time.split(':').map(Number);
@@ -76,14 +79,15 @@ const NotificationSettings = () => {
       
       // Feed notifications
       const feedSettings = settings.feed || {};
-      setFeedNotificationsEnabled(feedSettings.enabled || false);
-      setFeedNotificationMode(feedSettings.mode || 'all');
+      setFeedNotificationsEnabled(feedSettings.enabled ?? true);
+      setFeedNotificationMode(feedSettings.mode ?? 'all');
+      setFeedNotifyOnReactions(feedSettings.reactions ?? true);
       
       // Meeting notifications
       const meetingSettings = settings.meetings || {};
-      setMeetingNotificationsEnabled(meetingSettings.enabled || false);
-      setMeetingOneWeekBefore(meetingSettings.oneWeekBefore || false);
-      setMeetingOneDayBefore(meetingSettings.oneDayBefore || false);
+      setMeetingNotificationsEnabled(meetingSettings.enabled ?? true);
+      setMeetingOneWeekBefore(meetingSettings.oneWeekBefore ?? true);
+      setMeetingOneDayBefore(meetingSettings.oneDayBefore ?? true);
 
       if (userData.timezone) {
         setTimezone(userData.timezone);
@@ -139,6 +143,7 @@ const NotificationSettings = () => {
         feed: {
           enabled: feedNotificationsEnabled,
           mode: feedNotificationMode,
+          reactions: feedNotifyOnReactions,
         },
         meetings: {
           enabled: meetingNotificationsEnabled,
@@ -178,6 +183,7 @@ const NotificationSettings = () => {
       setGoalNotificationsEnabled(true);
       setFeedNotificationsEnabled(true);
       setFeedNotificationMode('all');
+      setFeedNotifyOnReactions(true);
       setMeetingNotificationsEnabled(true);
       setMeetingOneWeekBefore(true);
       setMeetingOneDayBefore(true);
@@ -195,6 +201,7 @@ const NotificationSettings = () => {
           feed: {
             enabled: true,
             mode: 'all',
+            reactions: true,
           },
           meetings: {
             enabled: true,
@@ -251,6 +258,7 @@ const NotificationSettings = () => {
         setGoalNotificationsEnabled(true);
         setFeedNotificationsEnabled(true);
         setFeedNotificationMode('all');
+        setFeedNotifyOnReactions(true);
         setMeetingNotificationsEnabled(true);
         setMeetingOneWeekBefore(true);
         setMeetingOneDayBefore(true);
@@ -260,7 +268,7 @@ const NotificationSettings = () => {
           const timeStr = `${hourStr}:00:00`;
           const notification_settings = {
             goals: { enabled: true, time: timeStr },
-            feed: { enabled: true, mode: 'all' },
+            feed: { enabled: true, mode: 'all', reactions: true },
             meetings: { enabled: true, oneWeekBefore: true, oneDayBefore: true },
           };
           await updateNotificationPreferences(user.uid, {
@@ -423,10 +431,23 @@ const NotificationSettings = () => {
               </RadioGroup>
             </FormControl>
 
+            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={feedNotifyOnReactions}
+                    onChange={(e) => setFeedNotifyOnReactions(e.target.checked)}
+                    disabled={saving}
+                  />
+                }
+                label="Notify when someone reacts to your posts"
+              />
+            </Box>
+
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {feedNotificationMode === 'all' 
+              {feedNotificationMode === 'all'
                 ? 'You will receive notifications for all new posts in your book club.'
-                : 'You will receive notifications when someone replies to your posts.'}
+                : 'You will receive notifications when someone replies to your posts or mentions you.'}
             </Typography>
           </>
         )}

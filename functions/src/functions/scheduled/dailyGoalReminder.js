@@ -1,6 +1,7 @@
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const db = require("../../../db/models/index");
 const {sendNotificationsToUser} = require("../../utils/pushSender");
+const {goalsNotificationsEnabled} = require("../../utils/defaultNotificationSettings");
 
 const GOALS_NOTIFICATION_ICON =
   "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
@@ -88,6 +89,12 @@ exports.dailyGoalReminder = onSchedule(
         for (const user of users) {
           usersProcessed++;
           console.log(`Processing user ${user.uid} (${usersProcessed}/${users.length})`);
+
+          if (!goalsNotificationsEnabled(user)) {
+            console.log(`  Skipping user ${user.uid}: goal notifications disabled in settings`);
+            usersSkipped++;
+            continue;
+          }
 
           // Check if it's time to send notification for this user
           if (!user.dailyGoalNotificationTime) {
