@@ -51,6 +51,8 @@ import BookInfoDialog from 'components/BookInfoDialog';
 import BooksTour from 'components/Tours/BooksTour';
 import ClubBooksTab from 'components/ClubBooksTab';
 import { parseLocalDate } from 'utils/dateHelpers';
+import { bookCoverAvatarSx } from 'utils/bookCoverDisplay';
+import { setOpenLibraryCoverSize, OL_COVER_SIZE } from 'services/openLibraryService';
 
 const CLUB_TAB_INDEX = 1;
 
@@ -727,15 +729,19 @@ const BookList = () => {
                 >
                   <TableCell>
                     <Avatar
-                      src={book.coverImage}
+                      src={
+                        book.coverImage
+                          ? setOpenLibraryCoverSize(book.coverImage, OL_COVER_SIZE.M)
+                          : undefined
+                      }
                       alt={book.title}
                       variant="rounded"
-                      sx={{ 
-                          width: 60, 
-                          height: 85,
-                          boxShadow: 2,
-                          borderRadius: 1
-                      }}
+                      sx={bookCoverAvatarSx({
+                        width: 60,
+                        height: 85,
+                        boxShadow: 2,
+                        borderRadius: 1,
+                      })}
                     />
                   </TableCell>
                   <TableCell>
@@ -938,6 +944,7 @@ const BookList = () => {
         discussionDate={selectedBook ? meetingDates[selectedBook.id] : null}
         onToggleLike={selectedBook ? handleToggleLike : undefined}
         isLikeLoading={selectedBook ? loadingLikes[selectedBook.id] : false}
+        saveBookProgress={updateBookProgress}
       />
     </Layout>
   );

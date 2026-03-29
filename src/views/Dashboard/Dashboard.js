@@ -76,7 +76,6 @@ const Dashboard = () => {
           const bookData = {
             id: bookId,
             ...meeting.book,
-            chosenForBookclub: true,
             progress: meeting.book.progress || null,
             meetingTheme: meeting.theme || null,
           };

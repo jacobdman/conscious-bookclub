@@ -33,6 +33,8 @@ import EmojiInput from 'components/EmojiInput';
 import MentionInput from 'components/MentionInput';
 import useFeedContext from 'contexts/Feed';
 import { EMOJI_CATEGORIES } from 'utils/emojiCategories';
+import { setOpenLibraryCoverSize, OL_COVER_SIZE } from 'services/openLibraryService';
+import { bookCoverImgSx } from 'utils/bookCoverDisplay';
 import { triggerHaptic } from 'utils/haptics';
 import { formatSemanticDateTime } from 'utils/dateHelpers';
 import { formatMeetingDisplay } from 'utils/meetingTime';
@@ -421,16 +423,17 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
         {coverImage && (
           <Box
             component="img"
-            src={coverImage}
+            src={setOpenLibraryCoverSize(coverImage, OL_COVER_SIZE.M)}
             alt={title}
             sx={{
-              width: 56,
-              height: 80,
-              objectFit: 'cover',
-              borderRadius: 1,
-              border: '1px solid',
-              borderColor: 'divider',
-              flexShrink: 0,
+              ...bookCoverImgSx({
+                width: 56,
+                height: 80,
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                flexShrink: 0,
+              }),
             }}
           />
         )}

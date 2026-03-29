@@ -10,14 +10,17 @@ import {
   Chip,
   Button,
   Divider,
-  LinearProgress,
   IconButton,
-  Tooltip
+  Tooltip,
 } from '@mui/material';
 import {
   ThumbUp as ThumbUpIcon,
-  ThumbUpOffAlt as ThumbUpOffAltIcon
+  ThumbUpOffAlt as ThumbUpOffAltIcon,
 } from '@mui/icons-material';
+import { useAuth } from 'AuthContext';
+import BookProgressControls from 'components/BookProgressControls';
+import { setOpenLibraryCoverSize, OL_COVER_SIZE } from 'services/openLibraryService';
+import { bookCoverAvatarSx } from 'utils/bookCoverDisplay';
 
 const LINE_CLAMP = 3;
 
@@ -90,15 +93,24 @@ const ClampedTextBlock = ({ sectionKey, title, text, emptyLabel }) => {
   );
 };
 
-const BookInfoDialog = ({ open, onClose, book, discussionDate, onToggleLike, isLikeLoading }) => {
+const BookInfoDialog = ({
+  open,
+  onClose,
+  book,
+  discussionDate,
+  onToggleLike,
+  isLikeLoading,
+  saveBookProgress,
+  onBookProgressUpdated,
+}) => {
+  const { user } = useAuth();
+
   if (!book) return null;
 
-  const themes = Array.isArray(book.theme) ? book.theme : (book.theme ? [book.theme] : []);
+  const themes = Array.isArray(book.theme) ? book.theme : book.theme ? [book.theme] : [];
   const description = book.description?.trim();
   const suggesterNotes = (book.suggesterNotes ?? book.suggester_notes ?? '').trim();
   const hasProgress = Boolean(book.chosenForBookclub);
-  const progressStatus = book.progress?.status || 'not_started';
-  const percentComplete = book.progress?.percentComplete;
   const likesCount = book.likesCount || 0;
   const isLiked = Boolean(book.isLiked);
   const uploadedBy = book.uploader?.displayName || book.uploadedBy || book.uploaded_by;
@@ -110,6 +122,7 @@ const BookInfoDialog = ({ open, onClose, book, discussionDate, onToggleLike, isL
 
   const getStatusLabel = () => {
     if (!hasProgress) return 'Not selected for reading';
+    const progressStatus = book.progress?.status || 'not_started';
     if (progressStatus === 'finished') return 'Finished';
     if (progressStatus === 'reading') return 'Reading';
     return 'Not Started';
@@ -128,16 +141,25 @@ const BookInfoDialog = ({ open, onClose, book, discussionDate, onToggleLike, isL
       <DialogContent dividers>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
           <Avatar
-            src={book.coverImage}
+            src={
+              book.coverImage
+                ? setOpenLibraryCoverSize(book.coverImage, OL_COVER_SIZE.L)
+                : undefined
+            }
             alt={book.title}
             variant="rounded"
-            sx={{ width: 100, height: 140, borderRadius: 2, boxShadow: 2 }}
+            sx={bookCoverAvatarSx({
+              width: 100,
+              height: 140,
+              borderRadius: 2,
+              boxShadow: 2,
+            })}
           />
           <Box sx={{ flex: 1 }}>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {themes.length > 0 ? themes.map((theme) => (
-                <Chip key={theme} label={theme} size="small" color="primary" />
-              )) : (
+              {themes.length > 0 ? (
+                themes.map((theme) => <Chip key={theme} label={theme} size="small" color="primary" />)
+              ) : (
                 <Chip label="No theme" size="small" variant="outlined" />
               )}
               <Chip label={book.genre || 'No genre'} size="small" variant="outlined" />
@@ -158,11 +180,7 @@ const BookInfoDialog = ({ open, onClose, book, discussionDate, onToggleLike, isL
                     color={isLiked ? 'primary' : 'default'}
                     aria-label={isLiked ? 'Unlike book' : 'Like book'}
                   >
-                    {isLiked ? (
-                      <ThumbUpIcon fontSize="small" />
-                    ) : (
-                      <ThumbUpOffAltIcon fontSize="small" />
-                    )}
+                    {isLiked ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOffAltIcon fontSize="small" />}
                   </IconButton>
                 </span>
               </Tooltip>
@@ -201,14 +219,15 @@ const BookInfoDialog = ({ open, onClose, book, discussionDate, onToggleLike, isL
         <Typography variant="body2" color="text.secondary" gutterBottom>
           {getStatusLabel()}
         </Typography>
-        {hasProgress && progressStatus === 'reading' && typeof percentComplete === 'number' && (
-          <Box sx={{ mt: 1 }}>
-            <LinearProgress variant="determinate" value={percentComplete} sx={{ height: 6, borderRadius: 3 }} />
-            <Typography variant="caption" color="text.secondary">
-              {Math.round(percentComplete)}% complete
-            </Typography>
-          </Box>
-        )}
+        <BookProgressControls
+          user={user}
+          bookId={book.id}
+          chosenForBookclub={book.chosenForBookclub}
+          initialProgress={book.progress}
+          saveProgress={saveBookProgress}
+          onProgressUpdated={onBookProgressUpdated}
+          showStatusLine={false}
+        />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} variant="outlined">

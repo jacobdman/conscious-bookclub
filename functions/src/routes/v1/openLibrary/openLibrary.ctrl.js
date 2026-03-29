@@ -15,6 +15,12 @@ const isValidOlKey = (key) =>
   !key.includes("..") &&
   /^(?:\/works\/OL[0-9]+W|\/authors\/OL[0-9]+A)$/i.test(key.trim());
 
+/** Edition record key, e.g. /books/OL24663544M */
+const isValidOlEditionKey = (key) =>
+  typeof key === "string" &&
+  !key.includes("..") &&
+  /^\/books\/OL[0-9]+M$/i.test(key.trim());
+
 // GET /v1/open-library/search?title=&author=&limit=
 const proxySearch = async (req, res, next) => {
   try {
@@ -90,8 +96,61 @@ const proxyAuthor = async (req, res, next) => {
   }
 };
 
+// GET /v1/open-library/work-editions?key=/works/OL1W&limit=50
+const proxyWorkEditions = async (req, res, next) => {
+  try {
+    const key = (req.query.key || "").trim();
+    if (!isValidOlKey(key) || !key.toLowerCase().startsWith("/works/")) {
+      const error = new Error("Invalid or missing work key");
+      error.status = 400;
+      throw error;
+    }
+
+    const lim = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "50"), 10) || 50));
+    const url = `${OL_ORIGIN}${key}/editions.json?limit=${lim}`;
+    const r = await fetch(url, {headers: olFetchHeaders});
+
+    if (!r.ok) {
+      const error = new Error(`Open Library error: ${r.status}`);
+      error.status = 502;
+      throw error;
+    }
+
+    res.json(await r.json());
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /v1/open-library/edition?key=/books/OL123M
+const proxyEdition = async (req, res, next) => {
+  try {
+    const key = (req.query.key || "").trim();
+    if (!isValidOlEditionKey(key)) {
+      const error = new Error("Invalid or missing edition key");
+      error.status = 400;
+      throw error;
+    }
+
+    const url = `${OL_ORIGIN}${key}.json`;
+    const r = await fetch(url, {headers: olFetchHeaders});
+
+    if (!r.ok) {
+      const error = new Error(`Open Library error: ${r.status}`);
+      error.status = 502;
+      throw error;
+    }
+
+    res.json(await r.json());
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   proxySearch,
   proxyWork,
   proxyAuthor,
+  proxyWorkEditions,
+  proxyEdition,
 };

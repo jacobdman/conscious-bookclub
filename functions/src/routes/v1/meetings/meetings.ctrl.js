@@ -95,7 +95,14 @@ const getMeetings = async (req, res, next) => {
     const bookInclude = {
       model: db.Book,
       as: "book",
-      attributes: ["id", "title", "author", "coverImage", "theme"],
+      attributes: [
+        "id",
+        "title",
+        "author",
+        "coverImage",
+        "theme",
+        "chosenForBookclub",
+      ],
     };
 
     // If userId is provided, include user's BookProgress for each book
@@ -124,9 +131,33 @@ const getMeetings = async (req, res, next) => {
 
     const meetings = await db.Meeting.findAll(queryOptions);
 
+    // Books on the club calendar are "chosen for reading" for progress API + UI.
+    // Heal stale rows (e.g. legacy data or failed client updates) so PUT /progress succeeds.
+    const numericClubId = parseInt(clubId, 10);
+    const bookIdsOnCalendar = [
+      ...new Set(
+          meetings.map((m) => m.bookId).filter((id) => id != null),
+      ),
+    ];
+    if (bookIdsOnCalendar.length > 0) {
+      await db.Book.update(
+          {chosenForBookclub: true},
+          {
+            where: {
+              id: {[db.Op.in]: bookIdsOnCalendar},
+              clubId: numericClubId,
+              chosenForBookclub: false,
+            },
+          },
+      );
+    }
+
     // Transform the response to nest progress in book.progress
     const transformedMeetings = meetings.map((meeting) => {
       const meetingJson = meeting.toJSON();
+      if (meetingJson.book && meetingJson.bookId) {
+        meetingJson.book.chosenForBookclub = true;
+      }
       if (meetingJson.book && userId && meetingJson.book.bookProgresses &&
           meetingJson.book.bookProgresses.length > 0) {
         // User has progress for this book - nest it in book.progress

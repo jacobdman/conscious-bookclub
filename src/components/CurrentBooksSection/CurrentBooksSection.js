@@ -1,31 +1,62 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
-  Button,
   Card,
   CardContent,
   CardMedia,
+  Chip,
   Typography,
-  TextField,
-  CircularProgress,
 } from '@mui/material';
 import { useAuth } from 'AuthContext';
-import { getUserBookProgress, updateUserBookProgress } from 'services/progress/progress.service';
+import { getUserBookProgress, getAllUsersProgressForBook } from 'services/progress/progress.service';
 import useClubContext from 'contexts/Club';
 import { useMeetings } from 'hooks/useMeetings';
 import { parseLocalDate } from 'utils/dateHelpers';
+import { bookCoverImgSx } from 'utils/bookCoverDisplay';
+import BookInfoDialog from 'components/BookInfoDialog';
+import { setOpenLibraryCoverSize, OL_COVER_SIZE } from 'services/openLibraryService';
+
+const getMyProgressChip = (chosenForBookclub, progress) => {
+  if (!chosenForBookclub) {
+    return { label: 'Not a club read', color: 'default', variant: 'outlined' };
+  }
+  const st = progress?.status;
+  if (st === 'finished') {
+    return { label: 'Finished', color: 'success' };
+  }
+  if (st === 'reading') {
+    return { label: 'Started', color: 'primary' };
+  }
+  return { label: 'Not started', color: 'default', variant: 'outlined' };
+};
+
+const formatClubFinishBlurb = (finishedCount, totalMembers) => {
+  if (finishedCount === 0) {
+    if (totalMembers > 0) {
+      return `No one finished yet · ${totalMembers} in club`;
+    }
+    return 'No one finished yet';
+  }
+  if (totalMembers > 0) {
+    return `${finishedCount} of ${totalMembers} members finished`;
+  }
+  return `${finishedCount} ${finishedCount === 1 ? 'member' : 'members'} finished`;
+};
 
 const CurrentBooksSection = ({ books }) => {
   const { user } = useAuth();
-  const { currentClub } = useClubContext();
+  const { currentClub, clubMembers } = useClubContext();
+  const queryClient = useQueryClient();
   const [bookProgress, setBookProgress] = useState({});
-  const [loadingProgress, setLoadingProgress] = useState({});
-  const [percentInputs, setPercentInputs] = useState({});
+  const [clubFinishedByBookId, setClubFinishedByBookId] = useState({});
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const { data: meetingsList = [] } = useMeetings(currentClub?.id, user?.uid, {});
-  const meetingDates = useMemo(() => {
+  const meetingDates = React.useMemo(() => {
     const datesMap = {};
-    (meetingsList || []).forEach(meeting => {
+    (meetingsList || []).forEach((meeting) => {
       if (meeting.bookId) {
         const meetingDate = parseLocalDate(meeting.date);
         if (!datesMap[meeting.bookId] || meetingDate < parseLocalDate(datesMap[meeting.bookId])) {
@@ -36,70 +67,121 @@ const CurrentBooksSection = ({ books }) => {
     return datesMap;
   }, [meetingsList]);
 
-  // Load progress for all books when component mounts or books change
-  useEffect(() => {
-    if (!user || !books || books.length === 0) return;
-
-    // Check if progress is already included in books
-    const progressMap = {};
-    let hasProgressInBooks = false;
-    books.forEach((book) => {
-      if (book.progress !== undefined) {
-        hasProgressInBooks = true;
-        progressMap[book.id] = book.progress;
-      }
-    });
-
-    if (hasProgressInBooks) {
-      // Progress already included in books, use it directly
-      setBookProgress(progressMap);
-    } else {
-      // Progress not included, fetch separately (fallback for backward compatibility)
-      const loadProgress = async () => {
-        const progressPromises = books.map(async (book) => {
-          try {
-            const progress = await getUserBookProgress(user.uid, book.id);
-            return { bookId: book.id, progress };
-          } catch (error) {
-            return { bookId: book.id, progress: null };
-          }
-        });
-
-        const results = await Promise.all(progressPromises);
-        const fetchedProgressMap = {};
-        results.forEach(({ bookId, progress }) => {
-          fetchedProgressMap[bookId] = progress;
-        });
-        setBookProgress(fetchedProgressMap);
-      };
-
-      loadProgress();
+  const fetchFinishCountsForBooks = useCallback(async (bookList) => {
+    if (!bookList || bookList.length === 0) {
+      return {};
     }
-  }, [user, books]);
+    const countEntries = await Promise.all(
+      bookList.map(async (book) => {
+        try {
+          const all = await getAllUsersProgressForBook(book.id);
+          const n = Array.isArray(all) ? all.filter((p) => p.status === 'finished').length : 0;
+          return [book.id, n];
+        } catch {
+          return [book.id, 0];
+        }
+      }),
+    );
+    return Object.fromEntries(countEntries);
+  }, []);
+
+  useEffect(() => {
+    if (!books || books.length === 0) {
+      setBookProgress({});
+      setClubFinishedByBookId({});
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      const progressMap = {};
+      let hasProgressInBooks = false;
+      books.forEach((book) => {
+        if (book.progress !== undefined) {
+          hasProgressInBooks = true;
+          progressMap[book.id] = book.progress;
+        }
+      });
+
+      if (hasProgressInBooks) {
+        if (!cancelled) setBookProgress(progressMap);
+      } else if (user) {
+        const results = await Promise.all(
+          books.map(async (book) => {
+            try {
+              const progress = await getUserBookProgress(user.uid, book.id);
+              return { bookId: book.id, progress };
+            } catch {
+              return { bookId: book.id, progress: null };
+            }
+          }),
+        );
+        if (!cancelled) {
+          const m = {};
+          results.forEach(({ bookId, progress }) => {
+            m[bookId] = progress;
+          });
+          setBookProgress(m);
+        }
+      } else if (!cancelled) {
+        setBookProgress({});
+      }
+
+      const counts = await fetchFinishCountsForBooks(books);
+      if (!cancelled) {
+        setClubFinishedByBookId(counts);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, books, fetchFinishCountsForBooks]);
+
+  const invalidateMeetings = () => {
+    if (currentClub?.id && user?.uid) {
+      queryClient.invalidateQueries({ queryKey: ['meetings', currentClub.id, user.uid] });
+    }
+  };
+
+  const handleProgressUpdated = async (bookId, merged) => {
+    setBookProgress((prev) => ({
+      ...prev,
+      [bookId]: merged,
+    }));
+    invalidateMeetings();
+    if (books?.length) {
+      const counts = await fetchFinishCountsForBooks(books);
+      setClubFinishedByBookId(counts);
+    }
+  };
 
   const formatDiscussionDate = (date) => {
     if (!date) return 'TBD';
-    
+
     const discussionDate = new Date(date);
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const discussionDay = new Date(discussionDate);
     discussionDay.setHours(0, 0, 0, 0);
-    
+
     const diffTime = discussionDay - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) {
       return 'Today';
-    } else if (diffDays === 1) {
-      return 'Tomorrow';
-    } else if (diffDays > 1) {
-      return `In ${diffDays} days`;
-    } else {
-      return discussionDate.toLocaleDateString();
     }
+    if (diffDays === 1) {
+      return 'Tomorrow';
+    }
+    if (diffDays > 1) {
+      return `In ${diffDays} days`;
+    }
+    return discussionDate.toLocaleDateString();
   };
 
   const getDiscussionTheme = (book) => {
@@ -112,117 +194,25 @@ const CurrentBooksSection = ({ books }) => {
     return book?.theme || 'General';
   };
 
-  const getButtonText = (bookId) => {
-    const progress = bookProgress[bookId];
-    if (!progress || progress.status === 'not-started') {
-      return 'Mark as Started';
-    } else if (progress.status === 'reading') {
-      return 'Mark as Finished';
-    } else if (progress.status === 'finished') {
-      return 'Mark as Started';
-    }
-    return 'Mark as Started';
+  const openBookInfo = (book) => {
+    setSelectedBook(book);
+    setInfoOpen(true);
   };
 
-  const handleProgressUpdate = async (bookId) => {
-    if (!user) return;
+  const handleInfoClose = () => {
+    setInfoOpen(false);
+    setSelectedBook(null);
+  };
 
-    setLoadingProgress(prev => ({ ...prev, [bookId]: true }));
-
-    try {
-      const currentProgress = bookProgress[bookId];
-      let newStatus;
-      let updateData = {};
-
-      if (!currentProgress || currentProgress.status === 'not_started') {
-        newStatus = 'reading';
-        updateData = {
-          status: newStatus,
-          startedAt: new Date(),
-          privacy: 'public'
-        };
-      } else if (currentProgress.status === 'reading') {
-        newStatus = 'finished';
-        updateData = {
-          status: newStatus,
-          finishedAt: new Date(),
-          percentComplete: 100,
-          privacy: 'public'
-        };
-      } else if (currentProgress.status === 'finished') {
-        newStatus = 'reading';
-        updateData = {
-          status: newStatus,
-          startedAt: new Date(),
-          finishedAt: null,
-          percentComplete: null,
-          privacy: 'public'
-        };
+  const dialogBook = selectedBook
+    ? {
+        ...selectedBook,
+        progress: bookProgress[selectedBook.id] ?? selectedBook.progress,
       }
+    : null;
 
-      await updateUserBookProgress(user.uid, bookId, updateData);
-      
-      // Update local state
-      setBookProgress(prev => ({
-        ...prev,
-        [bookId]: {
-          ...prev[bookId],
-          ...updateData
-        }
-      }));
-    } catch (error) {
-      // Error updating book progress
-    } finally {
-      setLoadingProgress(prev => ({ ...prev, [bookId]: false }));
-    }
-  };
+  const totalMembers = Array.isArray(clubMembers) ? clubMembers.length : 0;
 
-  const handlePercentChange = (bookId, value) => {
-    setPercentInputs(prev => ({ ...prev, [bookId]: value }));
-  };
-
-  const updatePercentProgress = async (bookId) => {
-    if (!user) return;
-    
-    const percentValue = percentInputs[bookId];
-    if (!percentValue || percentValue < 0 || percentValue > 100) return;
-
-    setLoadingProgress(prev => ({ ...prev, [bookId]: true }));
-
-    try {
-      const currentProgress = bookProgress[bookId];
-      const percentInt = parseInt(percentValue);
-      let updateData = {
-        percentComplete: percentInt,
-        privacy: 'public'
-      };
-
-      // If user sets 100%, automatically advance to finished status
-      if (percentInt === 100 && currentProgress?.status === 'reading') {
-        updateData = {
-          ...updateData,
-          status: 'finished',
-          finishedAt: new Date()
-        };
-      }
-
-      await updateUserBookProgress(user.uid, bookId, updateData);
-
-      // Update local state
-      setBookProgress(prev => ({
-        ...prev,
-        [bookId]: {
-          ...prev[bookId],
-          ...updateData
-        }
-      }));
-    } catch (error) {
-      // Error updating percent progress
-    } finally {
-      setLoadingProgress(prev => ({ ...prev, [bookId]: false }));
-    }
-  };
-  
   return (
     <Box>
       <Typography variant="h6" gutterBottom data-tour="dashboard-books-title">
@@ -234,88 +224,76 @@ const CurrentBooksSection = ({ books }) => {
         </Typography>
       )}
       <Box sx={{ display: 'flex', overflowX: 'auto', gap: 2 }}>
-        {books?.map((book, index) => (
-          <Card key={index} sx={{ minWidth: 200 }}>
-            <CardMedia
-              component="img"
-              height="300"
-              image={book.coverImage || '/logo192.png'}
-              alt={book.title}
-            />
-            <CardContent>
-              <Typography variant="subtitle1">{book.title}</Typography>
-              <Typography variant="body2" color="text.secondary">{book.author}</Typography>
-              <Typography variant="caption" display="block">
-                Discussion: {formatDiscussionDate(meetingDates[book.id])}
-              </Typography>
-              {meetingDates[book.id] && (
-                <Typography variant="caption" display="block" color="text.secondary">
-                  ({new Date(meetingDates[book.id]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })})
-                </Typography>
-              )}
-              <Typography variant="caption" display="block" gutterBottom>
-                Theme: {getDiscussionTheme(book)}
-              </Typography>
-              
-              {/* Progress Status Display */}
-              {bookProgress[book.id] && (
-                <Typography variant="caption" display="block" sx={{ mb: 1 }}>
-                  Status: {bookProgress[book.id].status}
-                  {bookProgress[book.id].percentComplete && 
-                    ` (${bookProgress[book.id].percentComplete}%)`
-                  }
-                </Typography>
-              )}
-              {!book.chosenForBookclub && (
-                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                  Not selected for book club reading yet.
-                </Typography>
-              )}
+        {books?.map((book, index) => {
+          const progress = bookProgress[book.id];
+          const chip = getMyProgressChip(book.chosenForBookclub, progress);
+          const finishedCount = clubFinishedByBookId[book.id];
+          const finishBlurb =
+            finishedCount === undefined
+              ? null
+              : formatClubFinishBlurb(finishedCount, totalMembers);
 
-              {/* Progress Update Button */}
-              {book.chosenForBookclub && (
-                <Button 
-                  variant="outlined" 
-                  size="small"
-                  onClick={() => handleProgressUpdate(book.id)}
-                  disabled={loadingProgress[book.id]}
-                  sx={{ mb: 1 }}
-                >
-                  {loadingProgress[book.id] ? (
-                    <CircularProgress size={16} />
-                  ) : (
-                    getButtonText(book.id)
-                  )}
-                </Button>
-              )}
-              
-              {/* Percentage Input (shown when reading or finished) */}
-              {book.chosenForBookclub &&
-                (bookProgress[book.id]?.status === 'reading' || bookProgress[book.id]?.status === 'finished') && (
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <TextField
-                    size="small"
-                    type="number"
-                    placeholder="%"
-                    value={percentInputs[book.id] ?? bookProgress[book.id]?.percentComplete ?? ''}
-                    onChange={(e) => handlePercentChange(book.id, e.target.value)}
-                    inputProps={{ min: 0, max: 100 }}
-                    sx={{ width: 60 }}
-                  />
-                  <Button
-                    size="small"
-                    variant="text"
-                    onClick={() => updatePercentProgress(book.id)}
-                    disabled={loadingProgress[book.id]}
-                  >
-                    Update %
-                  </Button>
+          return (
+            <Card
+              key={book.id ?? index}
+              sx={{ minWidth: 200, cursor: 'pointer' }}
+              onClick={() => openBookInfo(book)}
+            >
+              <CardMedia
+                component="img"
+                image={
+                  book.coverImage
+                    ? setOpenLibraryCoverSize(book.coverImage, OL_COVER_SIZE.L)
+                    : '/logo192.png'
+                }
+                alt={book.title}
+                sx={bookCoverImgSx({ height: 300, width: '100%', display: 'block' })}
+              />
+              <CardContent>
+                <Typography variant="subtitle1">{book.title}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {book.author}
+                </Typography>
+                <Typography variant="caption" display="block">
+                  Discussion: {formatDiscussionDate(meetingDates[book.id])}
+                </Typography>
+                {meetingDates[book.id] && (
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    (
+                    {new Date(meetingDates[book.id]).toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                    )
+                  </Typography>
+                )}
+                <Typography variant="caption" display="block" gutterBottom>
+                  Theme: {getDiscussionTheme(book)}
+                </Typography>
+
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center', mt: 1 }}>
+                  <Chip label={chip.label} size="small" color={chip.color} variant={chip.variant || 'filled'} />
                 </Box>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                {finishBlurb != null && (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                    {finishBlurb}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </Box>
+
+      <BookInfoDialog
+        open={infoOpen}
+        onClose={handleInfoClose}
+        book={dialogBook}
+        discussionDate={dialogBook ? meetingDates[dialogBook.id] : null}
+        onBookProgressUpdated={handleProgressUpdated}
+      />
     </Box>
   );
 };

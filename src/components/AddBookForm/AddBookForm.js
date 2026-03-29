@@ -22,10 +22,15 @@ import {
   DEFAULT_CLUB_THEMES,
   mapOlSubjectsToDefaultClubThemes,
   fetchWorkEnrichment,
+  fetchEditionEnrichment,
   resolveOlGenreForBookForm,
+  setOpenLibraryCoverSize,
+  OL_COVER_SIZE,
 } from 'services/openLibraryService';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
+import CoverPickerDialog from './CoverPickerDialog';
+import { bookCoverAvatarSx } from 'utils/bookCoverDisplay';
 
 const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = null }) => {
   const { currentClub } = useClubContext();
@@ -109,6 +114,10 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
   const [bookSuggestions, setBookSuggestions] = useState([]);
   const [autocompleteLoading, setAutocompleteLoading] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [editionEnrichPromptOpen, setEditionEnrichPromptOpen] = useState(false);
+  const [pendingOlCover, setPendingOlCover] = useState(null);
+  const [enrichApplying, setEnrichApplying] = useState(false);
 
   const themeOptions = Array.isArray(currentClub?.themes) && currentClub?.themes.length > 0
     ? currentClub.themes
@@ -202,7 +211,9 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         ...prev,
         title: value.title,
         author: value.author,
-        coverImage: value.coverImage,
+        coverImage: value.coverImage
+          ? setOpenLibraryCoverSize(value.coverImage, OL_COVER_SIZE.L)
+          : '',
         genre: genreFromOl || prev.genre,
         description: value.description || prev.description,
         externalApiId: olId,
@@ -254,6 +265,64 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     // Clear error when user starts typing
     if (errors.author) {
       setErrors(prev => ({ ...prev, author: '' }));
+    }
+  };
+
+  const applyCoverOnly = (coverImage) => {
+    const stored = coverImage
+      ? setOpenLibraryCoverSize(coverImage, OL_COVER_SIZE.L)
+      : coverImage;
+    setFormData((prev) => ({ ...prev, coverImage: stored }));
+    setSelectedBook((prev) => (prev ? { ...prev, coverImage: stored } : prev));
+  };
+
+  const handlePickOlCover = (opt) => {
+    setPendingOlCover(opt);
+    setEditionEnrichPromptOpen(true);
+  };
+
+  const handlePickCustomCover = (url) => {
+    applyCoverOnly(url);
+  };
+
+  const handleEditionEnrichNo = () => {
+    if (pendingOlCover) {
+      applyCoverOnly(pendingOlCover.coverImage);
+    }
+    setEditionEnrichPromptOpen(false);
+    setPendingOlCover(null);
+  };
+
+  const handleEditionEnrichYes = async () => {
+    if (!pendingOlCover) return;
+    const { coverImage, editionKey } = pendingOlCover;
+    const coverStored = coverImage
+      ? setOpenLibraryCoverSize(coverImage, OL_COVER_SIZE.L)
+      : coverImage;
+    const workKey = formData.externalApiId;
+    setEnrichApplying(true);
+    try {
+      const en = await fetchEditionEnrichment(editionKey, workKey);
+      setFormData((prev) => {
+        if (!en) {
+          return { ...prev, coverImage: coverStored };
+        }
+        const genreResolved = resolveOlGenreForBookForm(en.subjects, en.genre);
+        return {
+          ...prev,
+          coverImage: coverStored,
+          description: en.description || prev.description,
+          genre: genreResolved || prev.genre,
+          ...(usesDefaultThemeSet && en.subjects.length > 0
+            ? { theme: mapOlSubjectsToDefaultClubThemes(en.subjects) }
+            : {}),
+        };
+      });
+      setSelectedBook((prev) => (prev ? { ...prev, coverImage: coverStored } : prev));
+    } finally {
+      setEnrichApplying(false);
+      setEditionEnrichPromptOpen(false);
+      setPendingOlCover(null);
     }
   };
 
@@ -380,6 +449,10 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       setBookSuggestions([]);
       setErrors({});
       setSubmitError('');
+      setCoverPickerOpen(false);
+      setEditionEnrichPromptOpen(false);
+      setPendingOlCover(null);
+      setEnrichApplying(false);
       onClose();
     }
   };
@@ -444,9 +517,9 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
                   >
                     {option.coverImage && (
                       <Avatar
-                        src={option.coverImage}
+                        src={setOpenLibraryCoverSize(option.coverImage, OL_COVER_SIZE.M)}
                         alt={option.title}
-                        sx={{ width: 32, height: 48, borderRadius: 1 }}
+                        sx={bookCoverAvatarSx({ width: 32, height: 48, borderRadius: 1 })}
                         variant="rounded"
                       />
                     )}
@@ -536,14 +609,34 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
               )}
             />
 
-            <TextField
-              label="Cover Image URL"
-              value={formData.coverImage}
-              onChange={handleChange('coverImage')}
-              fullWidth
-              disabled={loading}
-              helperText="Optional: URL to the book's cover image"
-            />
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+              <Avatar
+                variant="rounded"
+                src={formData.coverImage || undefined}
+                alt=""
+                sx={bookCoverAvatarSx({ width: 80, height: 120, flexShrink: 0 })}
+              >
+                {!formData.coverImage && (
+                  <Typography variant="caption" align="center" sx={{ px: 0.5 }}>
+                    No cover
+                  </Typography>
+                )}
+              </Avatar>
+              <Box sx={{ flex: 1, pt: 0.5 }}>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  size="small"
+                  disabled={loading}
+                  onClick={() => setCoverPickerOpen(true)}
+                >
+                  Choose a different cover
+                </Button>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                  Browse Open Library edition covers or paste a custom image URL.
+                </Typography>
+              </Box>
+            </Box>
 
             <TextField
               label="Description"
@@ -610,6 +703,40 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
           </Button>
         </DialogActions>
       </form>
+
+      <CoverPickerDialog
+        open={coverPickerOpen}
+        onClose={() => setCoverPickerOpen(false)}
+        workKey={formData.externalApiId}
+        onPickOlCover={handlePickOlCover}
+        onPickCustomCover={handlePickCustomCover}
+      />
+
+      <Dialog
+        open={editionEnrichPromptOpen}
+        onClose={() => !enrichApplying && handleEditionEnrichNo()}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>This edition</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Update description and genre using metadata from this edition?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditionEnrichNo} disabled={enrichApplying}>
+            No, cover only
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleEditionEnrichYes}
+            disabled={enrichApplying}
+          >
+            {enrichApplying ? 'Applying…' : 'Yes, update'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 };

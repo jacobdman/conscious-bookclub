@@ -4,6 +4,10 @@ import {
   mapOlSubjectsToGenrePreset,
   resolveOlGenreForBookForm,
   normalizeOlGenreDisplayLabel,
+  buildEditionCoverOptionsFromEntries,
+  olLanguageCodeToLabel,
+  setOpenLibraryCoverSize,
+  OL_COVER_SIZE,
 } from './openLibraryService';
 
 const RED_RISING_SUBJECTS = [
@@ -100,5 +104,125 @@ describe('openLibraryService OL genre', () => {
         'History & Biography',
       );
     });
+  });
+});
+
+describe('olLanguageCodeToLabel', () => {
+  it('maps common codes and uppercases unknown', () => {
+    expect(olLanguageCodeToLabel('eng')).toBe('English');
+    expect(olLanguageCodeToLabel('fre')).toBe('French');
+    expect(olLanguageCodeToLabel('xyz')).toBe('XYZ');
+  });
+});
+
+describe('setOpenLibraryCoverSize', () => {
+  it('rewrites id and isbn cover URLs between S, M, L', () => {
+    const idM = 'https://covers.openlibrary.org/b/id/9255566-M.jpg';
+    expect(setOpenLibraryCoverSize(idM, OL_COVER_SIZE.L)).toBe(
+      'https://covers.openlibrary.org/b/id/9255566-L.jpg',
+    );
+    const isbnL = 'https://covers.openlibrary.org/b/isbn/9781234567890-L.jpg';
+    expect(setOpenLibraryCoverSize(isbnL, OL_COVER_SIZE.S)).toBe(
+      'https://covers.openlibrary.org/b/isbn/9781234567890-S.jpg',
+    );
+  });
+
+  it('leaves non-Open-Library URLs unchanged', () => {
+    const u = 'https://example.com/cover.jpg';
+    expect(setOpenLibraryCoverSize(u, OL_COVER_SIZE.M)).toBe(u);
+  });
+});
+
+describe('buildEditionCoverOptionsFromEntries', () => {
+  it('maps covers and edition keys', () => {
+    const entries = [
+      { key: '/books/OL1M', covers: [111, 222] },
+      { key: '/books/OL2M', covers: [333] },
+    ];
+    const out = buildEditionCoverOptionsFromEntries(entries);
+    expect(out).toEqual([
+      {
+        coverImage: 'https://covers.openlibrary.org/b/id/111-M.jpg',
+        editionKey: '/books/OL1M',
+        editionTitle: 'Edition',
+        editionDetail: '',
+        languageLabel: '',
+        year: '',
+      },
+      {
+        coverImage: 'https://covers.openlibrary.org/b/id/333-M.jpg',
+        editionKey: '/books/OL2M',
+        editionTitle: 'Edition',
+        editionDetail: '',
+        languageLabel: '',
+        year: '',
+      },
+    ]);
+  });
+
+  it('includes title, format, language, and year when present', () => {
+    const entries = [
+      {
+        key: '/books/OL1M',
+        covers: [111],
+        title: 'Project Hail Mary',
+        subtitle: 'Bonus',
+        physical_format: 'Hardcover',
+        languages: [{ key: '/languages/eng' }],
+        publish_date: '2021-05-04',
+      },
+    ];
+    const out = buildEditionCoverOptionsFromEntries(entries);
+    expect(out[0]).toMatchObject({
+      editionTitle: 'Project Hail Mary — Bonus',
+      editionDetail: 'Hardcover',
+      languageLabel: 'English',
+      year: '2021',
+    });
+  });
+
+  it('prefers edition_name over physical_format for detail line', () => {
+    const out = buildEditionCoverOptionsFromEntries([
+      {
+        key: '/books/OL1M',
+        covers: [1],
+        title: 'T',
+        edition_name: '2nd ed.',
+        physical_format: 'Paperback',
+      },
+    ]);
+    expect(out[0].editionDetail).toBe('2nd ed.');
+  });
+
+  it('skips invalid cover ids', () => {
+    expect(
+      buildEditionCoverOptionsFromEntries([
+        { key: '/books/OL1M', covers: [-1] },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('dedupes identical cover URLs (first edition wins)', () => {
+    const entries = [
+      { key: '/books/OL1M', covers: [999] },
+      { key: '/books/OL2M', covers: [999] },
+    ];
+    const out = buildEditionCoverOptionsFromEntries(entries);
+    expect(out).toHaveLength(1);
+    expect(out[0].editionKey).toBe('/books/OL1M');
+  });
+
+  it('skips entries without covers or valid book keys', () => {
+    const entries = [
+      { key: '/books/OL1M' },
+      { key: '/invalid/x', covers: [1] },
+      { covers: [2] },
+    ];
+    expect(buildEditionCoverOptionsFromEntries(entries)).toEqual([]);
+  });
+
+  it('returns empty for non-array', () => {
+    expect(buildEditionCoverOptionsFromEntries(null)).toEqual([]);
+    expect(buildEditionCoverOptionsFromEntries(undefined)).toEqual([]);
   });
 });

@@ -31,6 +31,21 @@ const openLibraryAuthorJsonUrl = (authorKey) => {
   return `${OPEN_LIBRARY_ORIGIN}${authorKey}.json`;
 };
 
+const openLibraryWorkEditionsUrl = (workKeyNormalized, limit) => {
+  const lim = Math.min(100, Math.max(1, limit || 50));
+  if (isNativeApp()) {
+    return `${getApiBase()}/v1/open-library/work-editions?key=${encodeURIComponent(workKeyNormalized)}&limit=${lim}`;
+  }
+  return `${OPEN_LIBRARY_ORIGIN}${workKeyNormalized}/editions.json?limit=${lim}`;
+};
+
+const openLibraryEditionJsonUrl = (editionKeyNormalized) => {
+  if (isNativeApp()) {
+    return `${getApiBase()}/v1/open-library/edition?key=${encodeURIComponent(editionKeyNormalized)}`;
+  }
+  return `${OPEN_LIBRARY_ORIGIN}${editionKeyNormalized}.json`;
+};
+
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -44,21 +59,152 @@ const debounce = (func, wait) => {
 };
 
 /**
+ * Open Library cover sizes (see https://openlibrary.org/dev/docs/api/covers).
+ * Use L for stored / hero display; M or S for dense lists and autocomplete.
+ */
+export const OL_COVER_SIZE = Object.freeze({
+  S: 'S',
+  M: 'M',
+  L: 'L',
+});
+
+/**
+ * Rewrite covers.openlibrary.org `b/id` or `b/isbn` URLs to another size suffix.
+ * Non-OL URLs are returned unchanged.
+ * @param {string} url
+ * @param {'S'|'M'|'L'} [size='L']
+ */
+export const setOpenLibraryCoverSize = (url, size = OL_COVER_SIZE.L) => {
+  if (!url || typeof url !== 'string') return url;
+  const suf =
+    size === OL_COVER_SIZE.S || size === OL_COVER_SIZE.M || size === OL_COVER_SIZE.L
+      ? size
+      : OL_COVER_SIZE.L;
+  return url.replace(
+      /^(https:\/\/covers\.openlibrary\.org\/b\/(?:id|isbn)\/.+)-[SML]\.jpg$/i,
+      (_, base) => `${base}-${suf}.jpg`,
+  );
+};
+
+/**
  * Build cover image URL from Open Library search/work fields.
  * `cover_i` is whichever edition OL attached to the work — it may be a translation’s jacket.
+ * @param {object} doc
+ * @param {'S'|'M'|'L'} [size=OL_COVER_SIZE.L] — default large for persisted club books / detail views
  */
-const buildCoverImageUrl = (doc) => {
+const buildCoverImageUrl = (doc, size = OL_COVER_SIZE.L) => {
   if (doc.cover_i != null && doc.cover_i !== '') {
-    return `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+    return `https://covers.openlibrary.org/b/id/${doc.cover_i}-${size}.jpg`;
   }
   const isbns = doc.isbn;
   if (Array.isArray(isbns) && isbns.length > 0) {
     const isbn = String(isbns[0]).replace(/-/g, '');
     if (isbn) {
-      return `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
+      return `https://covers.openlibrary.org/b/isbn/${isbn}-${size}.jpg`;
     }
   }
   return '';
+};
+
+/** Map Open Library /languages/* codes to a short display label. */
+const OL_LANGUAGE_CODE_TO_LABEL = {
+  eng: 'English',
+  en: 'English',
+  fre: 'French',
+  spa: 'Spanish',
+  ger: 'German',
+  deu: 'German',
+  ita: 'Italian',
+  por: 'Portuguese',
+  jpn: 'Japanese',
+  zho: 'Chinese',
+  chi: 'Chinese',
+  rus: 'Russian',
+  tur: 'Turkish',
+  fin: 'Finnish',
+  dut: 'Dutch',
+  pol: 'Polish',
+  swe: 'Swedish',
+  nor: 'Norwegian',
+  dan: 'Danish',
+  gre: 'Greek',
+  ara: 'Arabic',
+  heb: 'Hebrew',
+  hin: 'Hindi',
+  kor: 'Korean',
+};
+
+export const olLanguageCodeToLabel = (code) => {
+  if (!code || typeof code !== 'string') return '';
+  const c = code.toLowerCase().trim();
+  return OL_LANGUAGE_CODE_TO_LABEL[c] || c.toUpperCase();
+};
+
+const pickOlEditionLanguageCode = (entry) => {
+  const langs = entry.languages;
+  if (Array.isArray(langs) && langs.length > 0) {
+    const first = langs[0];
+    const key = typeof first === 'string' ? first : first?.key;
+    if (typeof key === 'string') {
+      const m = key.match(/\/languages\/([a-z]{2,3})/i);
+      if (m) return m[1].toLowerCase();
+    }
+  }
+  if (typeof entry.language === 'string') {
+    const m = entry.language.match(/([a-z]{2,3})/i);
+    if (m) return m[1].toLowerCase();
+  }
+  return '';
+};
+
+const pickOlEditionYear = (entry) => {
+  const raw = entry.publish_date || entry.first_publish_date || '';
+  if (!raw) return '';
+  const s = String(raw);
+  const ym = s.match(/\b(19|20)\d{2}\b/);
+  return ym ? ym[0] : '';
+};
+
+/**
+ * Dedupe by cover URL; first edition wins per cover.
+ * @param {object[]} entries — `entries` from Open Library `.../editions.json`
+ * @returns {{ coverImage: string, editionKey: string, editionTitle: string, editionDetail: string, languageLabel: string, year: string }[]}
+ */
+export const buildEditionCoverOptionsFromEntries = (entries) => {
+  if (!Array.isArray(entries)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const entry of entries) {
+    const coverId = Array.isArray(entry.covers) && entry.covers.length > 0 ? entry.covers[0] : null;
+    if (coverId == null || coverId === '' || coverId < 0) continue;
+    // Medium thumbs in the picker grid; parent saves `-L` when an edition is chosen.
+    const url = `https://covers.openlibrary.org/b/id/${coverId}-${OL_COVER_SIZE.M}.jpg`;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const editionKey = typeof entry.key === 'string' ? entry.key.trim() : '';
+    if (!editionKey.startsWith('/books/')) continue;
+
+    const title = (entry.title || '').trim();
+    const subtitle = (entry.subtitle || '').trim();
+    const editionTitle = [title, subtitle].filter(Boolean).join(' — ') || 'Edition';
+    const editionDetail =
+      (entry.edition_name && String(entry.edition_name).trim()) ||
+      (entry.physical_format && String(entry.physical_format).trim()) ||
+      '';
+    const langCode = pickOlEditionLanguageCode(entry);
+    const languageLabel = olLanguageCodeToLabel(langCode);
+    const year = pickOlEditionYear(entry);
+
+    out.push({
+      coverImage: url,
+      editionKey,
+      editionTitle,
+      editionDetail,
+      languageLabel,
+      year,
+    });
+  }
+  return out;
 };
 
 /** Club default themes — subject→theme auto-fill only when the club uses exactly these three. */
@@ -524,6 +670,76 @@ export const fetchWorkEnrichment = async (workKey) => {
 };
 
 /**
+ * Edition cover options for a work (cover picker carousel).
+ * @param {string} workKey
+ * @param {number} [limit=50]
+ */
+export const fetchWorkEditionCovers = async (workKey, limit = 15) => {
+  try {
+    const key = normalizeWorkKey(workKey);
+    if (!key) return [];
+
+    const url = openLibraryWorkEditionsUrl(key, limit);
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return buildEditionCoverOptionsFromEntries(data.entries);
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Description + subjects for an edition; fills gaps from work JSON when sparse.
+ * @param {string} editionKey — e.g. /books/OL123M
+ * @param {string|null|undefined} workFallbackKey — Open Library work key for this club book
+ */
+export const fetchEditionEnrichment = async (editionKey, workFallbackKey = null) => {
+  try {
+    const raw = (editionKey || '').trim();
+    if (!raw.startsWith('/books/')) return null;
+
+    const url = openLibraryEditionJsonUrl(raw);
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const edition = await response.json();
+
+    const descRaw = edition.description;
+    let description =
+      typeof descRaw === 'string'
+        ? descRaw.trim()
+        : typeof descRaw?.value === 'string'
+          ? descRaw.value.trim()
+          : '';
+
+    let subjects = normalizeOlSubjects(edition.subjects);
+
+    const workKey =
+      normalizeWorkKey(workFallbackKey) ||
+      (typeof edition.works?.[0]?.key === 'string' ? edition.works[0].key.trim() : '');
+    if (workKey && (!description || subjects.length === 0)) {
+      const workEnr = await fetchWorkEnrichment(workKey);
+      if (workEnr) {
+        if (!description && workEnr.description) {
+          description = workEnr.description;
+        }
+        if (subjects.length === 0 && workEnr.subjects?.length) {
+          subjects = [...workEnr.subjects];
+        }
+      }
+    }
+
+    return {
+      description: description.trim(),
+      subjects,
+      genre: primaryOlGenreFromSubjects(subjects),
+    };
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Fetch work details by Open Library work key.
  * @param {string} workKey — e.g. "/works/OL45883W"
  */
@@ -564,7 +780,7 @@ export const getBookById = async (workKey) => {
     const coverId = work.covers?.[0];
     let coverImage = '';
     if (coverId != null) {
-      coverImage = `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
+      coverImage = `https://covers.openlibrary.org/b/id/${coverId}-${OL_COVER_SIZE.L}.jpg`;
     }
 
     const subjects = normalizeOlSubjects(work.subjects);
@@ -594,6 +810,12 @@ const openLibraryService = {
   debouncedSearchBooks,
   getBookById,
   fetchWorkEnrichment,
+  fetchWorkEditionCovers,
+  fetchEditionEnrichment,
+  buildEditionCoverOptionsFromEntries,
+  olLanguageCodeToLabel,
+  setOpenLibraryCoverSize,
+  OL_COVER_SIZE,
 };
 
 export default openLibraryService;

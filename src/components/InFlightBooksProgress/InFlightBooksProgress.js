@@ -18,6 +18,8 @@ import ProfileAvatar from 'components/ProfileAvatar';
 import BookProgressRing from './BookProgressRing';
 import { parseLocalDate } from 'utils/dateHelpers';
 import { useAuth } from 'AuthContext';
+import { setOpenLibraryCoverSize, OL_COVER_SIZE } from 'services/openLibraryService';
+import { bookCoverImgSx } from 'utils/bookCoverDisplay';
 
 const InFlightBooksProgress = () => {
   const { user } = useAuth();
@@ -209,16 +211,16 @@ const InFlightBooksProgress = () => {
                 <Grid item xs={12} md="auto">
                   <Box display="flex" alignItems="flex-start" gap={2}>
                     {book.coverImage && (
-                      <img
-                        src={book.coverImage}
+                      <Box
+                        component="img"
+                        src={setOpenLibraryCoverSize(book.coverImage, OL_COVER_SIZE.M)}
                         alt={book.title}
-                        style={{
+                        sx={bookCoverImgSx({
                           width: 60,
                           height: 80,
-                          objectFit: 'cover',
-                          borderRadius: 4,
-                          flexShrink: 0
-                        }}
+                          borderRadius: 1,
+                          flexShrink: 0,
+                        })}
                       />
                     )}
                     <Box>
