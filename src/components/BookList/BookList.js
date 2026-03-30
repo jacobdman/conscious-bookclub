@@ -38,7 +38,8 @@ import {
   FilterList as FilterListIcon,
   Close as CloseIcon,
   ThumbUp as ThumbUpIcon,
-  ThumbUpOffAlt as ThumbUpOffAltIcon
+  ThumbUpOffAlt as ThumbUpOffAltIcon,
+  Explore as ExploreIcon,
 } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import { useMeetings } from 'hooks/useMeetings';
@@ -79,6 +80,7 @@ const BookList = () => {
     updateBookProgress,
     updateBook,
     toggleBookLike,
+    toggleBookSuperLike,
     refreshBooks
   } = useBooksContext();
 
@@ -107,6 +109,7 @@ const BookList = () => {
   const [selectedBookId, setSelectedBookId] = useState(null);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [loadingLikes, setLoadingLikes] = useState({});
+  const [loadingSuperLikes, setLoadingSuperLikes] = useState({});
   const [bookListTab, setBookListTab] = useState(0);
 
   const isClubTabFromUrl = location.pathname === '/books/club';
@@ -150,6 +153,34 @@ const BookList = () => {
     filters.suggestedBy !== 'all' &&
     !sortedClubMembers.some((m) => m.userId === filters.suggestedBy);
 
+  const booksListSummaryLine = useMemo(() => {
+    const viewLabels = {
+      backlog: 'Bookclub Backlog',
+      suggested: 'All Suggested',
+      bookmarked: 'Bookmarked',
+    };
+    const scope = filters.listScope ?? 'backlog';
+    const viewLabel = viewLabels[scope] ?? viewLabels.backlog;
+
+    const hasExtraFilters =
+      (themesEnabled && filters.theme !== 'all') ||
+      filters.status !== 'all' ||
+      filters.suggestedBy !== 'all' ||
+      Boolean(search?.trim());
+
+    const base = `Showing ${books.length} of ${totalCount} books — ${viewLabel}`;
+    return hasExtraFilters ? `${base} (filtered)` : base;
+  }, [
+    books.length,
+    totalCount,
+    filters.listScope,
+    filters.theme,
+    filters.status,
+    filters.suggestedBy,
+    themesEnabled,
+    search,
+  ]);
+
   useEffect(() => {
     if (!themesEnabled && filters.theme !== 'all') {
       setFilters({ theme: 'all' });
@@ -171,6 +202,10 @@ const BookList = () => {
 
   const handleSuggestedByChange = (event) => {
     setFilters({ suggestedBy: event.target.value });
+  };
+
+  const handleListScopeChange = (event) => {
+    setFilters({ listScope: event.target.value });
   };
 
   const handlePageSizeChange = (event) => {
@@ -360,6 +395,18 @@ const BookList = () => {
     }
   };
 
+  const handleSuperLikeToggle = async (bookId, shouldSuperLike) => {
+    if (!user) return undefined;
+    setLoadingSuperLikes((prev) => ({ ...prev, [bookId]: true }));
+    try {
+      return await toggleBookSuperLike(bookId, shouldSuperLike);
+    } catch {
+      return undefined;
+    } finally {
+      setLoadingSuperLikes((prev) => ({ ...prev, [bookId]: false }));
+    }
+  };
+
   const selectedBook = books.find((book) => book.id === selectedBookId) || null;
 
   // Force iOS WKWebView to re-evaluate scroll after content loads
@@ -436,17 +483,29 @@ const BookList = () => {
               Book List
             </Typography>
           {/* </Box> */}
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setAddBookOpen(true)}
-            data-tour="add_book_button"
-            sx={{ 
-              display: { xs: 'none', md: 'flex' }
-            }}
-          >
-            Add Book
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              startIcon={<ExploreIcon />}
+              onClick={() => navigate('/books/discover')}
+              sx={{
+                display: { xs: 'none', md: 'flex' },
+              }}
+            >
+              Discover
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setAddBookOpen(true)}
+              data-tour="add_book_button"
+              sx={{ 
+                display: { xs: 'none', md: 'flex' }
+              }}
+            >
+              Add Book
+            </Button>
+          </Box>
         </Box>
 
         {/* Controls Toolbar */}
@@ -518,13 +577,13 @@ const BookList = () => {
                 </Box>
             </ClickAwayListener>
 
-            {/* Filter Toggle and Per Page */}
+            {/* Filter toggle and Per Page */}
             <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Button 
                     startIcon={<FilterListIcon />}
                     endIcon={showFilters ? <CloseIcon fontSize="small" /> : null}
                     onClick={toggleFilters}
-                    color={showFilters || filters.theme !== 'all' || filters.status !== 'all' || filters.suggestedBy !== 'all' ? "primary" : "inherit"}
+                    color={showFilters || filters.theme !== 'all' || filters.status !== 'all' || filters.suggestedBy !== 'all' || (filters.listScope ?? 'backlog') !== 'backlog' ? "primary" : "inherit"}
                     data-tour="books-filter"
                     sx={{ 
                         textTransform: 'none',
@@ -562,6 +621,20 @@ const BookList = () => {
                 }}
             >
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <FormControl sx={{ minWidth: 200 }} size="small">
+                        <InputLabel id="book-list-view-label">View</InputLabel>
+                        <Select
+                            labelId="book-list-view-label"
+                            value={filters.listScope ?? 'backlog'}
+                            onChange={handleListScopeChange}
+                            label="View"
+                            sx={{ borderRadius: 2 }}
+                        >
+                            <MenuItem value="backlog">Bookclub Backlog</MenuItem>
+                            <MenuItem value="suggested">All Suggested</MenuItem>
+                            <MenuItem value="bookmarked">Bookmarked</MenuItem>
+                        </Select>
+                    </FormControl>
                     {themesEnabled && (
                         <FormControl sx={{ minWidth: 200 }} size="small">
                             <InputLabel>Theme Filter</InputLabel>
@@ -634,8 +707,7 @@ const BookList = () => {
         )}
 
         <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'right', mb: 1 }}>
-          Showing {books.length} of {totalCount} books
-          {(filters.theme !== 'all' || filters.status !== 'all' || filters.suggestedBy !== 'all') && ' (filtered)'}
+          {booksListSummaryLine}
         </Typography>
 
         {/* Loading overlay for list refresh */}
@@ -903,7 +975,34 @@ const BookList = () => {
           </Box>
         )}
 
-        {/* Floating Action Button for mobile */}
+        {/* Discover — centered bar (mobile) */}
+        <Button
+          variant="contained"
+          startIcon={<ExploreIcon />}
+          aria-label="discover books"
+          onClick={() => navigate('/books/discover')}
+          sx={{
+            display: { xs: 'inline-flex', md: 'none' },
+            position: 'fixed',
+            bottom: 'calc(72px + env(safe-area-inset-bottom))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            // minWidth: 200,
+            // maxWidth: 'min(92vw, 320px)',
+            width: '50%',
+            py: 1.25,
+            px: 2,
+            borderRadius: 999,
+            fontWeight: 700,
+            textTransform: 'none',
+            boxShadow: 4,
+            bgcolor: '#e65100',
+            color: '#fff',
+            '&:hover': { bgcolor: '#ef6c00' },
+          }}
+        >
+          Discover
+        </Button>
         <Fab
           color="primary"
           aria-label="add book"
@@ -945,6 +1044,8 @@ const BookList = () => {
         onToggleLike={selectedBook ? handleToggleLike : undefined}
         isLikeLoading={selectedBook ? loadingLikes[selectedBook.id] : false}
         saveBookProgress={updateBookProgress}
+        onSuperLikeToggle={selectedBook && currentClub?.id ? handleSuperLikeToggle : undefined}
+        isSuperLikeLoading={selectedBook ? !!loadingSuperLikes[selectedBook.id] : false}
       />
     </Layout>
   );

@@ -6,6 +6,7 @@ import useClubContext from 'contexts/Club';
 import BooksContext from './BooksContext';
 // Services
 import { likeBook, unlikeBook } from 'services/books/books.service';
+import { recordInteraction, removeInteraction } from 'services/books/discover.service';
 import { updateUserBookProgress } from 'services/progress/progress.service';
 // Hooks
 import { useBooks, useCreateBook, useUpdateBook, useDeleteBook } from 'hooks/useBooks';
@@ -28,8 +29,13 @@ const getStoredBooksViewState = (clubId) => {
           theme: String(parsed.filters.theme ?? 'all'),
           status: String(parsed.filters.status ?? 'all'),
           suggestedBy: String(parsed.filters.suggestedBy ?? 'all'),
+          listScope: ['backlog', 'suggested', 'bookmarked'].includes(
+              String(parsed.filters.listScope ?? '').trim(),
+          )
+            ? String(parsed.filters.listScope).trim()
+            : 'backlog',
         }
-        : { theme: 'all', status: 'all', suggestedBy: 'all' },
+        : { theme: 'all', status: 'all', suggestedBy: 'all', listScope: 'backlog' },
       search: typeof parsed.search === 'string' ? parsed.search : '',
       sort: parsed.sort && typeof parsed.sort === 'object'
         ? { field: String(parsed.sort.field ?? 'createdAt'), direction: String(parsed.sort.direction ?? 'desc') }
@@ -113,7 +119,12 @@ const BooksProvider = ({ children }) => {
 
   // New state for filters and pagination (restored from sessionStorage when club is set)
   const [pagination, setPaginationState] = useState({ page: 1, pageSize: 10 });
-  const [filters, setFiltersState] = useState({ theme: 'all', status: 'all', suggestedBy: 'all' });
+  const [filters, setFiltersState] = useState({
+    theme: 'all',
+    status: 'all',
+    suggestedBy: 'all',
+    listScope: 'backlog',
+  });
   const [search, setSearchState] = useState('');
   const [sort, setSortState] = useState({ field: 'createdAt', direction: 'desc' });
 
@@ -255,6 +266,8 @@ const BooksProvider = ({ children }) => {
             ...newBook,
             likesCount: 0,
             isLiked: false,
+            superLikesCount: 0,
+            isSuperLiked: false,
           }, ...(existing.books || [])],
           totalCount: (existing.totalCount || 0) + 1,
         };
@@ -378,6 +391,78 @@ const BooksProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Super-like uses discover interactions (book_interactions), not club BookLike alone.
+   * Updates pool / promotion per server rules; merges counts from API responses.
+   */
+  const toggleBookSuperLike = async (bookId, shouldSuperLike) => {
+    if (!user || !currentClub) throw new Error('User not logged in');
+
+    queryClient.setQueryData(booksQueryKey, (old) => {
+      if (!old || !old.books) return old;
+      return {
+        ...old,
+        books: old.books.map((b) => {
+          if (b.id !== bookId) return b;
+          const delta = shouldSuperLike ? 1 : -1;
+          return {
+            ...b,
+            isSuperLiked: shouldSuperLike,
+            superLikesCount: Math.max(0, (b.superLikesCount || 0) + delta),
+          };
+        }),
+      };
+    });
+
+    try {
+      if (shouldSuperLike) {
+        const res = await recordInteraction(currentClub.id, bookId, user.uid, 'super_like');
+        const nb = res?.book || {};
+        queryClient.setQueryData(booksQueryKey, (old) => {
+          if (!old || !old.books) return old;
+          return {
+            ...old,
+            books: old.books.map((b) => {
+              if (b.id !== bookId) return b;
+              return {
+                ...b,
+                isSuperLiked: true,
+                superLikesCount: nb.superLikesCount ?? b.superLikesCount,
+                pool: nb.pool ?? b.pool,
+                promotedAt: nb.promotedAt ?? b.promotedAt,
+                revalidationRequestedAt: nb.revalidationRequestedAt ?? b.revalidationRequestedAt,
+              };
+            }),
+          };
+        });
+        return { remainingSuperLikes: res?.remainingSuperLikes };
+      }
+      const res = await removeInteraction(currentClub.id, bookId, user.uid, 'super_like');
+      const nb = res?.book || {};
+      queryClient.setQueryData(booksQueryKey, (old) => {
+        if (!old || !old.books) return old;
+        return {
+          ...old,
+          books: old.books.map((b) => {
+            if (b.id !== bookId) return b;
+            return {
+              ...b,
+              isSuperLiked: false,
+              superLikesCount: nb.superLikesCount ?? Math.max(0, (b.superLikesCount || 0) - 1),
+              pool: nb.pool ?? b.pool,
+              revalidationRequestedAt: nb.revalidationRequestedAt ?? b.revalidationRequestedAt,
+            };
+          }),
+        };
+      });
+      return { remainingSuperLikes: res?.remainingSuperLikes };
+    } catch (err) {
+      console.error('Error toggling super like:', err);
+      refreshBooks();
+      throw err;
+    }
+  };
+
   // ******************EXPORTS**********************
   return (
     <BooksContext.Provider
@@ -406,6 +491,7 @@ const BooksProvider = ({ children }) => {
         deleteBook,
         updateBookProgress,
         toggleBookLike,
+        toggleBookSuperLike,
         refreshBooks,
       }}
     >

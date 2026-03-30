@@ -67,6 +67,46 @@ const buildLikesSummary = async (bookIds, userId) => {
   return {likesByBookId, likedBookIds};
 };
 
+/**
+ * Club-wide super-like counts (book_interactions) and whether the user super-liked each book.
+ * @param {number[]} bookIds
+ * @param {string} userId
+ */
+const buildSuperLikeSummary = async (bookIds, userId) => {
+  if (!bookIds.length) {
+    return {superLikesByBookId: new Map(), superLikedBookIds: new Set()};
+  }
+
+  const superCounts = await db.BookInteraction.findAll({
+    attributes: [
+      "bookId",
+      [db.sequelize.fn("COUNT", db.sequelize.col("BookInteraction.id")), "count"],
+    ],
+    where: {bookId: bookIds, action: "super_like"},
+    group: ["book_id"],
+    raw: true,
+  });
+
+  const superLikesByBookId = new Map();
+  superCounts.forEach((row) => {
+    superLikesByBookId.set(row.bookId, parseInt(row.count, 10));
+  });
+
+  const superLikedBookIds = new Set();
+  if (userId) {
+    const superRows = await db.BookInteraction.findAll({
+      attributes: ["bookId"],
+      where: {bookId: bookIds, userId, action: "super_like"},
+      raw: true,
+    });
+    superRows.forEach((row) => {
+      superLikedBookIds.add(row.bookId);
+    });
+  }
+
+  return {superLikesByBookId, superLikedBookIds};
+};
+
 const normalizeUploadedByFilter = (uploadedBy) => {
   if (uploadedBy == null || uploadedBy === "") {
     return null;
@@ -74,6 +114,19 @@ const normalizeUploadedByFilter = (uploadedBy) => {
   const s = String(uploadedBy).trim();
   if (!s || s === "all") {
     return null;
+  }
+  return s;
+};
+
+const parseListScope = (raw) => {
+  if (raw == null || raw === "") {
+    return null;
+  }
+  const s = String(raw).trim();
+  if (!["backlog", "suggested", "bookmarked"].includes(s)) {
+    const err = new Error("Invalid listScope");
+    err.status = 400;
+    throw err;
   }
   return s;
 };
@@ -89,12 +142,16 @@ const getBooksPage = async (
     readStatus,
     search,
     filterUploadedBy,
+    listScope,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
 
   let whereClause = {};
   if (clubId) {
     whereClause.clubId = parseInt(clubId);
+  }
+  if (listScope === "backlog" || listScope === "suggested") {
+    whereClause.pool = listScope;
   }
 
   // Add search filter
@@ -154,11 +211,28 @@ const getBooksPage = async (
     });
   }
 
+  if (listScope === "bookmarked") {
+    if (!userId) {
+      const err = new Error("userId is required when listScope is bookmarked");
+      err.status = 400;
+      throw err;
+    }
+    includeOptions.push({
+      model: db.BookInteraction,
+      as: "bookInteractions",
+      where: {userId, action: "bookmark"},
+      required: true,
+      attributes: ["id"],
+    });
+  }
+
   const queryOptions = {
     where: whereClause,
     order: buildOrderClause(orderByField, orderDirection),
     limit: pageSize,
     offset,
+    distinct: listScope === "bookmarked",
+    col: listScope === "bookmarked" ? "id" : undefined,
   };
 
   if (includeOptions.length > 0) {
@@ -168,10 +242,12 @@ const getBooksPage = async (
   const {count, rows} = await db.Book.findAndCountAll(queryOptions);
   const bookIds = rows.map((book) => book.id);
   const {likesByBookId, likedBookIds} = await buildLikesSummary(bookIds, userId);
+  const {superLikesByBookId, superLikedBookIds} = await buildSuperLikeSummary(bookIds, userId);
 
   return {
     books: rows.map((book) => {
       const bookData = book.toJSON();
+      delete bookData.bookInteractions;
       // Set progress to first element of bookProgresses array if present
       bookData.progress = bookData.bookProgresses && bookData.bookProgresses.length > 0 ?
         bookData.bookProgresses[0] : null;
@@ -180,6 +256,8 @@ const getBooksPage = async (
         ...bookData,
         likesCount: likesByBookId.get(book.id) || 0,
         isLiked: likedBookIds.has(book.id),
+        superLikesCount: superLikesByBookId.get(book.id) || 0,
+        isSuperLiked: superLikedBookIds.has(book.id),
       };
     }),
     totalCount: count,
@@ -198,12 +276,16 @@ const getBooksPageFiltered = async (
     readStatus,
     search,
     filterUploadedBy,
+    listScope,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
   let whereClause = {};
 
   if (clubId) {
     whereClause.clubId = parseInt(clubId);
+  }
+  if (listScope === "backlog" || listScope === "suggested") {
+    whereClause.pool = listScope;
   }
 
   if (theme === "no-theme") {
@@ -295,11 +377,28 @@ const getBooksPageFiltered = async (
     });
   }
 
+  if (listScope === "bookmarked") {
+    if (!userId) {
+      const err = new Error("userId is required when listScope is bookmarked");
+      err.status = 400;
+      throw err;
+    }
+    includeOptions.push({
+      model: db.BookInteraction,
+      as: "bookInteractions",
+      where: {userId, action: "bookmark"},
+      required: true,
+      attributes: ["id"],
+    });
+  }
+
   const queryOptions = {
     where: whereClause,
     order: buildOrderClause(orderByField, orderDirection),
     limit: pageSize,
     offset,
+    distinct: listScope === "bookmarked",
+    col: listScope === "bookmarked" ? "id" : undefined,
   };
 
   if (includeOptions.length > 0) {
@@ -309,10 +408,12 @@ const getBooksPageFiltered = async (
   const {count, rows} = await db.Book.findAndCountAll(queryOptions);
   const bookIds = rows.map((book) => book.id);
   const {likesByBookId, likedBookIds} = await buildLikesSummary(bookIds, userId);
+  const {superLikesByBookId, superLikedBookIds} = await buildSuperLikeSummary(bookIds, userId);
 
   return {
     books: rows.map((book) => {
       const bookData = book.toJSON();
+      delete bookData.bookInteractions;
       // Set progress to first element of bookProgresses array if present
       bookData.progress = bookData.bookProgresses && bookData.bookProgresses.length > 0 ?
         bookData.bookProgresses[0] : null;
@@ -321,6 +422,8 @@ const getBooksPageFiltered = async (
         ...bookData,
         likesCount: likesByBookId.get(book.id) || 0,
         isLiked: likedBookIds.has(book.id),
+        superLikesCount: superLikesByBookId.get(book.id) || 0,
+        isSuperLiked: superLikedBookIds.has(book.id),
       };
     }),
     totalCount: count,
@@ -340,6 +443,7 @@ const getBooks = async (req, res, next) => {
       readStatus,
       search,
       uploadedBy,
+      listScope: rawListScope,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -348,6 +452,7 @@ const getBooks = async (req, res, next) => {
     }
     const mappedOrderBy = mapOrderByField(orderBy);
     const filterUploadedBy = normalizeUploadedByFilter(uploadedBy);
+    const listScope = parseListScope(rawListScope);
     const result = await getBooksPage(
         parseInt(page),
         parseInt(pageSize),
@@ -358,6 +463,7 @@ const getBooks = async (req, res, next) => {
         readStatus || null,
         search,
         filterUploadedBy,
+        listScope,
     );
     res.json(result);
   } catch (e) {
@@ -368,34 +474,67 @@ const getBooks = async (req, res, next) => {
 // GET /v1/books/discussed - Get books with discussion dates
 const getDiscussedBooks = async (req, res, next) => {
   try {
-    const {clubId, userId} = req.query;
+    const {clubId, userId, listScope: rawListScope} = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
       error.status = 400;
       throw error;
     }
-    const books = await db.Book.findAll({
-      where: {
-        clubId: parseInt(clubId),
-        discussionDate: {
-          [db.Op.ne]: null,
-        },
+    const listScope = parseListScope(rawListScope);
+    if (listScope === "bookmarked" && !userId) {
+      const err = new Error("userId is required when listScope is bookmarked");
+      err.status = 400;
+      throw err;
+    }
+
+    const where = {
+      clubId: parseInt(clubId),
+      discussionDate: {
+        [db.Op.ne]: null,
       },
-      include: [{
+    };
+    if (listScope === "backlog" || listScope === "suggested") {
+      where.pool = listScope;
+    }
+
+    const include = [
+      {
         model: db.User,
         as: "uploader",
         attributes: ["uid", "displayName"],
         required: false,
-      }],
+      },
+    ];
+    if (listScope === "bookmarked") {
+      include.push({
+        model: db.BookInteraction,
+        as: "bookInteractions",
+        where: {userId, action: "bookmark"},
+        required: true,
+        attributes: ["id"],
+      });
+    }
+
+    const books = await db.Book.findAll({
+      where,
+      include,
+      subQuery: false,
     });
     const bookIds = books.map((book) => book.id);
     const {likesByBookId, likedBookIds} = await buildLikesSummary(bookIds, userId);
-    res.json(books.map((book) => ({
-      id: book.id,
-      ...book.toJSON(),
-      likesCount: likesByBookId.get(book.id) || 0,
-      isLiked: likedBookIds.has(book.id),
-    })));
+    const {superLikesByBookId, superLikedBookIds} = await buildSuperLikeSummary(bookIds, userId);
+    res.json(books.map((book) => {
+      const j = book.toJSON();
+      delete j.bookInteractions;
+      return {
+        id: book.id,
+        ...j,
+        likesCount: likesByBookId.get(book.id) || 0,
+        isLiked: likedBookIds.has(book.id),
+        superLikesCount: superLikesByBookId.get(book.id) || 0,
+        isSuperLiked: superLikedBookIds.has(book.id),
+      };
+    }));
   } catch (e) {
     next(e);
   }
@@ -415,6 +554,7 @@ const getFilteredBooks = async (req, res, next) => {
       readStatus,
       search,
       uploadedBy,
+      listScope: rawListScope,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -423,6 +563,7 @@ const getFilteredBooks = async (req, res, next) => {
     }
     const mappedOrderBy = mapOrderByField(orderBy);
     const filterUploadedBy = normalizeUploadedByFilter(uploadedBy);
+    const listScope = parseListScope(rawListScope);
     const result = await getBooksPageFiltered(
         theme,
         parseInt(page),
@@ -434,6 +575,7 @@ const getFilteredBooks = async (req, res, next) => {
         readStatus || null,
         search,
         filterUploadedBy,
+        listScope,
     );
     res.json(result);
   } catch (e) {
@@ -468,11 +610,15 @@ const getBook = async (req, res, next) => {
     }
 
     const {likesByBookId, likedBookIds} = await buildLikesSummary([book.id], req.query.userId);
+    const {superLikesByBookId, superLikedBookIds} = await buildSuperLikeSummary(
+        [book.id], req.query.userId);
     res.json({
       id: book.id,
       ...book.toJSON(),
       likesCount: likesByBookId.get(book.id) || 0,
       isLiked: likedBookIds.has(book.id),
+      superLikesCount: superLikesByBookId.get(book.id) || 0,
+      isSuperLiked: superLikedBookIds.has(book.id),
     });
   } catch (e) {
     next(e);
@@ -523,6 +669,11 @@ const updateBook = async (req, res, next) => {
     delete updates.uploaded_by;
 
     await db.Book.update(updates, {where: {id, clubId: parseInt(clubId)}});
+    if (updates.chosenForBookclub === true) {
+      await db.BookInteraction.destroy({
+        where: {bookId: parseInt(id, 10), action: "super_like"},
+      });
+    }
     const book = await db.Book.findByPk(id);
     if (!book || book.clubId !== parseInt(clubId)) {
       const error = new Error("Book not found");

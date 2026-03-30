@@ -106,6 +106,16 @@ const ClubManagement = () => {
   const [selectedClubThemeId, setSelectedClubThemeId] = useState(null);
   const [clubThemeMode, setClubThemeMode] = useState('light');
   const [savingClubTheme, setSavingClubTheme] = useState(false);
+  const [bdMinThreshold, setBdMinThreshold] = useState(3);
+  const [bdPercentage, setBdPercentage] = useState(0.5);
+  const [bdSuperLimit, setBdSuperLimit] = useState(3);
+  const [bdSurvivalMinLikes, setBdSurvivalMinLikes] = useState(3);
+  const [bdRevalMin, setBdRevalMin] = useState(3);
+  const [bdRevalRatio, setBdRevalRatio] = useState(0.5);
+  const [savingBookDiscovery, setSavingBookDiscovery] = useState(false);
+
+  const canManageClubSettings =
+    currentClub?.role === 'owner' || currentClub?.role === 'admin';
 
   const loadMembers = useCallback(async () => {
     if (!currentClub || !user) return;
@@ -139,6 +149,22 @@ const ClubManagement = () => {
         presetMatch?.mode ??
           (currentClub?.themeOverrides?.palette?.mode === 'dark' ? 'dark' : 'light'),
       );
+      const bd = currentClub.config?.bookDiscovery;
+      if (bd) {
+        setBdMinThreshold(bd.minThreshold ?? 3);
+        setBdPercentage(bd.percentageThreshold ?? 0.5);
+        setBdSuperLimit(bd.superLikeLimit ?? 3);
+        setBdSurvivalMinLikes(bd.backlogSurvivalMinLikes ?? 3);
+        setBdRevalMin(bd.revalidationMinReviews ?? 3);
+        setBdRevalRatio(bd.revalidationSurvivalRatio ?? 0.5);
+      } else {
+        setBdMinThreshold(3);
+        setBdPercentage(0.5);
+        setBdSuperLimit(3);
+        setBdSurvivalMinLikes(3);
+        setBdRevalMin(3);
+        setBdRevalRatio(0.5);
+      }
       loadMembers();
     }
   }, [currentClub, loadMembers]);
@@ -156,6 +182,31 @@ const ClubManagement = () => {
     }
   };
 
+  const handleSaveBookDiscovery = async () => {
+    if (!currentClub || !user || !canManageClubSettings) return;
+    try {
+      setSavingBookDiscovery(true);
+      setError(null);
+      const nextConfig = {
+        ...(currentClub.config || {}),
+        bookDiscovery: {
+          minThreshold: Number(bdMinThreshold),
+          percentageThreshold: Number(bdPercentage),
+          superLikeLimit: Number(bdSuperLimit),
+          backlogSurvivalMinLikes: Number(bdSurvivalMinLikes),
+          revalidationMinReviews: Number(bdRevalMin),
+          revalidationSurvivalRatio: Number(bdRevalRatio),
+        },
+      };
+      await updateClub(currentClub.id, user.uid, { config: nextConfig });
+      await refreshClubs();
+    } catch (err) {
+      setError('Failed to save book discovery settings');
+      console.error('Error saving book discovery:', err);
+    } finally {
+      setSavingBookDiscovery(false);
+    }
+  };
 
   const handleAddMember = async () => {
     if (!currentClub || !user || !newMemberId.trim()) return;
@@ -535,6 +586,76 @@ const ClubManagement = () => {
               </Box>
             </Stack>
           </Paper>
+
+          {canManageClubSettings && (
+            <Paper sx={{ p: { xs: 2, md: 3 }, mb: 2 }}>
+              <Typography variant="h6" sx={{ mb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>
+                Book discovery &amp; backlog
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Thresholds for promoting books to the club backlog, super-like limits, and re-validation survival.
+              </Typography>
+              <Stack spacing={2} sx={{ maxWidth: 400 }}>
+                <TextField
+                  label="Min promotion likes"
+                  type="number"
+                  size="small"
+                  value={bdMinThreshold}
+                  onChange={(e) => setBdMinThreshold(e.target.value)}
+                  inputProps={{ min: 1, step: 1 }}
+                />
+                <TextField
+                  label="Percentage of active users (0–1)"
+                  type="number"
+                  size="small"
+                  value={bdPercentage}
+                  onChange={(e) => setBdPercentage(e.target.value)}
+                  inputProps={{ min: 0, max: 1, step: 0.05 }}
+                />
+                <TextField
+                  label="Super-like limit per member"
+                  type="number"
+                  size="small"
+                  value={bdSuperLimit}
+                  onChange={(e) => setBdSuperLimit(e.target.value)}
+                  inputProps={{ min: 0, step: 1 }}
+                />
+                <TextField
+                  label="Backlog survival min organic likes"
+                  type="number"
+                  size="small"
+                  value={bdSurvivalMinLikes}
+                  onChange={(e) => setBdSurvivalMinLikes(e.target.value)}
+                  inputProps={{ min: 1, step: 1 }}
+                />
+                <TextField
+                  label="Re-validation min reviews"
+                  type="number"
+                  size="small"
+                  value={bdRevalMin}
+                  onChange={(e) => setBdRevalMin(e.target.value)}
+                  inputProps={{ min: 1, step: 1 }}
+                />
+                <TextField
+                  label="Re-validation survival ratio (0–1)"
+                  type="number"
+                  size="small"
+                  value={bdRevalRatio}
+                  onChange={(e) => setBdRevalRatio(e.target.value)}
+                  inputProps={{ min: 0, max: 1, step: 0.05 }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleSaveBookDiscovery}
+                  disabled={savingBookDiscovery}
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  {savingBookDiscovery ? 'Saving…' : 'Save book discovery settings'}
+                </Button>
+              </Stack>
+            </Paper>
+          )}
 
           {/* Delete Club Section */}
           {isOwner && (

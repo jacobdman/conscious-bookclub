@@ -49,17 +49,18 @@ const fetchBooks = async (clubId, userId, options = {}) => {
   const {
     page = 1,
     pageSize = 10,
-    filters = { theme: 'all', status: 'all', suggestedBy: 'all' },
+    filters = { theme: 'all', status: 'all', suggestedBy: 'all', listScope: 'backlog' },
     search = '',
     sort = { field: 'createdAt', direction: 'desc' },
   } = options;
 
-  const { theme, status, suggestedBy } = filters;
+  const { theme, status, suggestedBy, listScope: listScopeRaw } = filters;
+  const listScope = listScopeRaw ?? 'backlog';
   const readStatus = status === 'read' ? 'finished' : null;
   const uploadedByFilter = suggestedBy && suggestedBy !== 'all' ? suggestedBy : null;
 
   if (status === 'scheduled') {
-    let allScheduledBooks = await getAllDiscussedBooks(clubId, userId);
+    let allScheduledBooks = await getAllDiscussedBooks(clubId, userId, listScope);
 
     if (theme !== 'all') {
       if (theme === 'no-theme') {
@@ -126,6 +127,7 @@ const fetchBooks = async (clubId, userId, options = {}) => {
       readStatus,
       search,
       uploadedByFilter,
+      listScope,
     );
   }
 
@@ -139,6 +141,7 @@ const fetchBooks = async (clubId, userId, options = {}) => {
     readStatus,
     search,
     uploadedByFilter,
+    listScope,
   );
 };
 

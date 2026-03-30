@@ -8,7 +8,7 @@ const BooksContext = React.createContext({
   totalCount: 0,
   totalPages: 0,
   pagination: { page: 1, pageSize: 10 },
-  filters: { theme: 'all', status: 'all', suggestedBy: 'all' },
+  filters: { theme: 'all', status: 'all', suggestedBy: 'all', listScope: 'backlog' },
   search: '',
   sort: { field: 'createdAt', direction: 'desc' },
 
@@ -25,6 +25,7 @@ const BooksContext = React.createContext({
   deleteBook: async () => {},
   updateBookProgress: async () => {},
   toggleBookLike: async () => {},
+  toggleBookSuperLike: async () => {},
   refreshBooks: async () => {},
 });
 

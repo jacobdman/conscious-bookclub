@@ -45,7 +45,7 @@ export const deleteBook = async (clubId, bookId) => {
 };
 
 // Books pagination and filtering
-export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '', uploadedBy = null) => {
+export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '', uploadedBy = null, listScope = null) => {
   const params = new URLSearchParams({
     clubId: clubId.toString(),
     page: pageNumber.toString(),
@@ -65,10 +65,13 @@ export const getBooksPage = async (clubId, pageNumber = 1, pageSize = 10, orderB
   if (uploadedBy && uploadedBy !== 'all') {
     params.append('uploadedBy', uploadedBy);
   }
+  if (listScope) {
+    params.append('listScope', listScope);
+  }
   return apiCall(`/v1/books?${params}`);
 };
 
-export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '', uploadedBy = null) => {
+export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSize = 10, orderByField = 'created_at', orderDirection = 'desc', userId = null, readStatus = null, search = '', uploadedBy = null, listScope = null) => {
   const params = new URLSearchParams({
     clubId: clubId.toString(),
     theme,
@@ -89,13 +92,19 @@ export const getBooksPageFiltered = async (clubId, theme, pageNumber = 1, pageSi
   if (uploadedBy && uploadedBy !== 'all') {
     params.append('uploadedBy', uploadedBy);
   }
+  if (listScope) {
+    params.append('listScope', listScope);
+  }
   return apiCall(`/v1/books/filtered?${params}`);
 };
 
-export const getAllDiscussedBooks = async (clubId, userId = null) => {
+export const getAllDiscussedBooks = async (clubId, userId = null, listScope = null) => {
   const params = new URLSearchParams({ clubId: clubId.toString() });
   if (userId) {
     params.append('userId', userId);
+  }
+  if (listScope) {
+    params.append('listScope', listScope);
   }
   return apiCall(`/v1/books/discussed?${params}`);
 };

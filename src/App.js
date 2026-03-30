@@ -12,6 +12,7 @@ import Dashboard from './views/Dashboard';
 import Feed from './views/Feed';
 import ClubManagement from './views/ClubManagement';
 import Books from './views/Books';
+import SwipeReviewView from './views/SwipeReview';
 import Calendar from './views/Calendar';
 import Goals from './views/Goals';
 import Profile from './views/Profile';
@@ -128,6 +129,16 @@ function AppContent() {
                 element={
                   <ProtectedRoute>
                     <ClubManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/books/discover"
+                element={
+                  <ProtectedRoute>
+                    <FeatureGateRoute featureKey="books">
+                      <SwipeReviewView />
+                    </FeatureGateRoute>
                   </ProtectedRoute>
                 }
               />

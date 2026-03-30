@@ -1,6 +1,6 @@
 {
   "name": "conscious-bookclub",
-  "version": "0.8.5",
+  "version": "0.9.1",
   "private": true,
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.1.0",

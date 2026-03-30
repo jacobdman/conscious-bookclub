@@ -1,4 +1,5 @@
 const express = require("express");
+const booksDiscover = require("./books/discover");
 const books = require("./books");
 const goals = require("./goals");
 const posts = require("./posts");
@@ -16,6 +17,7 @@ const openLibrary = require("./openLibrary");
 
 const router = express.Router(); // eslint-disable-line new-cap
 
+router.use("/books/discover", booksDiscover);
 router.use("/books", books);
 router.use("/goals", goals);
 router.use("/posts", posts);

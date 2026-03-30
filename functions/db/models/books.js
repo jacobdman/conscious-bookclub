@@ -70,6 +70,21 @@ module.exports = function(sequelize, DataTypes) {
           field: "club_id",
           allowNull: false,
         },
+        pool: {
+          type: DataTypes.STRING(50),
+          allowNull: false,
+          defaultValue: "suggested",
+        },
+        promotedAt: {
+          type: DataTypes.DATEONLY,
+          field: "promoted_at",
+          allowNull: true,
+        },
+        revalidationRequestedAt: {
+          type: DataTypes.DATE,
+          field: "revalidation_requested_at",
+          allowNull: true,
+        },
       },
       {
         tableName: "books",
@@ -95,6 +110,10 @@ module.exports = function(sequelize, DataTypes) {
     Book.hasMany(models.BookLike, {
       foreignKey: "book_id",
       as: "bookLikes",
+    });
+    Book.hasMany(models.BookInteraction, {
+      foreignKey: "book_id",
+      as: "bookInteractions",
     });
     Book.belongsTo(models.User, {
       foreignKey: "uploaded_by",
