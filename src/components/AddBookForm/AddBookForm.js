@@ -8,8 +8,6 @@ import {
   Button,
   Box,
   Typography,
-  useMediaQuery,
-  useTheme,
   Alert,
   FormControlLabel,
   Checkbox,
@@ -17,6 +15,8 @@ import {
   CircularProgress,
   Avatar
 } from '@mui/material';
+// UI
+import FullscreenDialog from 'UI/FullscreenDialog';
 import {
   debouncedSearchBooks,
   DEFAULT_CLUB_THEMES,
@@ -35,9 +35,6 @@ import { bookCoverAvatarSx } from 'utils/bookCoverDisplay';
 const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = null }) => {
   const { currentClub } = useClubContext();
   const { createBook, updateBook, deleteBook } = useBooksContext();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
   const [formData, setFormData] = useState({
     title: '',
     author: '',
@@ -458,16 +455,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="sm"
-      fullWidth
-      fullScreen={isMobile}
-      PaperProps={{
-        sx: isMobile ? {} : { minHeight: '700px' }
-      }}
-    >
+    <FullscreenDialog open={open} onClose={handleClose}>
       <DialogTitle>
         <Typography variant="h5" component="div">
           {editingBook ? 'Edit Book' : 'Add New Book'}
@@ -737,7 +725,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
           </Button>
         </DialogActions>
       </Dialog>
-    </Dialog>
+    </FullscreenDialog>
   );
 };
 

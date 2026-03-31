@@ -320,8 +320,10 @@ const componentOverrides = {
       paperFullScreen: {
         height: 'auto',
         maxHeight: '100%',
-        display: 'block',
-        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        overflow: 'hidden',
       },
     },
   },

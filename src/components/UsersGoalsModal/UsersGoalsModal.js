@@ -12,7 +12,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -24,6 +23,8 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+// UI
+import FullscreenDialog from 'UI/FullscreenDialog';
 // Context
 import useClubContext from 'contexts/Club';
 // Components
@@ -241,10 +242,9 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
   ]);
 
   return (
-    <Dialog
+    <FullscreenDialog
       open={open}
       onClose={onClose}
-      fullScreen
       PaperProps={{
         sx: {
           backgroundColor: 'background.default',
@@ -515,7 +515,7 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
         )}
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
-    </Dialog>
+    </FullscreenDialog>
   );
 };
 

@@ -1,0 +1,26 @@
+diff --git a/node_modules/@capacitor/keyboard/ios/Sources/KeyboardPlugin/Keyboard.m b/node_modules/@capacitor/keyboard/ios/Sources/KeyboardPlugin/Keyboard.m
+index 29c0708..cc8c526 100644
+--- a/node_modules/@capacitor/keyboard/ios/Sources/KeyboardPlugin/Keyboard.m
++++ b/node_modules/@capacitor/keyboard/ios/Sources/KeyboardPlugin/Keyboard.m
+@@ -142,8 +142,7 @@ - (void)onKeyboardWillShow:(NSNotification *)notification
+     }
+   }
+ 
+-  double duration = [[notification.userInfo valueForKey:UIKeyboardAnimationDurationUserInfoKey] doubleValue]+0.2;
+-  [self setKeyboardHeight:height delay:duration];
++  [self setKeyboardHeight:height delay:0];
+   [self resetScrollView];
+ 
+   NSString * data = [NSString stringWithFormat:@"{ 'keyboardHeight': %d }", (int)height];
+@@ -237,7 +236,10 @@ - (void)_updateFrame
+     }
+     case ResizeNative:
+     {
+-      [self.webView setFrame:CGRectMake(wf.origin.x, wf.origin.y, f.size.width - wf.origin.x, f.size.height - wf.origin.y - self.paddingBottom)];
++      CGRect newFrame = CGRectMake(wf.origin.x, wf.origin.y, f.size.width - wf.origin.x, f.size.height - wf.origin.y - self.paddingBottom);
++      [UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
++        [self.webView setFrame:newFrame];
++      } completion:nil];
+       break;
+     }
+     default:

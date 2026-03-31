@@ -23,6 +23,8 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from '@mui/material';
+// UI
+import FullscreenDialog from 'UI/FullscreenDialog';
 import { Close, Add, Edit, Delete, DragIndicator, ExpandMore } from '@mui/icons-material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -719,10 +721,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
   return (
     <>
-      <Dialog
+      <FullscreenDialog
         open={open}
         onClose={onClose}
-        fullScreen
         PaperProps={{
           sx: {
             backgroundColor: 'background.default',
@@ -1068,7 +1069,7 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
           </Box>
           <Button onClick={onClose}>Close</Button>
         </DialogActions>
-      </Dialog>
+      </FullscreenDialog>
 
       <GoalEntryDialog
         open={entryDialog.open}

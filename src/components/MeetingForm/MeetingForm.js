@@ -8,7 +8,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -20,6 +19,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+// UI
+import FullscreenDialog from 'UI/FullscreenDialog';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -167,10 +168,9 @@ const MeetingForm = ({
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Dialog
+      <FullscreenDialog
         open={open}
         onClose={onClose}
-        fullScreen
         PaperProps={{
           sx: {
             backgroundColor: 'background.default',
@@ -348,7 +348,7 @@ const MeetingForm = ({
             )}
           </Button>
         </DialogActions>
-      </Dialog>
+      </FullscreenDialog>
     </LocalizationProvider>
   );
 };

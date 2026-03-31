@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		2FAD9767203C412B000D30F8 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9766203C412B000D30F8 /* GoogleService-Info.plist */; };
+		CBC0000100000000000000B1 /* WindowPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC0000100000000000000A1 /* WindowPlugin.swift */; };
+		CBC0000100000000000000B2 /* AppViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC0000100000000000000A2 /* AppViewController.swift */; };
 		369BB4E62F65B1D6006C3DCF /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 369BB4E52F65B1D6006C3DCF /* FirebaseAuth */; };
 		369BB4E82F65B1D6006C3DCF /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 369BB4E72F65B1D6006C3DCF /* FirebaseCore */; };
 		369BB4EA2F65B1D6006C3DCF /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 369BB4E92F65B1D6006C3DCF /* FirebaseFunctions */; };
@@ -31,6 +33,8 @@
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* Conscious Book Club.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Conscious Book Club.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		CBC0000100000000000000A1 /* WindowPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPlugin.swift; sourceTree = "<group>"; };
+		CBC0000100000000000000A2 /* AppViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewController.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -80,6 +84,8 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				CBC0000100000000000000A2 /* AppViewController.swift */,
+				CBC0000100000000000000A1 /* WindowPlugin.swift */,
 				2FAD9768203C412B000D30F8 /* App.entitlements */,
 				B7C8D9EA203C412B000D3100 /* App.release.entitlements */,
 				2FAD9766203C412B000D30F8 /* GoogleService-Info.plist */,
@@ -183,6 +189,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				CBC0000100000000000000B1 /* WindowPlugin.swift in Sources */,
+				CBC0000100000000000000B2 /* AppViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

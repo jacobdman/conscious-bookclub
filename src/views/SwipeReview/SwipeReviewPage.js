@@ -6,7 +6,7 @@ import SwipeReviewProvider from 'contexts/SwipeReview/SwipeReviewProvider';
 import SwipeReview from 'components/SwipeReview/SwipeReview';
 import { buildTheme } from 'theme';
 import { resolveThemeOverrides } from 'utils/themeResolver';
-import { syncIosStatusBarForTheme } from 'utils/capacitorNative';
+import { syncIosKeyboardForTheme, syncIosStatusBarForTheme, syncIosWindowBackground } from 'utils/capacitorNative';
 
 /**
  * Discover / swipe uses the same club + user theme resolution as Layout (books, dashboard, etc.).
@@ -28,7 +28,9 @@ const SwipeReviewView = () => {
 
   useEffect(() => {
     syncIosStatusBarForTheme(clubTheme.palette.mode);
-  }, [clubTheme.palette.mode]);
+    syncIosKeyboardForTheme(clubTheme.palette.mode);
+    syncIosWindowBackground(clubTheme.palette.background.default);
+  }, [clubTheme.palette.mode, clubTheme.palette.background.default]);
 
   return (
     <ThemeProvider theme={clubTheme}>

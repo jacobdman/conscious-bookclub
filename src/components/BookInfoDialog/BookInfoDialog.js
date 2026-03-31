@@ -11,6 +11,8 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Close } from '@mui/icons-material';
+// UI
+import FullscreenDialog from 'UI/FullscreenDialog';
 import BookInfoContent from 'components/BookInfoContent';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
@@ -99,10 +101,9 @@ const BookInfoDialog = ({
 
   return (
     <>
-      <Dialog
+      <FullscreenDialog
         open={open}
         onClose={onClose}
-        fullScreen
         PaperProps={{
           sx: {
             backgroundColor: 'background.default',
@@ -147,7 +148,7 @@ const BookInfoDialog = ({
             Close
           </Button>
         </DialogActions>
-      </Dialog>
+      </FullscreenDialog>
 
       <Dialog open={superConfirm.open} onClose={handleCloseSuperConfirm} maxWidth="xs" fullWidth>
         <DialogTitle>

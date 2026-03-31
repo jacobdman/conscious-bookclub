@@ -15,7 +15,6 @@ import {
   Alert,
   Card,
   CardContent,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -23,6 +22,8 @@ import {
   useTheme,
   LinearProgress,
 } from '@mui/material';
+// UI
+import FullscreenDialog from 'UI/FullscreenDialog';
 import { CalendarToday, List as ListIcon, LocationOn, AccessTime } from '@mui/icons-material';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
@@ -430,7 +431,7 @@ const CalendarComponent = () => {
         )}
 
         {/* Event Details Dialog */}
-        <Dialog
+        <FullscreenDialog
           open={eventDialogOpen}
           onClose={handleCloseEventDialog}
           maxWidth="sm"
@@ -503,7 +504,7 @@ const CalendarComponent = () => {
               </DialogActions>
             </>
           )}
-        </Dialog>
+        </FullscreenDialog>
       </Box>
     </Layout>
   );

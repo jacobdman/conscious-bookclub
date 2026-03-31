@@ -16,7 +16,7 @@ import { BottomNavigation, BottomNavigationAction, Paper, Badge } from '@mui/mat
 // Context
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
-import useKeyboardContext from 'contexts/Keyboard';
+import { useKeyboardContext } from 'contexts/Keyboard';
 import FeedContext from 'contexts/Feed/FeedContext';
 // Utils
 import { getClubFeatures } from 'utils/clubFeatures';

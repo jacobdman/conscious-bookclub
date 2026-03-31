@@ -7,7 +7,7 @@ import PullToRefreshIndicator from 'UI/PullToRefreshIndicator';
 // Context
 import useClubContext from 'contexts/Club';
 import ClubReportingProvider from 'contexts/ClubReporting/ClubReportingProvider';
-import useKeyboardContext from 'contexts/Keyboard';
+import { useKeyboardContext } from 'contexts/Keyboard';
 // Components
 import BottomNav from 'components/BottomNav';
 import Header from 'components/Header';
@@ -18,7 +18,7 @@ import { usePullToRefresh } from 'hooks/usePullToRefresh';
 import { buildTheme } from 'theme';
 import { resolveThemeOverrides } from 'utils/themeResolver';
 import { getPlatform } from 'utils/platformHelpers';
-import { syncIosStatusBarForTheme } from 'utils/capacitorNative';
+import { syncIosKeyboardForTheme, syncIosStatusBarForTheme, syncIosWindowBackground } from 'utils/capacitorNative';
 
 const ROUTE_TITLES = {
   '/': 'Dashboard',
@@ -130,7 +130,9 @@ const Layout = ({ children, onRefresh }) => {
 
   useEffect(() => {
     syncIosStatusBarForTheme(clubTheme.palette.mode);
-  }, [clubTheme.palette.mode]);
+    syncIosKeyboardForTheme(clubTheme.palette.mode);
+    syncIosWindowBackground(clubTheme.palette.background.default);
+  }, [clubTheme.palette.mode, clubTheme.palette.background.default]);
 
   // Update page title based on route and club
   useEffect(() => {

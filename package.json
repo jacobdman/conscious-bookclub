@@ -45,6 +45,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "postinstall": "patch-package",
+    "_patch_package_notes": "See patches/README.md — @capacitor/keyboard patch is version-coupled",
     "start": "react-scripts start",
     "prebuild": "node scripts/inject-service-worker-version.js",
     "build": "react-scripts build",
@@ -80,6 +82,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "patch-package": "^8.0.1"
   }
 }
