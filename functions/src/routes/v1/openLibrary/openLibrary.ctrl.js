@@ -25,15 +25,26 @@ const isValidOlEditionKey = (key) =>
   !key.includes("..") &&
   /^\/books\/OL[0-9]+M$/i.test(key.trim());
 
-// GET /v1/open-library/search?title=&author=&limit=
+const SEARCH_PROXY_KEYS = new Set(["title", "author", "limit", "lang", "sort"]);
+
+// GET /v1/open-library/search?title=&author=&limit=&lang=&sort=
 const proxySearch = async (req, res, next) => {
   try {
-    const {title = "", author = "", limit = "25"} = req.query;
-    const lim = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 25));
     const params = new URLSearchParams();
-    params.set("limit", String(lim));
-    if (title) params.set("title", String(title));
-    if (author) params.set("author", String(author));
+    for (const key of SEARCH_PROXY_KEYS) {
+      const raw = req.query[key];
+      if (raw == null || raw === "") continue;
+      const val = Array.isArray(raw) ? raw[0] : raw;
+      if (key === "limit") {
+        const lim = Math.min(100, Math.max(1, parseInt(String(val), 10) || 25));
+        params.set("limit", String(lim));
+      } else {
+        params.set(key, String(val));
+      }
+    }
+    if (!params.has("limit")) {
+      params.set("limit", "25");
+    }
 
     const url = `${OL_ORIGIN}/search.json?${params.toString()}`;
     const r = await fetch(url, {headers: olFetchHeaders});
@@ -111,7 +122,11 @@ const proxyWorkEditions = async (req, res, next) => {
     }
 
     const lim = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "50"), 10) || 50));
-    const url = `${OL_ORIGIN}${key}/editions.json?limit=${lim}`;
+    const off = Math.max(0, parseInt(String(req.query.offset || "0"), 10) || 0);
+    let url = `${OL_ORIGIN}${key}/editions.json?limit=${lim}`;
+    if (off > 0) {
+      url += `&offset=${off}`;
+    }
     const r = await fetch(url, {headers: olFetchHeaders});
 
     if (!r.ok) {

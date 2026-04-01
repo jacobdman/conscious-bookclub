@@ -318,7 +318,9 @@ const componentOverrides = {
         paddingRight: 'max(20px, env(safe-area-inset-right, 0px))',
       },
       paperFullScreen: {
-        height: 'auto',
+        // Match MUI default: fill the modal so DialogContent can scroll; height:auto lets the
+        // paper grow with content and breaks overflow scrolling when the body scroll is locked.
+        height: '100%',
         maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -355,6 +357,18 @@ const componentOverrides = {
 
 /** MUI component overrides applied only when running Capacitor iOS (native feel). */
 const iosNativeComponentOverrides = {
+  // WKWebView: nested scrollable regions inside fullscreen dialogs need explicit touch + scroll
+  // (PWA Safari handles the same layout without these).
+  MuiDialogContent: {
+    styleOverrides: {
+      root: {
+        WebkitOverflowScrolling: 'touch',
+        overflowY: 'scroll',
+        touchAction: 'pan-y',
+        overscrollBehaviorY: 'contain',
+      },
+    },
+  },
   MuiSwitch: {
     defaultProps: {
       disableRipple: true,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -16,6 +16,9 @@ import FullscreenDialog from 'UI/FullscreenDialog';
 import BookInfoContent from 'components/BookInfoContent';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
+import useBooksContext from 'contexts/Books';
+import useBookLikeActions from 'hooks/useBookLikeActions';
+import { getBook } from 'services/books/books.service';
 import { getDiscoverStats } from 'services/books/discover.service';
 
 const BookInfoDialog = ({
@@ -23,19 +26,72 @@ const BookInfoDialog = ({
   onClose,
   book,
   discussionDate,
-  onToggleLike,
-  isLikeLoading,
-  saveBookProgress,
+  /** Override default (BooksContext `updateBookProgress`). */
+  saveBookProgress: saveBookProgressProp,
   onBookProgressUpdated,
-  /** When set, shows super-like control with confirmation (book list). */
-  onSuperLikeToggle,
-  isSuperLikeLoading = false,
+  /** After like/super-like succeeds (e.g. invalidate meetings on dashboard). */
+  onAfterBookInteraction,
 }) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
+  const { updateBookProgress } = useBooksContext();
+  const saveBookProgress = saveBookProgressProp ?? updateBookProgress;
+
+  const {
+    handleToggleLike: runToggleLike,
+    handleSuperLikeToggle: runSuperLikeToggle,
+    loadingLikes,
+    loadingSuperLikes,
+  } = useBookLikeActions();
+
+  const [displayBook, setDisplayBook] = useState(null);
   const [remainingSuperLikes, setRemainingSuperLikes] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [superConfirm, setSuperConfirm] = useState({ open: false, intent: 'add' });
+  const bookRef = useRef(book);
+  bookRef.current = book;
+
+  // Merge parent `book` into local state so a new reference (e.g. dashboard memo) does not
+  // replace enriched data, and partial payloads (meetings embed) do not wipe GET /books/:id fields.
+  useEffect(() => {
+    if (!open) {
+      setDisplayBook(null);
+      return;
+    }
+    if (!book) return;
+    setDisplayBook((prev) => {
+      if (!prev || prev.id !== book.id) return book;
+      return { ...prev, ...book };
+    });
+  }, [open, book]);
+
+  // Same full book record as the book list (description, uploader, suggester notes, etc.).
+  useEffect(() => {
+    if (!open || !book?.id || !currentClub?.id || !user?.uid) return;
+    let cancelled = false;
+    const numericId = book.id;
+    (async () => {
+      try {
+        const full = await getBook(currentClub.id, numericId, user.uid);
+        if (cancelled) return;
+        setDisplayBook((prev) => {
+          const latest = bookRef.current;
+          const base = prev && prev.id === full.id ? prev : latest;
+          if (!full || full.id !== base?.id) return base;
+          return {
+            ...full,
+            progress: base.progress ?? full.progress,
+            meetingTheme: base.meetingTheme,
+          };
+        });
+      } catch {
+        // keep merged payload from meetings / parent
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, book?.id, currentClub?.id, user?.uid]);
 
   const loadStats = useCallback(async () => {
     if (!currentClub?.id || !user?.uid) {
@@ -56,16 +112,51 @@ const BookInfoDialog = ({
   }, [currentClub?.id, user?.uid]);
 
   useEffect(() => {
-    if (!open || !onSuperLikeToggle) {
+    if (!open || !currentClub?.id || !user?.uid) {
       setRemainingSuperLikes(null);
       return;
     }
     loadStats();
-  }, [open, book?.id, onSuperLikeToggle, loadStats]);
+  }, [open, displayBook?.id, currentClub?.id, user?.uid, loadStats]);
+
+  const handleToggleLike = useCallback(
+    async (event, b) => {
+      await runToggleLike(event, b);
+      setDisplayBook((prev) => {
+        if (!prev || prev.id !== b.id) return prev;
+        const shouldLike = !b.isLiked;
+        return {
+          ...prev,
+          isLiked: shouldLike,
+          likesCount: Math.max(0, (prev.likesCount || 0) + (shouldLike ? 1 : -1)),
+        };
+      });
+      onAfterBookInteraction?.();
+    },
+    [runToggleLike, onAfterBookInteraction],
+  );
+
+  const handleSuperLikeToggle = useCallback(
+    async (bookId, shouldSuperLike) => {
+      const result = await runSuperLikeToggle(bookId, shouldSuperLike);
+      setDisplayBook((prev) => {
+        if (!prev || prev.id !== bookId) return prev;
+        const delta = shouldSuperLike ? 1 : -1;
+        return {
+          ...prev,
+          isSuperLiked: shouldSuperLike,
+          superLikesCount: Math.max(0, (prev.superLikesCount || 0) + delta),
+        };
+      });
+      onAfterBookInteraction?.();
+      return result;
+    },
+    [runSuperLikeToggle, onAfterBookInteraction],
+  );
 
   const handleSuperLikeClick = (event, b) => {
     event?.stopPropagation?.();
-    if (!onSuperLikeToggle || !b) return;
+    if (!currentClub?.id || !b) return;
     setSuperConfirm({
       open: true,
       intent: b.isSuperLiked ? 'remove' : 'add',
@@ -77,10 +168,11 @@ const BookInfoDialog = ({
   };
 
   const handleConfirmSuperLike = async () => {
-    if (!book || !onSuperLikeToggle) return;
+    const b = displayBook ?? book;
+    if (!b) return;
     const shouldSuperLike = superConfirm.intent === 'add';
     try {
-      const result = await onSuperLikeToggle(book.id, shouldSuperLike);
+      const result = await handleSuperLikeToggle(b.id, shouldSuperLike);
       if (result && typeof result.remainingSuperLikes === 'number') {
         setRemainingSuperLikes(result.remainingSuperLikes);
       } else {
@@ -92,12 +184,17 @@ const BookInfoDialog = ({
     }
   };
 
-  if (!book) return null;
+  if (!open) return null;
+  const effectiveBook = displayBook ?? book;
+  if (!effectiveBook) return null;
 
   const rem =
     remainingSuperLikes == null ? null : Math.max(0, remainingSuperLikes);
   const afterRemoveRemaining =
     superConfirm.intent === 'remove' && rem != null ? rem + 1 : rem;
+
+  const likeLoading = !!loadingLikes[effectiveBook.id];
+  const superLikeLoading = !!loadingSuperLikes[effectiveBook.id];
 
   return (
     <>
@@ -121,10 +218,10 @@ const BookInfoDialog = ({
         >
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h5" component="div">
-              {book.title}
+              {effectiveBook.title}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {book.author || 'Unknown Author'}
+              {effectiveBook.author || 'Unknown Author'}
             </Typography>
           </Box>
           <IconButton onClick={onClose} size="small" aria-label="Close">
@@ -133,14 +230,14 @@ const BookInfoDialog = ({
         </DialogTitle>
         <DialogContent sx={{ pt: 0 }}>
           <BookInfoContent
-            book={book}
+            book={effectiveBook}
             discussionDate={discussionDate}
-            onToggleLike={onToggleLike}
-            isLikeLoading={isLikeLoading}
+            onToggleLike={handleToggleLike}
+            isLikeLoading={likeLoading}
             saveBookProgress={saveBookProgress}
             onBookProgressUpdated={onBookProgressUpdated}
-            onSuperLikeClick={onSuperLikeToggle ? handleSuperLikeClick : undefined}
-            isSuperLikeLoading={isSuperLikeLoading}
+            onSuperLikeClick={currentClub?.id ? handleSuperLikeClick : undefined}
+            isSuperLikeLoading={superLikeLoading}
           />
         </DialogContent>
         <DialogActions>
@@ -166,11 +263,12 @@ const BookInfoDialog = ({
                   {rem != null ? (
                     <>
                       You have <strong>{rem}</strong> super {rem === 1 ? 'like' : 'likes'} remaining.
-                      Super liking uses one. Are you sure you want to super like &ldquo;{book.title}
+                      Super liking uses one. Are you sure you want to super like &ldquo;
+                      {effectiveBook.title}
                       &rdquo;?
                     </>
                   ) : (
-                    <>Are you sure you want to super like &ldquo;{book.title}&rdquo;?</>
+                    <>Are you sure you want to super like &ldquo;{effectiveBook.title}&rdquo;?</>
                   )}
                 </Typography>
               ) : (
@@ -178,16 +276,16 @@ const BookInfoDialog = ({
                   <Typography variant="body2" color="text.secondary" component="div">
                     {afterRemoveRemaining != null ? (
                       <>
-                        After removing your super like from &ldquo;{book.title}&rdquo;, you will have{' '}
+                        After removing your super like from &ldquo;{effectiveBook.title}&rdquo;, you will have{' '}
                         <strong>{afterRemoveRemaining}</strong> super{' '}
                         {afterRemoveRemaining === 1 ? 'like' : 'likes'} remaining.
                       </>
                     ) : (
-                      <>You are about to remove your super like from &ldquo;{book.title}&rdquo;.</>
+                      <>You are about to remove your super like from &ldquo;{effectiveBook.title}&rdquo;.</>
                     )}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-                    {book.chosenForBookclub ? (
+                    {effectiveBook.chosenForBookclub ? (
                       <>
                         This book is selected for reading. Removing your super like will not remove
                         it from the backlog.
@@ -219,12 +317,12 @@ const BookInfoDialog = ({
             variant="contained"
             color={superConfirm.intent === 'remove' ? 'warning' : 'primary'}
             disabled={
-              isSuperLikeLoading ||
+              superLikeLoading ||
               statsLoading ||
               (superConfirm.intent === 'add' && rem === 0)
             }
           >
-            {isSuperLikeLoading ? <CircularProgress size={22} color="inherit" /> : 'Confirm'}
+            {superLikeLoading ? <CircularProgress size={22} color="inherit" /> : 'Confirm'}
           </Button>
         </DialogActions>
       </Dialog>

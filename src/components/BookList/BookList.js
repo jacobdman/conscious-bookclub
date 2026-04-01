@@ -43,6 +43,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
 import { useMeetings } from 'hooks/useMeetings';
+import useBookLikeActions from 'hooks/useBookLikeActions';
 import useClubContext from 'contexts/Club';
 import useBooksContext from 'contexts/Books';
 import Layout from 'components/Layout';
@@ -79,10 +80,10 @@ const BookList = () => {
     setSort,
     updateBookProgress,
     updateBook,
-    toggleBookLike,
-    toggleBookSuperLike,
     refreshBooks
   } = useBooksContext();
+
+  const { handleToggleLike, loadingLikes } = useBookLikeActions();
 
   const [addBookOpen, setAddBookOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
@@ -108,8 +109,6 @@ const BookList = () => {
   const [meetingFormPreviousChosen, setMeetingFormPreviousChosen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState(null);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
-  const [loadingLikes, setLoadingLikes] = useState({});
-  const [loadingSuperLikes, setLoadingSuperLikes] = useState({});
   const [bookListTab, setBookListTab] = useState(0);
 
   const isClubTabFromUrl = location.pathname === '/books/club';
@@ -377,34 +376,6 @@ const BookList = () => {
       return;
     }
     setSort(field, sort.direction === 'desc' ? 'asc' : 'desc');
-  };
-
-  const handleToggleLike = async (event, book) => {
-    if (event?.stopPropagation) {
-      event.stopPropagation();
-    }
-    if (!user) return;
-
-    setLoadingLikes(prev => ({ ...prev, [book.id]: true }));
-    try {
-      await toggleBookLike(book.id, !book.isLiked);
-    } catch (error) {
-      // Error handled in context
-    } finally {
-      setLoadingLikes(prev => ({ ...prev, [book.id]: false }));
-    }
-  };
-
-  const handleSuperLikeToggle = async (bookId, shouldSuperLike) => {
-    if (!user) return undefined;
-    setLoadingSuperLikes((prev) => ({ ...prev, [bookId]: true }));
-    try {
-      return await toggleBookSuperLike(bookId, shouldSuperLike);
-    } catch {
-      return undefined;
-    } finally {
-      setLoadingSuperLikes((prev) => ({ ...prev, [bookId]: false }));
-    }
   };
 
   const selectedBook = books.find((book) => book.id === selectedBookId) || null;
@@ -1041,11 +1012,7 @@ const BookList = () => {
         onClose={handleInfoClose}
         book={selectedBook}
         discussionDate={selectedBook ? meetingDates[selectedBook.id] : null}
-        onToggleLike={selectedBook ? handleToggleLike : undefined}
-        isLikeLoading={selectedBook ? loadingLikes[selectedBook.id] : false}
         saveBookProgress={updateBookProgress}
-        onSuperLikeToggle={selectedBook && currentClub?.id ? handleSuperLikeToggle : undefined}
-        isSuperLikeLoading={selectedBook ? !!loadingSuperLikes[selectedBook.id] : false}
       />
     </Layout>
   );

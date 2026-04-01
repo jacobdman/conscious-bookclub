@@ -19,8 +19,6 @@ import {
 import FullscreenDialog from 'UI/FullscreenDialog';
 import {
   debouncedSearchBooks,
-  DEFAULT_CLUB_THEMES,
-  mapOlSubjectsToDefaultClubThemes,
   fetchWorkEnrichment,
   fetchEditionEnrichment,
   resolveOlGenreForBookForm,
@@ -120,11 +118,7 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
     ? currentClub.themes
     : ['Classy', 'Creative', 'Curious'];
   const themesEnabled = currentClub?.themesEnabled !== false;
-  const usesDefaultThemeSet =
-    themesEnabled &&
-    themeOptions.length === DEFAULT_CLUB_THEMES.length &&
-    DEFAULT_CLUB_THEMES.every((t) => themeOptions.includes(t));
-  
+
   const genres = [
     'Personal Development',
     'Mindfulness & Spirituality',
@@ -197,10 +191,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
       setSelectedBook(value);
       const olId = typeof value.id === 'string' && value.id ? value.id : null;
       const categories = value.categories || [];
-      const themesFromOl =
-        usesDefaultThemeSet && categories.length > 0
-          ? mapOlSubjectsToDefaultClubThemes(categories)
-          : null;
 
       const genreFromOl = resolveOlGenreForBookForm(categories, value.genre);
 
@@ -214,7 +204,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         genre: genreFromOl || prev.genre,
         description: value.description || prev.description,
         externalApiId: olId,
-        ...(themesFromOl && themesFromOl.length > 0 ? { theme: themesFromOl } : {}),
       }));
 
       if (olId) {
@@ -225,9 +214,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
             ...prev,
             description: en.description || prev.description,
             genre: genreResolved || prev.genre,
-            ...(usesDefaultThemeSet && en.subjects.length > 0
-              ? { theme: mapOlSubjectsToDefaultClubThemes(en.subjects) }
-              : {}),
           }));
         });
       }
@@ -310,9 +296,6 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
           coverImage: coverStored,
           description: en.description || prev.description,
           genre: genreResolved || prev.genre,
-          ...(usesDefaultThemeSet && en.subjects.length > 0
-            ? { theme: mapOlSubjectsToDefaultClubThemes(en.subjects) }
-            : {}),
         };
       });
       setSelectedBook((prev) => (prev ? { ...prev, coverImage: coverStored } : prev));
@@ -465,8 +448,18 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
         </Typography>
       </DialogTitle>
 
-      <form onSubmit={handleSubmit}>
-        <DialogContent>
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          // Avoid overflow:hidden here: WKWebView often won't delegate touch scroll to DialogContent.
+        }}
+      >
+        <DialogContent sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
           {submitError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {submitError}
@@ -690,12 +683,13 @@ const AddBookForm = ({ open, onClose, onBookAdded, onBookDeleted, editingBook = 
             {loading ? (editingBook ? 'Updating...' : 'Adding...') : (editingBook ? 'Update Book' : 'Add Book')}
           </Button>
         </DialogActions>
-      </form>
+      </Box>
 
       <CoverPickerDialog
         open={coverPickerOpen}
         onClose={() => setCoverPickerOpen(false)}
         workKey={formData.externalApiId}
+        currentCoverImageUrl={formData.coverImage}
         onPickOlCover={handlePickOlCover}
         onPickCustomCover={handlePickCustomCover}
       />

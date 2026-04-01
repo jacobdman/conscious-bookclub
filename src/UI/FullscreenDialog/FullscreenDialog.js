@@ -3,6 +3,7 @@ import { Dialog } from '@mui/material';
 // Context
 import { useKeyboardContext } from 'contexts/Keyboard';
 // Utils
+import { getPlatform } from 'utils/platformHelpers';
 import { scrollFieldIntoView, isTextInputElement } from 'utils/scrollFieldIntoView';
 
 // Must exceed the native WebView resize animation duration (0.25s in patches/@capacitor+keyboard+8.0.1.patch).
@@ -18,7 +19,14 @@ const KEYBOARD_RESIZE_SCROLL_DELAY_MS = 300;
  * when keyboardInsetPx changes on the PWA/visual-viewport path—not for KeyboardResize.Native.
  */
 const FullscreenDialog = forwardRef(function FullscreenDialog(
-  { slotProps: slotPropsProp, PaperProps: paperPropsProp, fullScreen = true, open, ...rest },
+  {
+    slotProps: slotPropsProp,
+    PaperProps: paperPropsProp,
+    fullScreen = true,
+    open,
+    disableScrollLock: disableScrollLockProp,
+    ...rest
+  },
   ref,
 ) {
   const { keyboardInsetPx, keyboardVisible } = useKeyboardContext();
@@ -74,6 +82,9 @@ const FullscreenDialog = forwardRef(function FullscreenDialog(
     },
   };
 
+  // Capacitor WKWebView: MUI body scroll-lock + nested overflow often eats touch scrolling; PWA Safari is fine.
+  const disableScrollLock = disableScrollLockProp ?? getPlatform() === 'ios';
+
   return (
     <Dialog
       ref={ref}
@@ -81,6 +92,7 @@ const FullscreenDialog = forwardRef(function FullscreenDialog(
       fullScreen={fullScreen}
       PaperProps={mergedPaperProps}
       slotProps={mergedSlotProps}
+      disableScrollLock={disableScrollLock}
       {...rest}
     />
   );

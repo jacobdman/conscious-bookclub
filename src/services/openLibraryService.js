@@ -31,12 +31,19 @@ const openLibraryAuthorJsonUrl = (authorKey) => {
   return `${OPEN_LIBRARY_ORIGIN}${authorKey}.json`;
 };
 
-const openLibraryWorkEditionsUrl = (workKeyNormalized, limit) => {
+const openLibraryWorkEditionsUrl = (workKeyNormalized, limit, offset = 0) => {
   const lim = Math.min(100, Math.max(1, limit || 50));
-  if (isNativeApp()) {
-    return `${getApiBase()}/v1/open-library/work-editions?key=${encodeURIComponent(workKeyNormalized)}&limit=${lim}`;
+  const off = Math.max(0, Number(offset) || 0);
+  const qs = new URLSearchParams();
+  qs.set('limit', String(lim));
+  if (off > 0) {
+    qs.set('offset', String(off));
   }
-  return `${OPEN_LIBRARY_ORIGIN}${workKeyNormalized}/editions.json?limit=${lim}`;
+  const q = qs.toString();
+  if (isNativeApp()) {
+    return `${getApiBase()}/v1/open-library/work-editions?key=${encodeURIComponent(workKeyNormalized)}&${q}`;
+  }
+  return `${OPEN_LIBRARY_ORIGIN}${workKeyNormalized}/editions.json?${q}`;
 };
 
 const openLibraryEditionJsonUrl = (editionKeyNormalized) => {
@@ -59,8 +66,9 @@ const debounce = (func, wait) => {
 };
 
 /**
- * Open Library cover sizes (see https://openlibrary.org/dev/docs/api/covers).
- * Use L for stored / hero display; M or S for dense lists and autocomplete.
+ * Open Library cover sizes (official pattern: `…/b/{key}/{value}-{S|M|L}.jpg`).
+ * @see https://openlibrary.org/dev/docs/api/covers
+ * Use L for stored / hero display; M or S for thumbnails and dense lists.
  */
 export const OL_COVER_SIZE = Object.freeze({
   S: 'S',
@@ -69,8 +77,14 @@ export const OL_COVER_SIZE = Object.freeze({
 });
 
 /**
- * Rewrite covers.openlibrary.org `b/id` or `b/isbn` URLs to another size suffix.
+ * Rewrite a covers.openlibrary.org `b/{key}/…` URL to another size suffix.
+ * Supports documented keys: `id`, `olid`, `isbn`, `oclc`, `lccn` (same path shape).
  * Non-OL URLs are returned unchanged.
+ *
+ * Per OL docs, access by **ISBN / OCLC / LCCN** is rate-limited (100 req / 5 min / IP);
+ * **Cover ID** and **OLID** are not subject to that limit. Prefer `cover_i` → `b/id/`
+ * when building URLs from API data; use ISBN only when no cover id exists.
+ *
  * @param {string} url
  * @param {'S'|'M'|'L'} [size='L']
  */
@@ -81,14 +95,16 @@ export const setOpenLibraryCoverSize = (url, size = OL_COVER_SIZE.L) => {
       ? size
       : OL_COVER_SIZE.L;
   return url.replace(
-      /^(https:\/\/covers\.openlibrary\.org\/b\/(?:id|isbn)\/.+)-[SML]\.jpg$/i,
+      /^(https:\/\/covers\.openlibrary\.org\/b\/(?:id|olid|isbn|oclc|lccn)\/.+)-[SML]\.jpg$/i,
       (_, base) => `${base}-${suf}.jpg`,
   );
 };
 
 /**
  * Build cover image URL from Open Library search/work fields.
+ * Prefer `cover_i` (Cover ID / `b/id/`) when present — avoids ISBN rate limits on the Covers API.
  * `cover_i` is whichever edition OL attached to the work — it may be a translation’s jacket.
+ * @see https://openlibrary.org/dev/docs/api/covers
  * @param {object} doc
  * @param {'S'|'M'|'L'} [size=OL_COVER_SIZE.L] — default large for persisted club books / detail views
  */
@@ -165,22 +181,37 @@ const pickOlEditionYear = (entry) => {
   return ym ? ym[0] : '';
 };
 
+/** Numeric cover id from a covers.openlibrary.org /b/id/{id}-… URL, or null. */
+export const extractOlCoverIdFromImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const m = url.match(/\/b\/id\/(\d+)/i);
+  return m ? m[1] : null;
+};
+
+const editionEntryHasCoverId = (entry, coverIdStr) => {
+  if (!coverIdStr || !Array.isArray(entry?.covers)) return false;
+  return entry.covers.some((c) => String(c) === String(coverIdStr));
+};
+
+const entriesIncludeCoverId = (entries, coverIdStr) => {
+  if (!coverIdStr || !Array.isArray(entries)) return false;
+  return entries.some((e) => editionEntryHasCoverId(e, coverIdStr));
+};
+
 /**
- * Dedupe by cover URL; first edition wins per cover.
+ * One row per edition with a valid cover id (API order). Same cover URL may repeat
+ * when multiple editions share an Open Library cover id — each edition remains selectable.
  * @param {object[]} entries — `entries` from Open Library `.../editions.json`
  * @returns {{ coverImage: string, editionKey: string, editionTitle: string, editionDetail: string, languageLabel: string, year: string }[]}
  */
 export const buildEditionCoverOptionsFromEntries = (entries) => {
   if (!Array.isArray(entries)) return [];
-  const seen = new Set();
   const out = [];
   for (const entry of entries) {
     const coverId = Array.isArray(entry.covers) && entry.covers.length > 0 ? entry.covers[0] : null;
     if (coverId == null || coverId === '' || coverId < 0) continue;
     // Medium thumbs in the picker grid; parent saves `-L` when an edition is chosen.
     const url = `https://covers.openlibrary.org/b/id/${coverId}-${OL_COVER_SIZE.M}.jpg`;
-    if (seen.has(url)) continue;
-    seen.add(url);
     const editionKey = typeof entry.key === 'string' ? entry.key.trim() : '';
     if (!editionKey.startsWith('/books/')) continue;
 
@@ -485,84 +516,6 @@ const parseBookData = (doc) => {
 };
 
 /**
- * Re-rank Open Library hits so exact / phrase title matches beat substring word matches.
- * (e.g. "Red Rising" before "Red Storm Rising" — the latter does not contain "red rising" contiguously.)
- */
-const rankSearchDocs = (docs, titleQuery, authorQuery) => {
-  const tq = titleQuery.toLowerCase().trim();
-  const aq = authorQuery.toLowerCase().trim();
-  const titleWords = tq.split(/\s+/).filter(Boolean);
-
-  const wordBoundaryMatch = (haystack, word) => {
-    const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`\\b${esc}\\b`, 'i').test(haystack);
-  };
-
-  const scoreDoc = (doc) => {
-    const title = (doc.title || '').toLowerCase();
-    const authorNames = Array.isArray(doc.author_name) ? doc.author_name : [];
-    const authorsLower = authorNames.join(' ').toLowerCase();
-    let s = 0;
-
-    if (aq.length >= 2) {
-      if (authorsLower.includes(aq)) {
-        s += 80000;
-      }
-      for (const name of authorNames) {
-        if (name.toLowerCase().includes(aq)) {
-          s += 40000;
-          break;
-        }
-      }
-    }
-
-    if (tq.length >= 2) {
-      if (title === tq) {
-        s += 200000;
-      } else if (
-        title.startsWith(`${tq} `) ||
-        title.startsWith(`${tq}:`) ||
-        title.startsWith(`${tq}(`) ||
-        title.startsWith(`${tq}—`) ||
-        title.startsWith(`${tq}-`)
-      ) {
-        s += 120000;
-      } else if (title.includes(tq)) {
-        s += 60000;
-      } else if (titleWords.length > 0) {
-        const allWords = titleWords.every((w) => wordBoundaryMatch(title, w));
-        if (allWords) {
-          s += 15000;
-          const titleWordCount = title.split(/\s+/).filter(Boolean).length;
-          const extra = Math.max(0, titleWordCount - titleWords.length);
-          s -= extra * 2500;
-        }
-      }
-    }
-
-    const langs = Array.isArray(doc.language) ? doc.language : [];
-    if (langs.includes('eng')) {
-      s += 4500;
-    }
-
-    // Prefer a single credited author when the title is an exact match (filters many
-    // adaptations/retellings that list a second name in Open Library metadata).
-    if (tq.length >= 2 && title === tq && authorNames.length > 1) {
-      s -= (authorNames.length - 1) * 7500;
-    }
-
-    s += Math.min(doc.edition_count || 0, 400) * 0.3;
-    if (doc.cover_i != null) {
-      s += 40;
-    }
-
-    return s;
-  };
-
-  return [...docs].sort((a, b) => scoreDoc(b) - scoreDoc(a));
-};
-
-/**
  * Search Open Library by title and/or author.
  * @param {string} title
  * @param {string} author
@@ -579,10 +532,11 @@ export const searchBooks = async (title = '', author = '', maxResults = 10) => {
   try {
     const params = new URLSearchParams();
     const cappedMax = Math.min(Math.max(maxResults, 1), 100);
-    const fetchLimit = Math.min(100, Math.max(cappedMax * 3, 25));
-    params.set('limit', String(fetchLimit));
+    params.set('limit', String(cappedMax));
     if (trimmedTitle) params.set('title', trimmedTitle);
     if (trimmedAuthor) params.set('author', trimmedAuthor);
+    params.set('lang', 'en');
+    params.set('sort', 'readinglog');
 
     const url = openLibrarySearchUrl(params.toString());
     const response = await fetch(url);
@@ -597,8 +551,7 @@ export const searchBooks = async (title = '', author = '', maxResults = 10) => {
       return [];
     }
 
-    const ranked = rankSearchDocs(docs, trimmedTitle, trimmedAuthor);
-    return ranked.slice(0, cappedMax).map(parseBookData);
+    return docs.slice(0, cappedMax).map(parseBookData);
   } catch (error) {
     return [];
   }
@@ -669,21 +622,88 @@ export const fetchWorkEnrichment = async (workKey) => {
   }
 };
 
+const MAX_EDITION_PAGES = 12;
+
 /**
  * Edition cover options for a work (cover picker carousel).
+ * Loads additional pages of editions.json when needed so the edition matching
+ * `currentCoverImageUrl` (Open Library /b/id/…) is included — the first page
+ * alone often omits the work’s default cover edition.
+ *
  * @param {string} workKey
- * @param {number} [limit=50]
+ * @param {number|{ limit?: number, currentCoverImageUrl?: string }} [limitOrOptions]
+ *   Pass a number for page size only (legacy). Prefer an object with `currentCoverImageUrl`.
  */
-export const fetchWorkEditionCovers = async (workKey, limit = 15) => {
+export const fetchWorkEditionCovers = async (workKey, limitOrOptions = 50) => {
   try {
     const key = normalizeWorkKey(workKey);
     if (!key) return [];
 
-    const url = openLibraryWorkEditionsUrl(key, limit);
-    const response = await fetch(url);
-    if (!response.ok) return [];
-    const data = await response.json();
-    return buildEditionCoverOptionsFromEntries(data.entries);
+    const opts =
+      typeof limitOrOptions === 'object' && limitOrOptions !== null
+        ? {
+            limit: Math.min(100, Math.max(1, limitOrOptions.limit ?? 50)),
+            currentCoverImageUrl: limitOrOptions.currentCoverImageUrl ?? '',
+          }
+        : {
+            limit: Math.min(100, Math.max(1, limitOrOptions ?? 50)),
+            currentCoverImageUrl: '',
+          };
+
+    const targetCoverId = extractOlCoverIdFromImageUrl(opts.currentCoverImageUrl);
+    const pageSize = opts.limit;
+    const aggregated = [];
+    let offset = 0;
+    let totalSize = null;
+
+    for (let page = 0; page < MAX_EDITION_PAGES; page += 1) {
+      const url = openLibraryWorkEditionsUrl(key, pageSize, offset);
+      const response = await fetch(url);
+      if (!response.ok) break;
+      const data = await response.json();
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      if (typeof data.size === 'number') {
+        totalSize = data.size;
+      }
+      aggregated.push(...entries);
+
+      const foundTarget =
+        targetCoverId && entries.length > 0 && entriesIncludeCoverId(entries, targetCoverId);
+
+      if (!targetCoverId) {
+        break;
+      }
+      if (foundTarget) {
+        break;
+      }
+      if (entries.length === 0) {
+        break;
+      }
+      offset += entries.length;
+      if (totalSize != null && offset >= totalSize) {
+        break;
+      }
+      if (!data.links?.next) {
+        break;
+      }
+    }
+
+    let options = buildEditionCoverOptionsFromEntries(aggregated);
+    if (targetCoverId && options.length > 0) {
+      const matching = [];
+      const rest = [];
+      for (const o of options) {
+        if (extractOlCoverIdFromImageUrl(o.coverImage) === targetCoverId) {
+          matching.push(o);
+        } else {
+          rest.push(o);
+        }
+      }
+      if (matching.length > 0) {
+        options = [...matching, ...rest];
+      }
+    }
+    return options;
   } catch {
     return [];
   }
@@ -813,6 +833,7 @@ const openLibraryService = {
   fetchWorkEditionCovers,
   fetchEditionEnrichment,
   buildEditionCoverOptionsFromEntries,
+  extractOlCoverIdFromImageUrl,
   olLanguageCodeToLabel,
   setOpenLibraryCoverSize,
   OL_COVER_SIZE,

@@ -14,9 +14,16 @@ import {
 import { fetchWorkEditionCovers } from 'services/openLibraryService';
 import { bookCoverAvatarSx } from 'utils/bookCoverDisplay';
 
-const COVER_LIMIT = 15;
+const COVER_PAGE_SIZE = 50;
 
-const CoverPickerDialog = ({ open, onClose, workKey, onPickOlCover, onPickCustomCover }) => {
+const CoverPickerDialog = ({
+  open,
+  onClose,
+  workKey,
+  currentCoverImageUrl = '',
+  onPickOlCover,
+  onPickCustomCover,
+}) => {
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [customUrl, setCustomUrl] = useState('');
@@ -37,7 +44,10 @@ const CoverPickerDialog = ({ open, onClose, workKey, onPickOlCover, onPickCustom
         return;
       }
       setLoading(true);
-      const list = await fetchWorkEditionCovers(workKey, COVER_LIMIT);
+      const list = await fetchWorkEditionCovers(workKey, {
+        limit: COVER_PAGE_SIZE,
+        currentCoverImageUrl,
+      });
       if (!cancelled) {
         setOptions(list);
         setLoading(false);
@@ -47,7 +57,7 @@ const CoverPickerDialog = ({ open, onClose, workKey, onPickOlCover, onPickCustom
     return () => {
       cancelled = true;
     };
-  }, [open, workKey]);
+  }, [open, workKey, currentCoverImageUrl]);
 
   const handleCustomApply = () => {
     const trimmed = customUrl.trim();
@@ -88,7 +98,7 @@ const CoverPickerDialog = ({ open, onClose, workKey, onPickOlCover, onPickCustom
         {hasWork && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
-              Open Library editions (up to {COVER_LIMIT})
+              Open Library editions
             </Typography>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>

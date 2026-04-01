@@ -1,6 +1,7 @@
 const db = require("../../../../db/models/index");
 const moment = require("moment-timezone");
 const {emitToClub, postIncludes, buildPostResponse} = require("../posts/posts.ctrl");
+const {buildLikesSummary, buildSuperLikeSummary} = require("../books/likeHelpers");
 
 const DEFAULT_TIMEZONE = "UTC";
 
@@ -91,7 +92,10 @@ const getMeetings = async (req, res, next) => {
       };
     }
 
-    // Build include array for Book
+    // Build include array for Book (full fields for book detail modal + uploader)
+    // NOTE: Book model maps createdAt -> DB column "created_at" via timestamps option,
+    // but Sequelize doesn't resolve that mapping inside include `attributes` arrays.
+    // Always use the raw DB column name "created_at" here.
     const bookInclude = {
       model: db.Book,
       as: "book",
@@ -102,18 +106,32 @@ const getMeetings = async (req, res, next) => {
         "coverImage",
         "theme",
         "chosenForBookclub",
+        "description",
+        "suggesterNotes",
+        "genre",
+        "uploadedBy",
+        "pool",
+        "created_at",
+      ],
+      include: [
+        {
+          model: db.User,
+          as: "uploader",
+          attributes: ["uid", "displayName", "email", "photoUrl"],
+          required: false,
+        },
       ],
     };
 
     // If userId is provided, include user's BookProgress for each book
     if (userId) {
-      bookInclude.include = [{
+      bookInclude.include.push({
         model: db.BookProgress,
         as: "bookProgresses",
         where: {userId: userId},
         required: false, // LEFT JOIN - include books even if no progress
         attributes: ["id", "status", "percentComplete", "privacy", "updatedAt"],
-      }];
+      });
     }
 
     const queryOptions = {
@@ -152,6 +170,17 @@ const getMeetings = async (req, res, next) => {
       );
     }
 
+    const uniqueBookIds = [
+      ...new Set(
+          meetings.map((m) => m.bookId).filter((id) => id != null),
+      ),
+    ];
+    const {likesByBookId, likedBookIds} = await buildLikesSummary(uniqueBookIds, userId);
+    const {superLikesByBookId, superLikedBookIds} = await buildSuperLikeSummary(
+        uniqueBookIds,
+        userId,
+    );
+
     // Transform the response to nest progress in book.progress
     const transformedMeetings = meetings.map((meeting) => {
       const meetingJson = meeting.toJSON();
@@ -167,6 +196,13 @@ const getMeetings = async (req, res, next) => {
         // User has no progress - set progress to null
         meetingJson.book.progress = null;
         delete meetingJson.book.bookProgresses;
+      }
+      if (meetingJson.book && meetingJson.book.id != null) {
+        const bid = meetingJson.book.id;
+        meetingJson.book.likesCount = likesByBookId.get(bid) || 0;
+        meetingJson.book.isLiked = likedBookIds.has(bid);
+        meetingJson.book.superLikesCount = superLikesByBookId.get(bid) || 0;
+        meetingJson.book.isSuperLiked = superLikedBookIds.has(bid);
       }
       return {id: meeting.id, ...meetingJson};
     });

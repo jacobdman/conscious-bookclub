@@ -134,11 +134,11 @@ const CurrentBooksSection = ({ books }) => {
     };
   }, [user, books, fetchFinishCountsForBooks]);
 
-  const invalidateMeetings = () => {
+  const invalidateMeetings = useCallback(() => {
     if (currentClub?.id && user?.uid) {
       queryClient.invalidateQueries({ queryKey: ['meetings', currentClub.id, user.uid] });
     }
-  };
+  }, [currentClub?.id, user?.uid, queryClient]);
 
   const handleProgressUpdated = async (bookId, merged) => {
     setBookProgress((prev) => ({
@@ -198,12 +198,17 @@ const CurrentBooksSection = ({ books }) => {
     setSelectedBook(null);
   };
 
-  const dialogBook = selectedBook
-    ? {
-        ...selectedBook,
-        progress: bookProgress[selectedBook.id] ?? selectedBook.progress,
-      }
-    : null;
+  const selectedBookProgress = selectedBook ? bookProgress[selectedBook.id] : undefined;
+  const dialogBook = React.useMemo(
+    () =>
+      selectedBook
+        ? {
+            ...selectedBook,
+            progress: selectedBookProgress ?? selectedBook.progress,
+          }
+        : null,
+    [selectedBook, selectedBookProgress],
+  );
 
   return (
     <Box>
@@ -285,6 +290,7 @@ const CurrentBooksSection = ({ books }) => {
         book={dialogBook}
         discussionDate={dialogBook ? meetingDates[dialogBook.id] : null}
         onBookProgressUpdated={handleProgressUpdated}
+        onAfterBookInteraction={invalidateMeetings}
       />
     </Box>
   );

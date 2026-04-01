@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { ErrorNotificationProvider, useErrorNotification } from './contexts/ErrorNotification';
 import ClubProvider from './contexts/Club/ClubProvider';
 import FeedProvider from './contexts/Feed/FeedProvider';
+import BooksProvider from './contexts/Books/BooksProvider';
 import { setGlobalErrorHandler } from './services/apiHelpers';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './views/Dashboard';
@@ -107,7 +108,7 @@ function AppContent() {
                 <ClubSetup />
               }
             />
-            <Route element={<FeedProvider><Outlet /></FeedProvider>}>
+            <Route element={<FeedProvider><BooksProvider><Outlet /></BooksProvider></FeedProvider>}>
               <Route
                 path="/"
                 element={

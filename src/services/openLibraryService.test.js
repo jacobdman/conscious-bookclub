@@ -5,6 +5,7 @@ import {
   resolveOlGenreForBookForm,
   normalizeOlGenreDisplayLabel,
   buildEditionCoverOptionsFromEntries,
+  extractOlCoverIdFromImageUrl,
   olLanguageCodeToLabel,
   setOpenLibraryCoverSize,
   OL_COVER_SIZE,
@@ -115,15 +116,48 @@ describe('olLanguageCodeToLabel', () => {
   });
 });
 
+describe('extractOlCoverIdFromImageUrl', () => {
+  it('parses id from Open Library cover URLs', () => {
+    expect(
+      extractOlCoverIdFromImageUrl(
+        'https://covers.openlibrary.org/b/id/539652-L.jpg',
+      ),
+    ).toBe('539652');
+    expect(
+      extractOlCoverIdFromImageUrl(
+        'https://covers.openlibrary.org/b/id/12345-M.jpg',
+      ),
+    ).toBe('12345');
+  });
+  it('returns null for non-OL or missing URLs', () => {
+    expect(extractOlCoverIdFromImageUrl('')).toBe(null);
+    expect(extractOlCoverIdFromImageUrl('https://example.com/x.jpg')).toBe(
+      null,
+    );
+  });
+});
+
 describe('setOpenLibraryCoverSize', () => {
-  it('rewrites id and isbn cover URLs between S, M, L', () => {
+  it('rewrites id, olid, isbn, oclc, and lccn cover URLs between S, M, L', () => {
     const idM = 'https://covers.openlibrary.org/b/id/9255566-M.jpg';
     expect(setOpenLibraryCoverSize(idM, OL_COVER_SIZE.L)).toBe(
       'https://covers.openlibrary.org/b/id/9255566-L.jpg',
     );
+    const olidS = 'https://covers.openlibrary.org/b/olid/OL7440033M-S.jpg';
+    expect(setOpenLibraryCoverSize(olidS, OL_COVER_SIZE.M)).toBe(
+      'https://covers.openlibrary.org/b/olid/OL7440033M-M.jpg',
+    );
     const isbnL = 'https://covers.openlibrary.org/b/isbn/9781234567890-L.jpg';
     expect(setOpenLibraryCoverSize(isbnL, OL_COVER_SIZE.S)).toBe(
       'https://covers.openlibrary.org/b/isbn/9781234567890-S.jpg',
+    );
+    const oclc = 'https://covers.openlibrary.org/b/oclc/28419896-M.jpg';
+    expect(setOpenLibraryCoverSize(oclc, OL_COVER_SIZE.L)).toBe(
+      'https://covers.openlibrary.org/b/oclc/28419896-L.jpg',
+    );
+    const lccn = 'https://covers.openlibrary.org/b/lccn/93005405-L.jpg';
+    expect(setOpenLibraryCoverSize(lccn, OL_COVER_SIZE.S)).toBe(
+      'https://covers.openlibrary.org/b/lccn/93005405-S.jpg',
     );
   });
 
@@ -202,14 +236,16 @@ describe('buildEditionCoverOptionsFromEntries', () => {
     ).toEqual([]);
   });
 
-  it('dedupes identical cover URLs (first edition wins)', () => {
+  it('keeps one row per edition even when cover id is shared (same URL)', () => {
     const entries = [
       { key: '/books/OL1M', covers: [999] },
       { key: '/books/OL2M', covers: [999] },
     ];
     const out = buildEditionCoverOptionsFromEntries(entries);
-    expect(out).toHaveLength(1);
+    expect(out).toHaveLength(2);
     expect(out[0].editionKey).toBe('/books/OL1M');
+    expect(out[1].editionKey).toBe('/books/OL2M');
+    expect(out[0].coverImage).toBe(out[1].coverImage);
   });
 
   it('skips entries without covers or valid book keys', () => {
