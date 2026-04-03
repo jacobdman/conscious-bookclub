@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import {
   Alert,
+  Box,
   Button,
   Grid,
   Paper,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material';
+// Components
+import ProfileAvatar from 'components/ProfileAvatar';
 import SetupLayout from 'components/SetupLayout';
+// Context
 import useClubContext from 'contexts/Club';
 import { useAuth } from 'AuthContext';
 import { joinClubByInviteCode } from 'services/clubs/clubs.service';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const NoClub = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { refreshClubs, setCurrentClub } = useClubContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -80,8 +85,62 @@ const NoClub = () => {
     navigate('/setup/create-club');
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  const displayName = user?.displayName || user?.email || 'User';
+
   return (
     <SetupLayout>
+      {user && (
+        <Box
+          sx={{
+            maxWidth: { xs: '100%', lg: 1040 },
+            mx: 'auto',
+            px: 3,
+            pt: 3,
+            pb: 0,
+          }}
+        >
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            justifyContent="space-between"
+            spacing={2}
+            sx={{ mb: 2 }}
+          >
+            <Stack direction="row" alignItems="center" spacing={2} sx={{ minWidth: 0 }}>
+              <ProfileAvatar
+                user={user}
+                size={40}
+                disableGoalModal
+                showEntryRing={false}
+              />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Signed in as
+                </Typography>
+                <Typography variant="subtitle1" noWrap title={displayName}>
+                  {displayName}
+                </Typography>
+                {user.displayName && user.email && (
+                  <Typography variant="caption" color="text.secondary" noWrap title={user.email}>
+                    {user.email}
+                  </Typography>
+                )}
+              </Box>
+            </Stack>
+            <Button variant="outlined" onClick={handleLogout} sx={{ alignSelf: { xs: 'stretch', sm: 'center' } }}>
+              Log out
+            </Button>
+          </Stack>
+        </Box>
+      )}
       <Grid
         container
         spacing={3}
