@@ -39,6 +39,8 @@ const {
  * 6. Apply weighted averaging:
  *    - weight_n = 1 / log2(n + 1) where n is position (1, 2, 3...)
  *    - weightedAverage = SUM(consistencyRate * weight) / SUM(weight)
+ *    - Habits with zero scoreable periods (e.g. no completed cadence yet, or all
+ *      periods paused) are excluded from the average but still listed in habitDetails
  *
  * @param {string} userId - User ID
  * @param {number} clubId - Club ID
@@ -96,6 +98,7 @@ const getHabitConsistencyReport = async (userId, clubId, startDate = null, endDa
             goal,
             consistencyRate: 0,
             consistency: null,
+            totalPeriods: 0,
           };
         }
 
@@ -182,6 +185,7 @@ const getHabitConsistencyReport = async (userId, clubId, startDate = null, endDa
         return {
           goal,
           consistencyRate,
+          totalPeriods,
           consistency: {
             consistencyRate,
             periods,
@@ -207,20 +211,28 @@ const getHabitConsistencyReport = async (userId, clubId, startDate = null, endDa
   const habitDetails = [];
 
   for (let i = 0; i < habitsWithConsistency.length; i++) {
-    const {goal, consistencyRate, consistency} = habitsWithConsistency[i];
+    const {goal, consistencyRate, consistency, totalPeriods = 0} = habitsWithConsistency[i];
     const habitPosition = i + 1; // Position among habits only (1, 2, 3...)
     const weight = calculateHabitWeight(habitPosition);
+    const isPaused = (goal.goalPauses || []).some((p) => {
+      const resumedAt = p.resumedAt ?? p.resumed_at ?? null;
+      return !resumedAt;
+    });
 
-    if (consistency) {
+    habitDetails.push({
+      goalId: goal.id,
+      title: goal.title,
+      habitPosition,
+      weight,
+      consistencyRate,
+      cadence: goal.cadence || null,
+      isPaused,
+      totalPeriods,
+    });
+
+    if (consistency && totalPeriods > 0) {
       weightedSum += consistencyRate * weight;
       totalWeight += weight;
-      habitDetails.push({
-        goalId: goal.id,
-        title: goal.title,
-        habitPosition,
-        weight,
-        consistencyRate,
-      });
     }
   }
 

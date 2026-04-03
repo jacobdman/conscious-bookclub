@@ -14,6 +14,9 @@ import {
   Collapse,
   IconButton,
   Divider,
+  Chip,
+  Stack,
+  Tooltip,
 } from '@mui/material';
 import { ExpandMore, ExpandLess } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -63,6 +66,18 @@ const getDateRangeForPeriod = (period) => {
   }
 
   return { startDate, endDate };
+};
+
+const CADENCE_LABELS = {
+  day: 'Daily',
+  week: 'Weekly',
+  month: 'Monthly',
+  quarter: 'Quarterly',
+};
+
+const formatHabitCadenceLabel = (cadence) => {
+  if (!cadence) return null;
+  return CADENCE_LABELS[cadence] || cadence;
 };
 
 const PersonalGoalsReport = () => {
@@ -302,9 +317,12 @@ const PersonalGoalsReport = () => {
                   <Collapse in={habitDetailsExpanded}>
                     <Box>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        This score is a weighted average of all habit goals for the current quarter. 
-                        Habits are weighted by their position in your list, with higher positions 
-                        (more important habits) receiving higher weights. The formula uses: 
+                        This score is a weighted average of habit goals that have at least one
+                        completed scoreable period in the selected range. Habits with no completed
+                        periods yet (for example, weekly/monthly habits at the start of a period) or
+                        habits that are fully paused for the range are listed below but do not affect
+                        the score. Habits are weighted by sort order (highest consistency first),
+                        with higher ranks receiving higher weights. The formula uses:{' '}
                         <Box component="span" sx={{ fontFamily: 'monospace', ml: 0.5 }}>
                           weight = 1 / log₂(position + 1)
                         </Box>
@@ -316,34 +334,88 @@ const PersonalGoalsReport = () => {
                           <Typography variant="subtitle2" gutterBottom>
                             Habit Breakdown:
                           </Typography>
-                          {habitConsistency.habitDetails.map((habit, index) => (
-                            <Box 
-                              key={habit.goalId} 
-                              sx={{ 
-                                mb: 1.5,
-                                p: 1.5,
-                                backgroundColor: 'background.default',
-                                borderRadius: 1,
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {habit.title}
-                                </Typography>
-                                <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
-                                  {habit.consistencyRate.toFixed(1)}%
-                                </Typography>
+                          {habitConsistency.habitDetails.map((habit) => {
+                            const excludedFromScore = habit.totalPeriods === 0;
+                            const cadenceLabel = formatHabitCadenceLabel(habit.cadence);
+                            return (
+                              <Box
+                                key={habit.goalId}
+                                sx={{
+                                  mb: 1.5,
+                                  p: 1.5,
+                                  backgroundColor: 'background.default',
+                                  borderRadius: 1,
+                                  opacity: excludedFromScore ? 0.85 : 1,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                    gap: 1,
+                                    mb: 0.5,
+                                  }}
+                                >
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                      {habit.title}
+                                    </Typography>
+                                    <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap" sx={{ mt: 0.75 }}>
+                                      {cadenceLabel && (
+                                        <Chip label={cadenceLabel} size="small" variant="outlined" />
+                                      )}
+                                      {habit.isPaused && (
+                                        <Chip label="Paused" size="small" color="warning" variant="outlined" />
+                                      )}
+                                      {excludedFromScore && (
+                                        <Tooltip title="Not counted in the weighted average">
+                                          <Chip label="Excluded" size="small" variant="outlined" />
+                                        </Tooltip>
+                                      )}
+                                    </Stack>
+                                  </Box>
+                                  <Box
+                                    sx={{
+                                      textAlign: 'right',
+                                      flexShrink: 1,
+                                      minWidth: 0,
+                                      maxWidth: { xs: '42%', sm: 160 },
+                                      pl: 0.5,
+                                    }}
+                                  >
+                                    {excludedFromScore ? (
+                                      <>
+                                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                                          —
+                                        </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          display="block"
+                                          sx={{ whiteSpace: 'normal', lineHeight: 1.25 }}
+                                        >
+                                          No completed periods in range
+                                        </Typography>
+                                      </>
+                                    ) : (
+                                      <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                                        {habit.consistencyRate.toFixed(1)}%
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 2, mt: 0.5, flexWrap: 'wrap' }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Position: {habit.habitPosition}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Weight: {habit.weight.toFixed(2)}
+                                  </Typography>
+                                </Box>
                               </Box>
-                              <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                                <Typography variant="caption" color="text.secondary">
-                                  Position: {habit.habitPosition}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Weight: {habit.weight.toFixed(2)}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          ))}
+                            );
+                          })}
                         </>
                       )}
                     </Box>
