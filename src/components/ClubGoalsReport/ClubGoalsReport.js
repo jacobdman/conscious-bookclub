@@ -329,13 +329,13 @@ const ClubGoalsReport = () => {
         {/* Tab Panel: Competitive Goals */}
         {activeTab === 0 && (
           <Box>
-            {/* Habit Streaks Leaderboard */}
+            {/* Daily Habit Streaks leaderboard */}
             <Box sx={{ mb: 5 }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-                Habit Streaks Leaderboard
+                Daily Habit Streaks Leaderboard
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Longest active streaks ({formatDateRange(startDate, endDate)})
+                {`Longest active streaks on daily habits—consecutive days meeting targets (${formatDateRange(startDate, endDate)})`}
               </Typography>
               <HabitStreaksLeaderboard leaderboard={streakLeaderboard} />
             </Box>

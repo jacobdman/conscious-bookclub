@@ -37,7 +37,7 @@ const TopPerformersByCategory = ({ topPerformers }) => {
     },
     {
       key: 'streakChampion',
-      title: 'Streak Champion',
+      title: 'Daily Streak Champion',
       value: topPerformers.streakChampion,
       formatValue: (val) => `${val}`,
       emoji: '🔥',

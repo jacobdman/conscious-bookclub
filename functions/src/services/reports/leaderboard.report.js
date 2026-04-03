@@ -44,7 +44,7 @@ const isCurrentPeriodCompletedForHabit = (goal, entries, memberTimezone, now) =>
 };
 
 /**
- * Calculates club leaderboard with habit consistency scores and streaks
+ * Calculates club leaderboard with habit consistency scores and daily habit streaks
  *
  * SQL/Sequelize Query Logic:
  *
@@ -76,19 +76,21 @@ const isCurrentPeriodCompletedForHabit = (goal, entries, memberTimezone, now) =>
  *       - weight_n = 1 / log2(n + 1) where n is position (1, 2, 3...)
  *       - weightedAverage = SUM(consistencyRate * weight) / SUM(weight)
  *
- *    g. Calculate longest streak across all habits
+ *    g. Calculate longest streak across daily habits only (cadence === "day").
+ *       Streak fields on each member, streakLeaderboard, and topPerformers.streakChampion
+ *       use this; consistency scoring still includes all habit cadences.
  *
  * 3. Sort members by consistency score (descending), then ties by
  *    completedGoalToday (current period satisfied for any habit), then members
  *    with at least one habit goal before members with none (N/A), then name
- * 4. Create streak leaderboard (sorted by longest streak)
+ * 4. Create streak leaderboard (sorted by longest daily habit streak)
  *
  * @param {number} clubId - Club ID
  * @param {string} userId - User ID (for membership verification)
  * @param {Date} startDate - Start date for the report (optional, defaults to last 8 weeks)
  * @param {Date} endDate - End date for the report (optional, defaults to now)
  * @param {string|null} reportTimezone - Timezone for period calculations
- * @return {Promise<Object>} Report data with leaderboard and streakLeaderboard
+ * @return {Promise<Object>} Report data with leaderboard and streakLeaderboard (daily streaks)
  */
 const getLeaderboardReport = async (
     clubId,
@@ -371,14 +373,16 @@ const getLeaderboardReport = async (
     let longestStreak = 0;
 
     for (let i = 0; i < habitsWithConsistency.length; i++) {
-      const {consistencyRate, consistency, totalPeriods = 0} = habitsWithConsistency[i];
+      const {goal, consistencyRate, consistency, totalPeriods = 0} = habitsWithConsistency[i];
       const habitPosition = i + 1; // Position among habits only (1, 2, 3...)
       const weight = calculateHabitWeight(habitPosition);
 
       if (consistency && totalPeriods > 0) {
         weightedSum += consistencyRate * weight;
         totalWeight += weight;
-        longestStreak = Math.max(longestStreak, consistency.streak);
+        if (goal.cadence === "day") {
+          longestStreak = Math.max(longestStreak, consistency.streak);
+        }
       }
     }
 
@@ -573,7 +577,7 @@ const getLeaderboardReport = async (
     };
   }
 
-  // Streak Champion (longest streak)
+  // Streak Champion (longest daily habit streak)
   if (streakLeaderboard.length > 0) {
     const streakChampion = streakLeaderboard[0]; // Already sorted by streak
     topPerformers.streakChampion = {
