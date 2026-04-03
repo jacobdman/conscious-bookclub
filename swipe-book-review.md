@@ -161,7 +161,7 @@ These are not separate datasets — just views.
 Default queue
 Mix of:
 new books
-resurfaced books
+resurfaced books (excludes titles you currently have bookmarked — those appear under Bookmarked or after Discover is exhausted in the same session)
 lightly engaged books
 🔥 Hot Picks
 Books close to promotion threshold

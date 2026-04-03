@@ -159,7 +159,7 @@ const getMeetings = async (req, res, next) => {
     ];
     if (bookIdsOnCalendar.length > 0) {
       await db.Book.update(
-          {chosenForBookclub: true},
+          {chosenForBookclub: true, revalidationRequestedAt: null},
           {
             where: {
               id: {[db.Op.in]: bookIdsOnCalendar},
@@ -258,7 +258,11 @@ const createMeeting = async (req, res, next) => {
     // Update book discussion date and chosen status if book is selected
     if (meeting.bookId) {
       await db.Book.update(
-          {discussionDate: meeting.date, chosenForBookclub: true},
+          {
+            discussionDate: meeting.date,
+            chosenForBookclub: true,
+            revalidationRequestedAt: null,
+          },
           {where: {id: meeting.bookId}},
       );
     }
@@ -361,7 +365,11 @@ const updateMeeting = async (req, res, next) => {
     // Update book discussion date and chosen status if book is selected
     if (meeting.bookId) {
       await db.Book.update(
-          {discussionDate: meeting.date, chosenForBookclub: true},
+          {
+            discussionDate: meeting.date,
+            chosenForBookclub: true,
+            revalidationRequestedAt: null,
+          },
           {where: {id: meeting.bookId}},
       );
     }

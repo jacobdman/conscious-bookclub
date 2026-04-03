@@ -594,7 +594,11 @@ const updateBook = async (req, res, next) => {
     delete updates.uploadedBy;
     delete updates.uploaded_by;
 
-    await db.Book.update(updates, {where: {id, clubId: parseInt(clubId)}});
+    const updatePayload = {...updates};
+    if (updates.chosenForBookclub === true) {
+      updatePayload.revalidationRequestedAt = null;
+    }
+    await db.Book.update(updatePayload, {where: {id, clubId: parseInt(clubId)}});
     if (updates.chosenForBookclub === true) {
       await db.BookInteraction.destroy({
         where: {bookId: parseInt(id, 10), action: "super_like"},

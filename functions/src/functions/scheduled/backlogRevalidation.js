@@ -25,6 +25,7 @@ exports.backlogRevalidation = onSchedule(
               where: {
                 pool: "backlog",
                 revalidationRequestedAt: {[Op.eq]: null},
+                chosenForBookclub: false,
               },
             },
         );

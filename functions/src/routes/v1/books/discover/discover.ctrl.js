@@ -1,7 +1,6 @@
 const db = require("../../../../../db/models/index");
 const {Op, QueryTypes} = db.Sequelize;
 
-const BOOKMARK_REAPPEAR_DAYS = 30;
 const ACTIVE_USER_DAYS = 30;
 const DEFAULT_MIN_THRESHOLD = 3;
 const DEFAULT_PERCENTAGE_THRESHOLD = 0.5;
@@ -26,14 +25,22 @@ const getDiscoveryConfig = (club) => {
   };
 };
 
+/**
+ * Members of the club whose last login is within ACTIVE_USER_DAYS.
+ * Uses users.last_login_at (not book activity) so members who rarely interact
+ * with suggestions still affect the promotion threshold.
+ * @param {number|string} clubId
+ * @return {Promise<number>}
+ */
 const getActiveUserCount = async (clubId) => {
   const since = new Date();
   since.setDate(since.getDate() - ACTIVE_USER_DAYS);
   const rows = await db.sequelize.query(
-      `SELECT COUNT(DISTINCT bi.user_id)::int AS cnt
-       FROM book_interactions bi
-       INNER JOIN books b ON b.id = bi.book_id
-       WHERE b.club_id = :clubId AND bi.created_at >= :since`,
+      `SELECT COUNT(*)::int AS cnt
+       FROM club_members cm
+       INNER JOIN users u ON u.uid = cm.user_id
+       WHERE cm.club_id = :clubId
+       AND u.last_login_at >= :since`,
       {
         replacements: {clubId: parseInt(clubId, 10), since},
         type: QueryTypes.SELECT,
@@ -53,7 +60,9 @@ const getPromotionThreshold = async (clubId, club) => {
 };
 
 /**
- * Promote a suggested book to backlog when like count meets the club threshold.
+ * Promote a suggested book to backlog when regular like count meets the club
+ * threshold. Super likes promote immediately in postDiscoverInteract and are
+ * not counted toward this threshold.
  * @param {number} bookId Book id.
  * @param {number|string} clubId Club id.
  *
@@ -71,7 +80,7 @@ const checkAndPromoteBook = async (bookId, clubId) => {
   const likesCount = await db.BookInteraction.count({
     where: {
       bookId,
-      action: {[Op.in]: ["like", "super_like"]},
+      action: "like",
     },
   });
   if (likesCount >= threshold) {
@@ -215,6 +224,12 @@ const UPLOADER_INCLUDE = {
 
 const BATCH_SIZE = 200;
 
+/** Normalize PKs so Map lookups match Sequelize (number vs string mismatch breaks filters). */
+const bookPk = (id) => {
+  const n = parseInt(id, 10);
+  return Number.isNaN(n) ? id : n;
+};
+
 /**
  * Cursor for suggested-pool books: older than anchor (created_at DESC, id DESC).
  * @param {number|string} clubId Club id.
@@ -225,6 +240,7 @@ const suggestedPoolWhereAfter = (clubId, anchorBook) => {
   const base = {
     clubId: parseInt(clubId, 10),
     pool: "suggested",
+    chosenForBookclub: false,
   };
   if (!anchorBook) {
     return base;
@@ -255,6 +271,7 @@ const backlogRevalWhereAfter = (clubId, anchorBook) => {
     clubId: parseInt(clubId, 10),
     pool: "backlog",
     revalidationRequestedAt: {[Op.ne]: null},
+    chosenForBookclub: false,
   };
   if (!anchorBook) {
     return base;
@@ -286,25 +303,26 @@ const backlogRevalWhereAfter = (clubId, anchorBook) => {
  * Loads user interaction flags for suggested-pool discover filtering (one query per batch).
  * @param {number[]} bookIds
  * @param {string} userId
- * @return {Promise<Map>} bookId -> blocked and bookmarkUpdatedAt
+ * @return {Promise<Map>} bookId -> blocked and hasBookmark
  */
 const buildDiscoverFilterMapForBookIds = async (bookIds, userId) => {
   const map = new Map();
   if (!bookIds.length) {
     return map;
   }
-  for (const bid of bookIds) {
-    map.set(bid, {blocked: false, bookmarkUpdatedAt: null});
+  const normalizedIds = bookIds.map(bookPk);
+  for (const bid of normalizedIds) {
+    map.set(bid, {blocked: false, hasBookmark: false});
   }
   const rows = await db.BookInteraction.findAll({
     where: {
-      bookId: {[Op.in]: bookIds},
+      bookId: {[Op.in]: normalizedIds},
       userId,
       action: {[Op.in]: ["like", "super_like", "pass", "bookmark"]},
     },
   });
   for (const row of rows) {
-    const bid = row.bookId;
+    const bid = bookPk(row.bookId);
     const info = map.get(bid);
     if (!info) {
       continue;
@@ -313,21 +331,21 @@ const buildDiscoverFilterMapForBookIds = async (bookIds, userId) => {
       info.blocked = true;
     }
     if (row.action === "bookmark") {
-      info.bookmarkUpdatedAt = row.updatedAt;
+      info.hasBookmark = true;
     }
   }
   return map;
 };
 
-const passesDiscoverFiltersFromMap = (bid, filterMap, bookmarkCutoff) => {
-  const info = filterMap.get(bid);
+const passesDiscoverFiltersFromMap = (bid, filterMap) => {
+  const info = filterMap.get(bookPk(bid));
   if (!info) {
     return true;
   }
   if (info.blocked) {
     return false;
   }
-  if (info.bookmarkUpdatedAt && new Date(info.bookmarkUpdatedAt) > bookmarkCutoff) {
+  if (info.hasBookmark) {
     return false;
   }
   return true;
@@ -366,15 +384,14 @@ const loadBacklogReviewedBookIdsInBatch = async (batchIds, userId) => {
 };
 
 /**
- * Hot queue: suggested books with club-wide like momentum, excluding user block/recent bookmark.
+ * Hot queue: suggested books with club-wide regular-like momentum, excluding user block/bookmark.
  * @param {number|string} clubId
  * @param {string} userId
  * @param {number} limitNum
  * @param {number} threshold
- * @param {Date} bookmarkCutoff
  * @return {Promise<object[]>} Sequelize Book instances with uploader, ordered by like_count DESC.
  */
-const loadHotQueueBooks = async (clubId, userId, limitNum, threshold, bookmarkCutoff) => {
+const loadHotQueueBooks = async (clubId, userId, limitNum, threshold) => {
   const cid = parseInt(clubId, 10);
   const minLc = Math.max(0, threshold - 2);
   const rows = await db.sequelize.query(
@@ -383,11 +400,12 @@ const loadHotQueueBooks = async (clubId, userId, limitNum, threshold, bookmarkCu
        INNER JOIN (
          SELECT book_id, COUNT(*)::int AS lc
          FROM book_interactions
-         WHERE action IN ('like', 'super_like')
+         WHERE action = 'like'
          GROUP BY book_id
          HAVING COUNT(*) >= :minLc
        ) agg ON agg.book_id = b.id
        WHERE b.club_id = :clubId AND b.pool = 'suggested'
+       AND b.chosen_for_bookclub = false
        AND NOT EXISTS (
          SELECT 1 FROM book_interactions bi
          WHERE bi.book_id = b.id AND bi.user_id = :userId
@@ -396,7 +414,6 @@ const loadHotQueueBooks = async (clubId, userId, limitNum, threshold, bookmarkCu
        AND NOT EXISTS (
          SELECT 1 FROM book_interactions bm
          WHERE bm.book_id = b.id AND bm.user_id = :userId AND bm.action = 'bookmark'
-         AND bm.updated_at > :bookmarkCutoff
        )
        ORDER BY agg.lc DESC, b.id DESC
        LIMIT :limitNum`,
@@ -405,7 +422,6 @@ const loadHotQueueBooks = async (clubId, userId, limitNum, threshold, bookmarkCu
           clubId: cid,
           userId,
           minLc,
-          bookmarkCutoff,
           limitNum,
         },
         type: QueryTypes.SELECT,
@@ -430,10 +446,9 @@ const loadHotQueueBooks = async (clubId, userId, limitNum, threshold, bookmarkCu
  * @param {number|string} clubId
  * @param {string} userId
  * @param {number} limitNum
- * @param {Date} bookmarkCutoff
  * @return {Promise<object[]>} Sequelize Book instances with uploader
  */
-const loadChampionQueueBooks = async (clubId, userId, limitNum, bookmarkCutoff) => {
+const loadChampionQueueBooks = async (clubId, userId, limitNum) => {
   const cid = parseInt(clubId, 10);
   const candidateLim = limitNum * 3;
   const rows = await db.sequelize.query(
@@ -441,7 +456,8 @@ const loadChampionQueueBooks = async (clubId, userId, limitNum, bookmarkCutoff) 
          SELECT bi.book_id AS book_id, MAX(bi.updated_at) AS mx
          FROM book_interactions bi
          INNER JOIN books b ON b.id = bi.book_id
-         WHERE b.club_id = :clubId AND b.pool = 'suggested' AND bi.action = 'super_like'
+         WHERE b.club_id = :clubId AND b.pool = 'suggested'
+         AND b.chosen_for_bookclub = false AND bi.action = 'super_like'
          GROUP BY bi.book_id
          ORDER BY mx DESC
          LIMIT :candidateLim
@@ -456,7 +472,6 @@ const loadChampionQueueBooks = async (clubId, userId, limitNum, bookmarkCutoff) 
        AND NOT EXISTS (
          SELECT 1 FROM book_interactions bm
          WHERE bm.book_id = r.book_id AND bm.user_id = :userId AND bm.action = 'bookmark'
-         AND bm.updated_at > :bookmarkCutoff
        )
        ORDER BY r.mx DESC
        LIMIT :limitNum`,
@@ -464,7 +479,6 @@ const loadChampionQueueBooks = async (clubId, userId, limitNum, bookmarkCutoff) 
         replacements: {
           clubId: cid,
           userId,
-          bookmarkCutoff,
           candidateLim,
           limitNum,
         },
@@ -484,7 +498,7 @@ const loadChampionQueueBooks = async (clubId, userId, limitNum, bookmarkCutoff) 
   return orderedIds.map((id) => byId.get(id)).filter(Boolean);
 };
 
-const loadDiscoverSuggestedPage = async (clubId, userId, limitNum, bookmarkCutoff, afterBookId) => {
+const loadDiscoverSuggestedPage = async (clubId, userId, limitNum, afterBookId) => {
   let anchor = null;
   if (afterBookId) {
     anchor = await db.Book.findByPk(parseInt(afterBookId, 10));
@@ -517,7 +531,7 @@ const loadDiscoverSuggestedPage = async (clubId, userId, limitNum, bookmarkCutof
       if (books.length >= limitNum) {
         break;
       }
-      if (!passesDiscoverFiltersFromMap(b.id, filterMap, bookmarkCutoff)) {
+      if (!passesDiscoverFiltersFromMap(b.id, filterMap)) {
         continue;
       }
       books.push(b);
@@ -607,9 +621,6 @@ const getDiscoverQueue = async (req, res, next) => {
     const threshold = await getPromotionThreshold(clubId, club);
     const limitNum = Math.min(parseInt(limit, 10) || 20, 50);
 
-    const bookmarkCutoff = new Date();
-    bookmarkCutoff.setDate(bookmarkCutoff.getDate() - BOOKMARK_REAPPEAR_DAYS);
-
     let books = [];
     let queueHasMore = false;
 
@@ -618,7 +629,6 @@ const getDiscoverQueue = async (req, res, next) => {
           clubId,
           userId,
           limitNum,
-          bookmarkCutoff,
           afterBookId || null,
       );
       books = page.books;
@@ -629,14 +639,12 @@ const getDiscoverQueue = async (req, res, next) => {
           userId,
           limitNum,
           threshold,
-          bookmarkCutoff,
       );
     } else if (queue === "champion") {
       books = await loadChampionQueueBooks(
           clubId,
           userId,
           limitNum,
-          bookmarkCutoff,
       );
     } else if (queue === "bookmarked") {
       let markWhere = {userId, action: "bookmark"};
@@ -678,7 +686,10 @@ const getDiscoverQueue = async (req, res, next) => {
         include: [{
           model: db.Book,
           as: "book",
-          where: {clubId: parseInt(clubId, 10)},
+          where: {
+            clubId: parseInt(clubId, 10),
+            chosenForBookclub: false,
+          },
           required: true,
           include: [UPLOADER_INCLUDE],
         }],
@@ -801,7 +812,8 @@ const getDiscoverStats = async (req, res, next) => {
     const bmRows = await db.sequelize.query(
         `SELECT COUNT(*)::int AS c FROM book_interactions bi
          INNER JOIN books b ON b.id = bi.book_id
-         WHERE bi.user_id = :userId AND b.club_id = :clubId AND bi.action = 'bookmark'`,
+         WHERE bi.user_id = :userId AND b.club_id = :clubId AND bi.action = 'bookmark'
+         AND b.chosen_for_bookclub = false`,
         {
           replacements: {userId, clubId: parseInt(clubId, 10)},
           type: QueryTypes.SELECT,

@@ -118,8 +118,9 @@ const SwipeDiscoverInfoDialog = ({ open, onClose }) => {
               <strong>Super-like</strong> — strongest signal; you have a limited number per cycle (badge). Swipe up.
             </Bullet>
             <Bullet>
-              <strong>Bookmark</strong> — save for later (swipe down). Bookmarked books can surface again after about{' '}
-              <strong>30 days</strong> so your list stays fresh.
+              <strong>Bookmark</strong> — save for later (swipe down). While bookmarked, a title stays out of
+              Discover, Hot Picks, and Champion Picks; after other suggestions are exhausted, the same Discover session
+              continues with your bookmarked list, or open <strong>Bookmarked</strong> anytime.
             </Bullet>
           </Box>
         </Section>
