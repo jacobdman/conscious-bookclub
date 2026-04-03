@@ -19,8 +19,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
-import { getClubGoalsReport } from 'services/clubs/goalsReport.service';
-import { getWeeklyTrendByMemberReport } from 'services/reports/reports.service';
+import { getClubGoalsAnalyticsOnly } from 'services/clubs/goalsReport.service';
+import { getLeaderboardReport, getWeeklyTrendByMemberReport } from 'services/reports/reports.service';
 import HabitConsistencyLeaderboard from 'components/HabitConsistencyLeaderboard';
 import HabitStreaksLeaderboard from 'components/HabitStreaksLeaderboard';
 import WeeklyCompletionTrendByMember from './WeeklyCompletionTrendByMember';
@@ -62,7 +62,7 @@ const getDateRangeForPeriod = (period) => {
     }
     case 'custom':
     default:
-      return null; // Custom will use existing startDate/endDate state
+      return null;
   }
 
   return { startDate, endDate };
@@ -72,15 +72,15 @@ const ClubGoalsReport = () => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
   const [reportData, setReportData] = useState(null);
-  const [analyticsData, setAnalyticsData] = useState(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState(null);
   const [weeklyTrendData, setWeeklyTrendData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [weeklyTrendLoading, setWeeklyTrendLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [weeklyTrendError, setWeeklyTrendError] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
 
-  // Date range state - default to current quarter
   const [dateRangePeriod, setDateRangePeriod] = useState('currentQuarter');
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
@@ -95,7 +95,6 @@ const ClubGoalsReport = () => {
     return lastDay;
   });
 
-  // Update dates when period changes
   useEffect(() => {
     if (dateRangePeriod !== 'custom') {
       const range = getDateRangeForPeriod(dateRangePeriod);
@@ -106,50 +105,48 @@ const ClubGoalsReport = () => {
     }
   }, [dateRangePeriod]);
 
-  // Fetch competitive goals data (always loaded)
   useEffect(() => {
-    const fetchReport = async () => {
-      if (!user || !currentClub) return;
+    setAnalyticsData(null);
+    setWeeklyTrendData(null);
+    setReportData(null);
+  }, [startDate, endDate]);
 
+  // Parallel: leaderboard bundle + weekly trend (independent completion times)
+  useEffect(() => {
+    if (!user || !currentClub) return;
+
+    let cancelled = false;
+
+    const runLeaderboard = async () => {
+      setLeaderboardLoading(true);
+      setLeaderboardError(null);
       try {
-        setLoading(true);
-        setError(null);
-        const data = await getClubGoalsReport(
+        const data = await getLeaderboardReport(
           currentClub.id,
           user.uid,
           startDate,
           endDate,
-          false // Don't include expensive analytics
         );
-        setReportData(data);
+        if (!cancelled) {
+          setReportData(data);
+        }
       } catch (err) {
-        setError('Failed to load goals report');
-        console.error('Error fetching goals report:', err);
+        console.error('Error fetching leaderboard:', err);
+        if (!cancelled) {
+          setLeaderboardError('Failed to load leaderboard data');
+          setReportData(null);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLeaderboardLoading(false);
+        }
       }
     };
 
-    fetchReport();
-  }, [user, currentClub, startDate, endDate]);
-
-  // Reset analytics when date range changes (weekly trend refetched via effect below)
-  useEffect(() => {
-    setAnalyticsData(null);
-    setWeeklyTrendData(null);
-  }, [startDate, endDate]);
-
-  // Fetch weekly trend after the main report has loaded for the selected range.
-  // IntersectionObserver was unreliable here: changing the date sets loading=true and
-  // unmounts this section, so the observer detached and never re-fired when loading finished.
-  useEffect(() => {
-    if (!user || !currentClub || loading || !reportData) return;
-
-    let cancelled = false;
-
-    const fetchWeeklyTrend = async () => {
+    const runWeeklyTrend = async () => {
+      setWeeklyTrendLoading(true);
+      setWeeklyTrendError(null);
       try {
-        setWeeklyTrendLoading(true);
         const data = await getWeeklyTrendByMemberReport(
           currentClub.id,
           user.uid,
@@ -162,6 +159,7 @@ const ClubGoalsReport = () => {
       } catch (err) {
         console.error('Error fetching weekly trend:', err);
         if (!cancelled) {
+          setWeeklyTrendError('Failed to load weekly trend');
           setWeeklyTrendData(null);
         }
       } finally {
@@ -171,59 +169,55 @@ const ClubGoalsReport = () => {
       }
     };
 
-    fetchWeeklyTrend();
+    runLeaderboard();
+    runWeeklyTrend();
 
     return () => {
       cancelled = true;
     };
-  }, [user, currentClub, loading, reportData, startDate, endDate]);
+  }, [user, currentClub, startDate, endDate]);
 
-  // Fetch analytics data only when analytics tab is active
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      if (!user || !currentClub || activeTab !== 1 || analyticsData) return;
+    if (!user || !currentClub || activeTab !== 1 || analyticsData) return;
 
+    let cancelled = false;
+
+    const fetchAnalytics = async () => {
       try {
         setAnalyticsLoading(true);
-        const data = await getClubGoalsReport(
+        const data = await getClubGoalsAnalyticsOnly(
           currentClub.id,
           user.uid,
           startDate,
           endDate,
-          true // Include expensive analytics
         );
-        setAnalyticsData(data);
+        if (!cancelled) {
+          setAnalyticsData(data);
+        }
       } catch (err) {
         console.error('Error fetching analytics:', err);
+        if (!cancelled) {
+          setAnalyticsData(null);
+        }
       } finally {
-        setAnalyticsLoading(false);
+        if (!cancelled) {
+          setAnalyticsLoading(false);
+        }
       }
     };
 
     fetchAnalytics();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, currentClub, startDate, endDate, activeTab, analyticsData]);
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" p={3}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box p={3}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
-  }
-
-  if (!reportData) {
+  if (!user || !currentClub) {
     return (
       <Box p={3}>
         <Typography variant="body2" color="text.secondary">
-          No report data available
+          Select a club to view the goals report.
         </Typography>
       </Box>
     );
@@ -235,20 +229,20 @@ const ClubGoalsReport = () => {
     topPerformers,
   } = reportData || {};
 
-  // Use lazy-loaded weekly trend if available, otherwise use from reportData
-  const weeklyTrendByMember = weeklyTrendData || reportData?.weeklyTrendByMember;
+  const weeklyTrendByMember = weeklyTrendData;
 
-  const analytics = activeTab === 1 ? (analyticsData || reportData) : null;
+  const analytics = activeTab === 1 ? analyticsData : null;
   const {
     averageCompletionByType,
     participationHeatmap,
     clubGoalTypeDistribution,
   } = analytics || {};
 
+  const leaderboardBusy = leaderboardLoading;
+
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ p: 2 }}>
-        {/* Date Range Selector */}
         <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Date Range</InputLabel>
@@ -263,7 +257,7 @@ const ClubGoalsReport = () => {
               <MenuItem value="custom">Custom</MenuItem>
             </Select>
           </FormControl>
-          
+
           {dateRangePeriod === 'custom' && (
             <>
               <DatePicker
@@ -288,27 +282,15 @@ const ClubGoalsReport = () => {
               />
             </>
           )}
-          
+
           <Typography variant="body2" color="text.secondary">
             {formatDateRange(startDate, endDate)}
           </Typography>
         </Box>
 
-        {/* Section 1: Leaderboard Section - At the very top */}
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-            Habit Consistency Leaderboard
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Average habit completion rate ({formatDateRange(startDate, endDate)})
-          </Typography>
-          <HabitConsistencyLeaderboard leaderboard={leaderboard} />
-        </Box>
-
-        {/* Tabs for Competitive Goals and Analytics */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
-          <Tabs 
-            value={activeTab} 
+          <Tabs
+            value={activeTab}
             onChange={(e, newValue) => setActiveTab(newValue)}
             sx={{
               '& .MuiTab-root': {
@@ -324,10 +306,26 @@ const ClubGoalsReport = () => {
           </Tabs>
         </Box>
 
-        {/* Tab Panel: Competitive Goals */}
         {activeTab === 0 && (
           <Box>
-            {/* Daily Habit Streaks leaderboard */}
+            <Box sx={{ mb: 5 }}>
+              <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
+                Habit Consistency Leaderboard
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Average habit completion rate ({formatDateRange(startDate, endDate)})
+              </Typography>
+              {leaderboardBusy ? (
+                <Box display="flex" justifyContent="center" py={3}>
+                  <CircularProgress />
+                </Box>
+              ) : leaderboardError ? (
+                <Alert severity="error">{leaderboardError}</Alert>
+              ) : (
+                <HabitConsistencyLeaderboard leaderboard={leaderboard} />
+              )}
+            </Box>
+
             <Box sx={{ mb: 5 }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
                 Daily Habit Streaks Leaderboard
@@ -335,22 +333,21 @@ const ClubGoalsReport = () => {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 {`Longest active streaks on daily habits—consecutive days meeting targets (${formatDateRange(startDate, endDate)})`}
               </Typography>
-              <HabitStreaksLeaderboard leaderboard={streakLeaderboard} />
+              {leaderboardBusy ? (
+                <Box display="flex" justifyContent="center" py={3}>
+                  <CircularProgress />
+                </Box>
+              ) : leaderboardError ? (
+                <Alert severity="error">{leaderboardError}</Alert>
+              ) : (
+                <HabitStreaksLeaderboard leaderboard={streakLeaderboard} />
+              )}
             </Box>
 
-            {/* Top Performers by Category */}
-            <Box sx={{ mb: 5 }}>
-              <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-                Top Performers by Category
-              </Typography>
-              <TopPerformersByCategory topPerformers={topPerformers} />
-            </Box>
-
-            {/* Weekly Completion Trend by Member */}
             <Box sx={{ mb: 4 }}>
-              <Card 
+              <Card
                 elevation={2}
-                sx={{ 
+                sx={{
                   width: '100%',
                   borderRadius: 2,
                 }}
@@ -366,16 +363,32 @@ const ClubGoalsReport = () => {
                     <Box display="flex" justifyContent="center" p={3}>
                       <CircularProgress />
                     </Box>
+                  ) : weeklyTrendError ? (
+                    <Alert severity="error">{weeklyTrendError}</Alert>
                   ) : (
                     <WeeklyCompletionTrendByMember weeklyTrendByMember={weeklyTrendByMember} />
                   )}
                 </CardContent>
               </Card>
             </Box>
+
+            <Box sx={{ mb: 5 }}>
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
+                Top Performers by Category
+              </Typography>
+              {leaderboardBusy ? (
+                <Box display="flex" justifyContent="center" py={3}>
+                  <CircularProgress />
+                </Box>
+              ) : leaderboardError ? (
+                <Alert severity="error">{leaderboardError}</Alert>
+              ) : (
+                <TopPerformersByCategory topPerformers={topPerformers} />
+              )}
+            </Box>
           </Box>
         )}
 
-        {/* Tab Panel: Insights & Analytics */}
         {activeTab === 1 && (
           <Box>
             {analyticsLoading ? (
@@ -384,13 +397,12 @@ const ClubGoalsReport = () => {
               </Box>
             ) : (
               <>
-                {/* Average Completion by Goal Type */}
                 <Grid container spacing={3} sx={{ mb: 4 }}>
                   <Grid item xs={12} sm={6} sx={{ display: 'flex', flexGrow: 1 }}>
-                    <Card 
+                    <Card
                       elevation={2}
-                      sx={{ 
-                        height: '100%', 
+                      sx={{
+                        height: '100%',
                         width: '100%',
                         borderRadius: 2,
                       }}
@@ -407,12 +419,11 @@ const ClubGoalsReport = () => {
                     </Card>
                   </Grid>
 
-                  {/* Club Goal Type Distribution */}
                   <Grid item xs={12} sm={6} sx={{ display: 'flex', flexGrow: 1 }}>
-                    <Card 
+                    <Card
                       elevation={2}
-                      sx={{ 
-                        height: '100%', 
+                      sx={{
+                        height: '100%',
                         width: '100%',
                         borderRadius: 2,
                       }}
@@ -428,14 +439,12 @@ const ClubGoalsReport = () => {
                       </CardContent>
                     </Card>
                   </Grid>
-
                 </Grid>
 
-                {/* Participation Heatmap */}
                 <Box sx={{ mb: 4 }}>
-                  <Card 
+                  <Card
                     elevation={2}
-                    sx={{ 
+                    sx={{
                       width: '100%',
                       borderRadius: 2,
                     }}
@@ -461,4 +470,3 @@ const ClubGoalsReport = () => {
 };
 
 export default ClubGoalsReport;
-

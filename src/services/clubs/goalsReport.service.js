@@ -2,6 +2,33 @@ import { getLeaderboardReport } from '../reports/reports.service';
 import { apiCall } from '../apiHelpers';
 
 /**
+ * Insights-only payloads from legacy club goals-report (no duplicate leaderboard call).
+ * @param {number} clubId - Club ID
+ * @param {string} userId - User ID (for membership verification)
+ * @param {Date} startDate - Start date (optional)
+ * @param {Date} endDate - End date (optional)
+ * @returns {Promise<Object>} Analytics fields only
+ */
+export const getClubGoalsAnalyticsOnly = async (clubId, userId, startDate, endDate) => {
+  const params = new URLSearchParams({ userId });
+  if (startDate) {
+    params.append('startDate', startDate.toISOString());
+  }
+  if (endDate) {
+    params.append('endDate', endDate.toISOString());
+  }
+  params.append('includeAnalytics', 'true');
+  const oldData = await apiCall(`/v1/clubs/${clubId}/goals-report?${params}`);
+  return {
+    averageCompletionByType: oldData.averageCompletionByType,
+    participationHeatmap: oldData.participationHeatmap,
+    clubGoalTypeDistribution: oldData.clubGoalTypeDistribution,
+    bookCompletionPercentage: oldData.bookCompletionPercentage,
+    topPerformers: oldData.topPerformers,
+  };
+};
+
+/**
  * Get club goals report (uses new reports API for leaderboard)
  * This function maintains backward compatibility with the old endpoint
  * @param {number} clubId - Club ID
@@ -20,16 +47,15 @@ export const getClubGoalsReport = async (clubId, userId, startDate, endDate, inc
   let analyticsData = null;
 
   if (includeAnalytics) {
-    const params = new URLSearchParams({ userId });
-    if (startDate) {
-      params.append('startDate', startDate.toISOString());
+    analyticsData = await getClubGoalsAnalyticsOnly(clubId, userId, startDate, endDate);
+    const hasPayload =
+      analyticsData.averageCompletionByType ||
+      analyticsData.participationHeatmap ||
+      analyticsData.clubGoalTypeDistribution ||
+      analyticsData.bookCompletionPercentage;
+    if (!hasPayload) {
+      analyticsData = null;
     }
-    if (endDate) {
-      params.append('endDate', endDate.toISOString());
-    }
-    params.append('includeAnalytics', 'true');
-    const oldData = await apiCall(`/v1/clubs/${clubId}/goals-report?${params}`);
-    analyticsData = oldData.averageCompletionByType || oldData.participationHeatmap || oldData.clubGoalTypeDistribution || oldData.bookCompletionPercentage ? oldData : null;
   }
 
   // Combine new leaderboard data with old analytics if needed
