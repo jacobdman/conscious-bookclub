@@ -11,6 +11,39 @@ const {
 const {Op} = db;
 
 /**
+ * Whether the habit goal's current cadence period (containing `now`) is satisfied.
+ * @param {Object} goal Goal row
+ * @param {Array} entries Prefetched entries for the goal
+ * @param {string|null} memberTimezone User timezone
+ * @param {Date} now Reference time
+ * @return {boolean}
+ */
+const isCurrentPeriodCompletedForHabit = (goal, entries, memberTimezone, now) => {
+  if (!goal.cadence) {
+    return false;
+  }
+  const pausePeriodsList = (goal.goalPauses || []).map((p) => ({
+    pausedAt: p.pausedAt || p.paused_at,
+    resumedAt: p.resumedAt ?? p.resumed_at ?? null,
+  }));
+  const currentBoundaries = getPeriodBoundaries(goal.cadence, now, memberTimezone);
+  const periodStart = currentBoundaries.start;
+  const periodEnd = currentBoundaries.end;
+  if (isPeriodPaused(periodStart, periodEnd, pausePeriodsList, now)) {
+    return false;
+  }
+  const periodEntries = entries.filter((entry) => {
+    const occurredAt = new Date(entry.occurredAt || entry.occurred_at);
+    return occurredAt >= periodStart && occurredAt < periodEnd;
+  });
+  const completed = goal.measure === "count" ?
+    periodEntries.length >= goal.targetCount :
+    periodEntries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0) >=
+      parseFloat(goal.targetQuantity);
+  return completed;
+};
+
+/**
  * Calculates club leaderboard with habit consistency scores and streaks
  *
  * SQL/Sequelize Query Logic:
@@ -45,7 +78,9 @@ const {Op} = db;
  *
  *    g. Calculate longest streak across all habits
  *
- * 3. Sort members by consistency score (descending)
+ * 3. Sort members by consistency score (descending), then ties by
+ *    completedGoalToday (current period satisfied for any habit), then members
+ *    with at least one habit goal before members with none (N/A), then name
  * 4. Create streak leaderboard (sorted by longest streak)
  *
  * @param {number} clubId - Club ID
@@ -149,6 +184,8 @@ const getLeaderboardReport = async (
         },
         consistencyScore: 0,
         streak: 0,
+        habitGoalCount: 0,
+        completedGoalToday: false,
       });
       return;
     }
@@ -347,6 +384,14 @@ const getLeaderboardReport = async (
 
     const avgConsistency = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
+    let completedGoalToday = false;
+    for (const {goal, entries} of habitEntries) {
+      if (isCurrentPeriodCompletedForHabit(goal, entries, memberTimezone, now)) {
+        completedGoalToday = true;
+        break;
+      }
+    }
+
     // Calculate metric progress
     const metricGoals = memberGoals.filter((g) => g.type === "metric");
     const metricProgresses = [];
@@ -393,6 +438,8 @@ const getLeaderboardReport = async (
       },
       consistencyScore: avgConsistency,
       streak: longestStreak,
+      habitGoalCount: habitGoals.length,
+      completedGoalToday,
     });
 
     // Add to metrics
@@ -429,10 +476,21 @@ const getLeaderboardReport = async (
     });
   }));
 
-  // Sort leaderboard by consistency score (descending)
+  // Sort leaderboard by consistency score (descending), then completedGoalToday,
+  // then habit participants (habitGoalCount > 0) before no-habit (N/A) rows
   leaderboard.sort((a, b) => {
     if (b.consistencyScore !== a.consistencyScore) {
       return b.consistencyScore - a.consistencyScore;
+    }
+    const todayA = a.completedGoalToday ? 1 : 0;
+    const todayB = b.completedGoalToday ? 1 : 0;
+    if (todayB !== todayA) {
+      return todayB - todayA;
+    }
+    const habitsA = (a.habitGoalCount ?? 0) > 0 ? 1 : 0;
+    const habitsB = (b.habitGoalCount ?? 0) > 0 ? 1 : 0;
+    if (habitsB !== habitsA) {
+      return habitsB - habitsA;
     }
     const nameA = (a.user.displayName || "").toLowerCase();
     const nameB = (b.user.displayName || "").toLowerCase();

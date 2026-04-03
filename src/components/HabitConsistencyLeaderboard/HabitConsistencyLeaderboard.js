@@ -24,6 +24,16 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
     if (scoreB !== scoreA) {
       return scoreB - scoreA;
     }
+    const todayA = a.completedGoalToday ? 1 : 0;
+    const todayB = b.completedGoalToday ? 1 : 0;
+    if (todayB !== todayA) {
+      return todayB - todayA;
+    }
+    const habitsA = (a.habitGoalCount ?? 0) > 0 ? 1 : 0;
+    const habitsB = (b.habitGoalCount ?? 0) > 0 ? 1 : 0;
+    if (habitsB !== habitsA) {
+      return habitsB - habitsA;
+    }
     const nameA = (a.user.displayName || '').toLowerCase();
     const nameB = (b.user.displayName || '').toLowerCase();
     return nameA.localeCompare(nameB);
@@ -77,7 +87,9 @@ const HabitConsistencyLeaderboard = ({ leaderboard, title, subtitle }) => {
               {entry.user.displayName || 'Unknown'}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {entry.consistencyScore.toFixed(1)}%
+              {entry.habitGoalCount === 0
+                ? 'N/A'
+                : `${entry.consistencyScore.toFixed(1)}%`}
             </Typography>
           </Box>
         );
