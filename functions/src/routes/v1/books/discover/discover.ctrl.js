@@ -1,5 +1,6 @@
 const db = require("../../../../../db/models/index");
 const {Op, QueryTypes} = db.Sequelize;
+const {loadMergedLikeMemberListsByBookId} = require("../likeHelpers");
 
 const ACTIVE_USER_DAYS = 30;
 const DEFAULT_MIN_THRESHOLD = 3;
@@ -191,13 +192,6 @@ const countUserSuperLikesInClub = async (userId, clubId) => {
   return row && row.c != null ? parseInt(row.c, 10) : 0;
 };
 
-const upsertBookLikeRow = async (bookId, userId) => {
-  await db.BookLike.findOrCreate({
-    where: {bookId, userId},
-    defaults: {bookId, userId},
-  });
-};
-
 const upsertInteraction = async (bookId, userId, action, now) => {
   const [row, created] = await db.BookInteraction.findOrCreate({
     where: {bookId, userId, action},
@@ -224,7 +218,11 @@ const UPLOADER_INCLUDE = {
 
 const BATCH_SIZE = 200;
 
-/** Normalize PKs so Map lookups match Sequelize (number vs string mismatch breaks filters). */
+/**
+ * Normalize PKs so Map lookups match Sequelize (number vs string mismatch breaks filters).
+ * @param {number|string} id Book id.
+ * @return {number|string} Numeric id when parseable, else original.
+ */
 const bookPk = (id) => {
   const n = parseInt(id, 10);
   return Number.isNaN(n) ? id : n;
@@ -717,47 +715,53 @@ const getDiscoverQueue = async (req, res, next) => {
     }
 
     const bookIds = books.map((b) => b.id);
-    const likesByBookId = new Map();
     const superByBookId = new Map();
+    let memberListsByBookId = new Map();
     if (bookIds.length) {
-      const likeInteractionCounts = await db.BookInteraction.findAll({
-        attributes: [
-          "bookId",
-          [db.sequelize.fn("COUNT", db.sequelize.col("id")), "cnt"],
-        ],
-        where: {bookId: bookIds, action: "like"},
-        group: ["book_id"],
-        raw: true,
-      });
-      likeInteractionCounts.forEach((row) => {
-        likesByBookId.set(row.bookId, parseInt(row.cnt, 10));
-      });
-      const superCounts = await db.BookInteraction.findAll({
-        attributes: [
-          "bookId",
-          [db.sequelize.fn("COUNT", db.sequelize.col("id")), "cnt"],
-        ],
-        where: {bookId: bookIds, action: "super_like"},
-        group: ["book_id"],
-        raw: true,
-      });
+      const [superCounts, memberLists] = await Promise.all([
+        db.BookInteraction.findAll({
+          attributes: [
+            "bookId",
+            [db.sequelize.fn("COUNT", db.sequelize.col("id")), "cnt"],
+          ],
+          where: {bookId: bookIds, action: "super_like"},
+          group: ["book_id"],
+          raw: true,
+        }),
+        loadMergedLikeMemberListsByBookId(bookIds),
+      ]);
       superCounts.forEach((row) => {
         superByBookId.set(row.bookId, parseInt(row.cnt, 10));
       });
+      memberListsByBookId = memberLists;
     }
 
     const usedSuper = await countUserSuperLikesInClub(userId, clubId);
     const remainingSuperLikes = Math.max(0, cfg.superLikeLimit - usedSuper);
 
+    const emptyMembers = {
+      likeUsers: [],
+      superLikeUsers: [],
+      likeUsersTruncated: false,
+      superLikeUsersTruncated: false,
+      mergedLikeCount: 0,
+    };
+
     const payload = books.map((book) => {
       const j = book.toJSON();
+      const pk = bookPk(book.id);
+      const members = memberListsByBookId.get(pk) || emptyMembers;
       return {
         id: book.id,
         ...j,
-        likesCount: likesByBookId.get(book.id) || 0,
+        likesCount: members.mergedLikeCount ?? 0,
         superLikesCount: superByBookId.get(book.id) || 0,
         remainingSuperLikes,
         promotionThreshold: threshold,
+        likeUsers: members.likeUsers,
+        superLikeUsers: members.superLikeUsers,
+        likeUsersTruncated: members.likeUsersTruncated,
+        superLikeUsersTruncated: members.superLikeUsersTruncated,
       };
     });
 
@@ -885,7 +889,6 @@ const postDiscoverInteract = async (req, res, next) => {
         });
       }
       await upsertInteraction(book.id, userId, "super_like", now);
-      await upsertBookLikeRow(book.id, userId);
       await db.Book.update(
           {pool: "backlog", promotedAt: new Date()},
           {where: {id: book.id}},
@@ -893,7 +896,6 @@ const postDiscoverInteract = async (req, res, next) => {
     } else if (action === "like") {
       const isRevalidation = book.pool === "backlog" && book.revalidationRequestedAt;
       await upsertInteraction(book.id, userId, "like", now);
-      await upsertBookLikeRow(book.id, userId);
       if (isRevalidation) {
         await evaluateRevalidationSurvival(book.id, clubId);
       } else if (book.pool === "suggested") {
@@ -904,9 +906,6 @@ const postDiscoverInteract = async (req, res, next) => {
       if (isRevalidation) {
         await db.BookInteraction.destroy({
           where: {bookId: book.id, userId, action: "like"},
-        });
-        await db.BookLike.destroy({
-          where: {bookId: book.id, userId},
         });
       }
       await upsertInteraction(book.id, userId, "pass", now);
@@ -972,16 +971,6 @@ const deleteDiscoverInteract = async (req, res, next) => {
     });
 
     if (action === "super_like") {
-      const hasLikeInteraction = await db.BookInteraction.findOne({
-        where: {bookId: book.id, userId, action: "like"},
-      });
-      if (!hasLikeInteraction) {
-        await db.BookLike.destroy({
-          where: {bookId: book.id, userId},
-        });
-      } else {
-        await upsertBookLikeRow(book.id, userId);
-      }
       const reloaded = await db.Book.findByPk(book.id);
       if (reloaded && reloaded.pool === "backlog" && !reloaded.chosenForBookclub) {
         await checkSuperLikeRemovalSurvival(book.id, clubId);

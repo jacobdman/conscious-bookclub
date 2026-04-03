@@ -93,10 +93,6 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "user_id",
       as: "quoteLikes",
     });
-    User.hasMany(models.BookLike, {
-      foreignKey: "user_id",
-      as: "bookLikes",
-    });
     User.hasMany(models.BookInteraction, {
       foreignKey: "user_id",
       as: "bookInteractions",

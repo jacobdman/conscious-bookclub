@@ -107,10 +107,6 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "book_id",
       as: "bookProgresses",
     });
-    Book.hasMany(models.BookLike, {
-      foreignKey: "book_id",
-      as: "bookLikes",
-    });
     Book.hasMany(models.BookInteraction, {
       foreignKey: "book_id",
       as: "bookInteractions",

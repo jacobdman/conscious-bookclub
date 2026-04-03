@@ -177,6 +177,7 @@ const SwipeReview = () => {
               <SwipeCard
                 key={`stack-${next.id}`}
                 book={next}
+                activeQueue={activeQueue}
                 isBacklogReview={isBacklogReviewForBook(next)}
                 onCommit={async () => {}}
                 stackIndex={1}
@@ -187,6 +188,7 @@ const SwipeReview = () => {
               <SwipeCard
                 key={current.id}
                 book={current}
+                activeQueue={activeQueue}
                 isBacklogReview={isBacklogReviewForBook(current)}
                 onCommit={handleCommit}
                 stackIndex={0}

@@ -1,5 +1,9 @@
 const db = require("../../../../db/models/index");
-const {buildLikesSummary, buildSuperLikeSummary} = require("./likeHelpers");
+const {
+  buildLikesSummary,
+  buildSuperLikeSummary,
+  loadMergedLikeMemberListsByBookId,
+} = require("./likeHelpers");
 
 // Map camelCase API field names to snake_case database column names
 const mapOrderByField = (field) => {
@@ -19,7 +23,8 @@ const mapOrderByField = (field) => {
 const buildOrderClause = (orderByField, orderDirection) => {
   if (orderByField === "likes_count") {
     return [[db.sequelize.literal(
-        `(SELECT COUNT(*) FROM book_likes WHERE book_likes.book_id = "Book".id)`,
+        `(SELECT COUNT(*) FROM book_interactions bi ` +
+        `WHERE bi.book_id = "Book".id AND bi.action = 'like')`,
     ), orderDirection]];
   }
 
@@ -535,16 +540,29 @@ const getBook = async (req, res, next) => {
       throw error;
     }
 
-    const {likesByBookId, likedBookIds} = await buildLikesSummary([book.id], req.query.userId);
+    const {likedBookIds} = await buildLikesSummary([book.id], req.query.userId);
     const {superLikesByBookId, superLikedBookIds} = await buildSuperLikeSummary(
         [book.id], req.query.userId);
+    const memberMap = await loadMergedLikeMemberListsByBookId([book.id]);
+    const pk = parseInt(book.id, 10);
+    const members = memberMap.get(Number.isNaN(pk) ? book.id : pk) || {
+      likeUsers: [],
+      superLikeUsers: [],
+      likeUsersTruncated: false,
+      superLikeUsersTruncated: false,
+      mergedLikeCount: 0,
+    };
     res.json({
       id: book.id,
       ...book.toJSON(),
-      likesCount: likesByBookId.get(book.id) || 0,
+      likesCount: members.mergedLikeCount,
       isLiked: likedBookIds.has(book.id),
       superLikesCount: superLikesByBookId.get(book.id) || 0,
       isSuperLiked: superLikedBookIds.has(book.id),
+      likeUsers: members.likeUsers,
+      superLikeUsers: members.superLikeUsers,
+      likeUsersTruncated: members.likeUsersTruncated,
+      superLikeUsersTruncated: members.superLikeUsersTruncated,
     });
   } catch (e) {
     next(e);
@@ -671,20 +689,30 @@ const addBookLike = async (req, res, next) => {
       throw error;
     }
 
-    const [like, created] = await db.BookLike.findOrCreate({
-      where: {bookId: numericBookId, userId},
-      defaults: {bookId: numericBookId, userId},
+    const now = new Date();
+    const [interaction, created] = await db.BookInteraction.findOrCreate({
+      where: {bookId: numericBookId, userId, action: "like"},
+      defaults: {
+        bookId: numericBookId,
+        userId,
+        action: "like",
+        createdAt: now,
+        updatedAt: now,
+      },
     });
+    if (!created) {
+      await interaction.update({updatedAt: now});
+    }
 
-    const likesCount = await db.BookLike.count({
-      where: {bookId: numericBookId},
+    const likesCount = await db.BookInteraction.count({
+      where: {bookId: numericBookId, action: "like"},
     });
 
     res.status(created ? 201 : 200).json({
       bookId: numericBookId,
       liked: true,
       likesCount,
-      likeId: like.id,
+      likeId: interaction.id,
     });
   } catch (e) {
     next(e);
@@ -729,8 +757,8 @@ const removeBookLike = async (req, res, next) => {
       throw error;
     }
 
-    const deleted = await db.BookLike.destroy({
-      where: {bookId: numericBookId, userId},
+    const deleted = await db.BookInteraction.destroy({
+      where: {bookId: numericBookId, userId, action: "like"},
     });
 
     if (!deleted) {
@@ -739,8 +767,8 @@ const removeBookLike = async (req, res, next) => {
       throw error;
     }
 
-    const likesCount = await db.BookLike.count({
-      where: {bookId: numericBookId},
+    const likesCount = await db.BookInteraction.count({
+      where: {bookId: numericBookId, action: "like"},
     });
 
     res.status(200).json({

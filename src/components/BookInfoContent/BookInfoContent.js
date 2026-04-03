@@ -13,6 +13,9 @@ import { bookCoverAvatarSx } from 'utils/bookCoverDisplay';
 
 const LINE_CLAMP = 3;
 
+/** First N names shown before "Show more" (discover interaction lists). */
+const INTERACTION_NAME_PREVIEW = 3;
+
 const formatSuggestedAt = (book) => {
   const raw = book.createdAt ?? book.created_at;
   if (raw == null || raw === '') return null;
@@ -111,6 +114,13 @@ const BookInfoContent = ({
   sx,
 }) => {
   const { user } = useAuth();
+  const [likesMembersExpanded, setLikesMembersExpanded] = useState(false);
+  const [superLikesMembersExpanded, setSuperLikesMembersExpanded] = useState(false);
+
+  useEffect(() => {
+    setLikesMembersExpanded(false);
+    setSuperLikesMembersExpanded(false);
+  }, [book?.id]);
 
   if (!book) return null;
 
@@ -139,6 +149,34 @@ const BookInfoContent = ({
     if (progressStatus === 'reading') return 'Reading';
     return 'Not Started';
   };
+
+  const likeUsers = Array.isArray(book.likeUsers) ? book.likeUsers : [];
+  const superLikeUsers = Array.isArray(book.superLikeUsers) ? book.superLikeUsers : [];
+  const likeUsersTruncated = Boolean(book.likeUsersTruncated);
+  const superLikeUsersTruncated = Boolean(book.superLikeUsersTruncated);
+
+  const formatInteractionNamesLine = (users, expanded, apiTruncated) => {
+    if (!users.length) {
+      return { text: '—' };
+    }
+    const visible = expanded ? users : users.slice(0, INTERACTION_NAME_PREVIEW);
+    const names = visible.map((u) => u.displayName || 'Unknown').join(', ');
+    const tail = expanded && apiTruncated ? ' (+ more)' : '';
+    return { text: `${names}${tail}` };
+  };
+
+  const interactionListHasMore = (users, apiTruncated) =>
+    users.length > 0 &&
+    (users.length > INTERACTION_NAME_PREVIEW || apiTruncated);
+
+  const likeLine = formatInteractionNamesLine(likeUsers, likesMembersExpanded, likeUsersTruncated);
+  const superLikeLine = formatInteractionNamesLine(
+    superLikeUsers,
+    superLikesMembersExpanded,
+    superLikeUsersTruncated,
+  );
+  const showLikeMembersToggle = interactionListHasMore(likeUsers, likeUsersTruncated);
+  const showSuperLikeMembersToggle = interactionListHasMore(superLikeUsers, superLikeUsersTruncated);
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%', ...sx }}>
@@ -243,6 +281,57 @@ const BookInfoContent = ({
               </Typography>
             </Box>
           )}
+          <Box sx={{ mt: 1.5 }} aria-label="Discover swipe likes">
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600 }}>
+              Liked by
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+              sx={{ mt: 0.35, wordBreak: 'break-word' }}
+            >
+              {likeLine.text}
+            </Typography>
+            {showLikeMembersToggle ? (
+              <Button
+                type="button"
+                variant="text"
+                size="small"
+                onClick={() => setLikesMembersExpanded((v) => !v)}
+                sx={{ mt: 0.25, p: 0, minWidth: 0, textTransform: 'none', display: 'block' }}
+              >
+                {likesMembersExpanded ? 'Show less' : 'Show more'}
+              </Button>
+            ) : null}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+              sx={{ fontWeight: 600, mt: 1 }}
+            >
+              Super liked by
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+              sx={{ mt: 0.35, wordBreak: 'break-word' }}
+            >
+              {superLikeLine.text}
+            </Typography>
+            {showSuperLikeMembersToggle ? (
+              <Button
+                type="button"
+                variant="text"
+                size="small"
+                onClick={() => setSuperLikesMembersExpanded((v) => !v)}
+                sx={{ mt: 0.25, p: 0, minWidth: 0, textTransform: 'none', display: 'block' }}
+              >
+                {superLikesMembersExpanded ? 'Show less' : 'Show more'}
+              </Button>
+            ) : null}
+          </Box>
         </Box>
       </Box>
 

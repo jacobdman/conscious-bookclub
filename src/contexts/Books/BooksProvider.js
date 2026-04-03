@@ -392,7 +392,7 @@ const BooksProvider = ({ children }) => {
   };
 
   /**
-   * Super-like uses discover interactions (book_interactions), not club BookLike alone.
+   * Super-like uses discover interactions (book_interactions).
    * Updates pool / promotion per server rules; merges counts from API responses.
    */
   const toggleBookSuperLike = async (bookId, shouldSuperLike) => {

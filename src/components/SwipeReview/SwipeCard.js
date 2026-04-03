@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Box, Typography, Avatar, IconButton } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { getSwipeQueueMeta } from 'constants/swipeQueues';
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion';
 import BookInfoContent from 'components/BookInfoContent';
 import SwipeOverlay from './SwipeOverlay';
@@ -30,7 +31,7 @@ const faceSx = {
   width: '100%',
 };
 
-const SwipeCard = ({ book, isBacklogReview, onCommit, stackIndex = 0, dragDisabled = false }) => {
+const SwipeCard = ({ book, activeQueue, isBacklogReview, onCommit, stackIndex = 0, dragDisabled = false }) => {
   const [flipped, setFlipped] = useState(false);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -124,6 +125,9 @@ const SwipeCard = ({ book, isBacklogReview, onCommit, stackIndex = 0, dragDisabl
   };
 
   const scale = 1 - stackIndex * 0.035;
+
+  const queuePhase = book._swipePhase ?? activeQueue;
+  const queueMeta = getSwipeQueueMeta(queuePhase);
 
   const frontFace = (
     <Box sx={{ ...faceSx, alignItems: 'center' }}>
@@ -235,11 +239,14 @@ const SwipeCard = ({ book, isBacklogReview, onCommit, stackIndex = 0, dragDisabl
       >
         <Box sx={cardShellSx}>
           <Box
+            role="group"
+            aria-label={`Book details. Queue: ${queueMeta.label}.`}
             sx={{
               flexShrink: 0,
               display: 'flex',
-              justifyContent: 'flex-end',
+              justifyContent: 'space-between',
               alignItems: 'center',
+              gap: 1,
               px: 1,
               pt: 1,
               pb: 0.5,
@@ -247,6 +254,25 @@ const SwipeCard = ({ book, isBacklogReview, onCommit, stackIndex = 0, dragDisabl
               bgcolor: 'background.paper',
             }}
           >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                fontWeight: 600,
+                lineHeight: 1.35,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              <Box component="span" sx={{ mr: 0.5 }} aria-hidden>
+                {queueMeta.emoji}
+              </Box>
+              {queueMeta.label}
+            </Typography>
             <IconButton
               size="small"
               onClick={() => setFlipped((f) => !f)}

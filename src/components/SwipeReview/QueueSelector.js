@@ -1,14 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Button, Menu, MenuItem, Typography, Box } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-
-const QUEUES = [
-  { id: 'discover', emoji: '✨', label: 'Discover', hint: 'Find your next great read' },
-  { id: 'hot', emoji: '🔥', label: 'Hot Picks', hint: 'Almost in the backlog' },
-  { id: 'champion', emoji: '🏆', label: 'Champion Picks', hint: 'Backed by your club' },
-  { id: 'bookmarked', emoji: '🔖', label: 'Bookmarked', hint: 'Saved for later' },
-  { id: 'backlog_review', emoji: '📋', label: 'Backlog Review', hint: 'Keep your backlog fresh' },
-];
+import { SWIPE_QUEUES, getSwipeQueueMeta } from 'constants/swipeQueues';
 
 const QueueSelector = ({ activeQueue, onSelect }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -31,7 +24,7 @@ const QueueSelector = ({ activeQueue, onSelect }) => {
     setMenuOpen(false);
   }, []);
 
-  const current = QUEUES.find((q) => q.id === activeQueue) || QUEUES[0];
+  const current = getSwipeQueueMeta(activeQueue);
 
   return (
     <Box ref={triggerRef} sx={{ textAlign: 'center' }}>
@@ -71,7 +64,7 @@ const QueueSelector = ({ activeQueue, onSelect }) => {
           },
         }}
       >
-        {QUEUES.map((q) => (
+        {SWIPE_QUEUES.map((q) => (
           <MenuItem
             key={q.id}
             selected={q.id === activeQueue}
