@@ -41,6 +41,7 @@ import { formatMeetingDisplay } from 'utils/meetingTime';
 import { isIosNativeApp, iosBottomSheetPaperSx, iosSheetGrabberSx } from 'utils/iosNativeUi';
 import { getPlatform } from 'utils/platformHelpers';
 import { renderMentions, encodeMentions, MENTION_REGEX, parseMentions, extractFirstLink } from 'utils/mentionHelpers';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
 const PostCard = ({ post, isFirstInGroup = true }) => {
   const { user } = useAuth();
@@ -453,7 +454,7 @@ const PostCard = ({ post, isFirstInGroup = true }) => {
   const renderGoalCompletionActivity = () => {
     const goalData = relatedRecord?.record || {};
     const actorName = post.authorName || 'A member';
-    const goalTitle = goalData.title || 'a goal';
+    const goalTitle = aprilFoolsGoalTitle(goalData.title || 'a goal', goalData.id);
     const goalType = goalData.type ? goalData.type.replace('_', ' ') : 'goal';
     const cadenceLabel = goalData.cadence ? `${goalData.cadence} ${goalType}` : goalType;
     let targetLabel = null;

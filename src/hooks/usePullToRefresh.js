@@ -95,6 +95,7 @@ export function usePullToRefresh({
         setIsRefreshing(true);
         promise.finally(() => {
           setIsRefreshing(false);
+          window.dispatchEvent(new CustomEvent('cbc-pull-to-refresh'));
         });
       }
     };

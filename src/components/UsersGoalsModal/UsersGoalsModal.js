@@ -44,6 +44,7 @@ import {
   getTodayEntries,
   isGoalPauseCoveringPeriod,
 } from 'utils/goalHelpers';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 const getUserId = (user) => user?.uid || user?.id || user?.userId || user?.user_id;
 
 const UsersGoalsModal = ({ open, onClose, user }) => {
@@ -313,7 +314,7 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                         <ListItemButton onClick={() => setSelectedGoal(goal)} sx={{ px: 1 }}>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
-                              {goal.title || 'Goal'}
+                              {aprilFoolsGoalTitle(goal.title || 'Goal', goal.id)}
                             </Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                               <GoalTypeChip goal={goal} />
@@ -347,7 +348,7 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                         >
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
-                              {goal.title || 'Goal'}
+                              {aprilFoolsGoalTitle(goal.title || 'Goal', goal.id)}
                             </Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                               <GoalTypeChip goal={goal} />
@@ -381,7 +382,7 @@ const UsersGoalsModal = ({ open, onClose, user }) => {
                     >
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
-                          {goal.title || 'Goal'}
+                          {aprilFoolsGoalTitle(goal.title || 'Goal', goal.id)}
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                           <GoalTypeChip goal={goal} />

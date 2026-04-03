@@ -1,0 +1,21 @@
+{
+  "palette": {
+    "mode": "light",
+    "primary": { "main": "#6B1F7A" },
+    "secondary": { "main": "#1F6B3A" },
+    "accent": { "main": "#C9A227" },
+    "success": { "main": "#4A7C4E" },
+    "warning": { "main": "#B8860B" },
+    "error": { "main": "#8B2E2E" },
+    "info": { "main": "#4A6FA5" },
+    "background": { "default": "#D4C4A0", "paper": "#E8DCC4" },
+    "text": { "primary": "#2A1A0E", "secondary": "#5C4A3A" },
+    "divider": "rgba(42, 26, 14, 0.25)"
+  },
+  "typography": {
+    "fontFamily": "\"MedievalSharp\", \"Times New Roman\", Georgia, serif",
+    "h1": { "fontWeight": 700 },
+    "button": { "textTransform": "none", "fontWeight": 700 }
+  },
+  "shape": { "borderRadius": 4 }
+}

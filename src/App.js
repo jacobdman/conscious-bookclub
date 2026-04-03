@@ -27,6 +27,7 @@ import Quotes from './views/Quotes';
 import Dev from './views/Dev';
 import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
+import AprilFools2026 from 'components/AprilFools2026';
 import BackButtonHandler from 'components/BackButtonHandler';
 import FeatureGateRoute from 'components/FeatureGateRoute';
 import TutorialProvider from 'contexts/Tutorial/TutorialProvider';
@@ -69,6 +70,7 @@ function AppContent() {
   return (
     <KeyboardProvider>
       <Router>
+        {user ? <AprilFools2026 /> : null}
         <BackButtonHandler />
         <Routes>
         {/* Public routes */}

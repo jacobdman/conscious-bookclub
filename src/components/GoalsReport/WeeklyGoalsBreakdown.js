@@ -18,6 +18,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
 const WeeklyGoalsBreakdown = ({ weeklyBreakdown, loading }) => {
   if (loading) {
@@ -100,7 +101,7 @@ const WeeklyGoalsBreakdown = ({ weeklyBreakdown, loading }) => {
                       >
                         <TableCell>
                           <Typography variant="body2" fontWeight={500}>
-                            {goal.title}
+                            {aprilFoolsGoalTitle(goal.title, goal.goalId)}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">

@@ -3,6 +3,7 @@
  */
 
 import { formatLocalDate, parseLocalDate } from 'utils/dateHelpers';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
 /**
  * Normalize goal type (handle variations like 'one-time' vs 'one_time')
@@ -637,8 +638,9 @@ export const getCompletedMilestonesToday = (milestones) => {
  * @returns {Array} - Array of milestone display objects with text and completed flag
  */
 export const formatMilestoneDisplay = (goal) => {
+  const goalTitleDisplay = aprilFoolsGoalTitle(goal.title, goal.id);
   if (!goal.milestones || goal.milestones.length === 0) {
-    return [{text: goal.title, completed: false}];
+    return [{text: goalTitleDisplay, completed: false}];
   }
   
   // Sort milestones by order (lowest first)
@@ -660,7 +662,7 @@ export const formatMilestoneDisplay = (goal) => {
     return aOrder - bOrder;
   }).forEach(m => {
     display.push({
-      text: `${goal.title}: ${m.title}`,
+      text: `${goalTitleDisplay}: ${m.title}`,
       completed: true,
       milestone: m,
     });
@@ -669,7 +671,7 @@ export const formatMilestoneDisplay = (goal) => {
   // Add next incomplete milestone
   if (nextIncomplete) {
     display.push({
-      text: `${goal.title}: ${nextIncomplete.title}`,
+      text: `${goalTitleDisplay}: ${nextIncomplete.title}`,
       completed: false,
       milestone: nextIncomplete,
     });
@@ -678,7 +680,7 @@ export const formatMilestoneDisplay = (goal) => {
   // If no next incomplete and no completed today, show goal title
   if (display.length === 0) {
     display.push({
-      text: goal.title,
+      text: goalTitleDisplay,
       completed: false,
     });
   }

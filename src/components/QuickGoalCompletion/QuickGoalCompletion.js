@@ -44,6 +44,7 @@ import {
   normalizeGoalType,
   getGoalStreakValue,
 } from 'utils/goalHelpers';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
 const QuickGoalCompletion = () => {
   const { user, userProfile, setUserProfile } = useAuth();
@@ -517,16 +518,16 @@ const QuickGoalCompletion = () => {
     if (goal.type === 'milestone') {
       const display = formatMilestoneDisplay(goal);
       // Return the next incomplete milestone text (last item)
-      return display.length > 0 ? display[display.length - 1].text : goal.title;
+      return display.length > 0 ? display[display.length - 1].text : aprilFoolsGoalTitle(goal.title, goal.id);
     }
-    return goal.title;
+    return aprilFoolsGoalTitle(goal.title, goal.id);
   };
 
   const getGoalDisplayItems = (goal) => {
     if (goal.type === 'milestone') {
       return formatMilestoneDisplay(goal);
     }
-    return [{ text: goal.title, completed: getCompletionState(goal) }];
+    return [{ text: aprilFoolsGoalTitle(goal.title, goal.id), completed: getCompletionState(goal) }];
   };
 
 

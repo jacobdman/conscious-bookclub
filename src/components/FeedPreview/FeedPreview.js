@@ -15,6 +15,7 @@ import EmojiInput from 'components/EmojiInput';
 import ReplyQuote from 'components/ReplyQuote';
 import { formatMeetingDisplay } from 'utils/meetingTime';
 import { renderMentions } from 'utils/mentionHelpers';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
 const FeedPreview = () => {
   const navigate = useNavigate();
@@ -180,7 +181,7 @@ const FeedPreview = () => {
             } else if (isGoalCompletionActivity) {
               const goal = post.relatedRecord?.record || {};
               const actorName = post.authorName || 'A member';
-              const goalTitle = goal.title || 'a goal';
+              const goalTitle = aprilFoolsGoalTitle(goal.title || 'a goal', goal.id);
               const streakMatch = post.text?.match(/\|streak:([^|]+)$/);
               const goalStreakValue = streakMatch?.[1]?.trim();
               previewText = `🎉 ${actorName} completed ${goalTitle}`;

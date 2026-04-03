@@ -153,16 +153,25 @@ const getLeaderboardReport = async (
       return;
     }
 
-    // Prefetch habit entries once per goal for the full effective range
+    // Prefetch habit entries once per goal for the full effective range.
+    // Include entries slightly before the report start so periods that begin
+    // before the window but overlap it (e.g. week spanning Mar 30–Apr 6 when
+    // the report starts Apr 1) still have their check-ins loaded.
     const habitEntries = await Promise.all(
         habitGoals.map(async (goal) => {
-          const goalStartDate = getGoalStartDate(goal, effectiveStartDate);
+          const scoringStart = getGoalStartDate(goal, effectiveStartDate);
+          const overlapBufferMs = 120 * 24 * 60 * 60 * 1000; // cover any cadence overlap
+          const entryRangeStart = new Date(
+              Math.min(scoringStart.getTime(), effectiveStartDate.getTime() - overlapBufferMs),
+          );
+          const goalFloor = getGoalStartDate(goal, null);
+          const entryLower = new Date(Math.max(entryRangeStart.getTime(), goalFloor.getTime()));
           const entries = await db.GoalEntry.findAll({
             where: {
               goalId: goal.id,
               userId: memberUserId,
               occurredAt: {
-                [Op.gte]: goalStartDate,
+                [Op.gte]: entryLower,
                 [Op.lt]: effectiveEndDate,
               },
             },
@@ -184,6 +193,7 @@ const getLeaderboardReport = async (
               goal,
               consistencyRate: 0,
               consistency: null,
+              totalPeriods: 0,
             };
           }
 
@@ -194,6 +204,10 @@ const getLeaderboardReport = async (
 
           const periods = [];
           const goalStartDate = getGoalStartDate(goal, effectiveStartDate);
+          // Walk periods back to goal creation — not to report start. Using
+          // report start as the floor skips cadence periods that begin before
+          // the window but overlap it (common on the first day of a quarter).
+          const goalIterationFloor = getGoalStartDate(goal, null);
           const implicitSuccessCount = getImplicitSuccessCount(
               goal.cadence,
               effectiveStartDate,
@@ -218,14 +232,17 @@ const getLeaderboardReport = async (
             );
           }
 
+          const periodOverlapsReportWindow = (periodStart, periodEnd) =>
+            periodEnd > effectiveStartDate && periodStart < effectiveEndDate;
+
           let periodIndex = 0;
-          while (currentBoundaries.start >= goalStartDate) {
+          while (currentBoundaries.start >= goalIterationFloor) {
           // Only include periods that:
-          // 1. Overlap with the date range
+          // 1. Overlap the report window (not only those ending after report start)
           // 2. Are fully complete (end <= effectiveEndDate && end <= now)
             if (
-              currentBoundaries.end > goalStartDate &&
-            currentBoundaries.start <= effectiveEndDate &&
+              periodOverlapsReportWindow(currentBoundaries.start, currentBoundaries.end) &&
+            currentBoundaries.end > goalStartDate &&
             currentBoundaries.end <= effectiveEndDate &&
             currentBoundaries.end <= now
             ) {
@@ -291,6 +308,7 @@ const getLeaderboardReport = async (
           return {
             goal,
             consistencyRate,
+            totalPeriods,
             consistency: {
               consistencyRate,
               streak,
@@ -316,11 +334,11 @@ const getLeaderboardReport = async (
     let longestStreak = 0;
 
     for (let i = 0; i < habitsWithConsistency.length; i++) {
-      const {consistencyRate, consistency} = habitsWithConsistency[i];
+      const {consistencyRate, consistency, totalPeriods = 0} = habitsWithConsistency[i];
       const habitPosition = i + 1; // Position among habits only (1, 2, 3...)
       const weight = calculateHabitWeight(habitPosition);
 
-      if (consistency) {
+      if (consistency && totalPeriods > 0) {
         weightedSum += consistencyRate * weight;
         totalWeight += weight;
         longestStreak = Math.max(longestStreak, consistency.streak);

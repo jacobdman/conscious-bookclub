@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, Typography, Tooltip as MUITooltip } from '@mui/material';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
 /**
  * Heatmap-style visualization with flipped axis
@@ -124,7 +125,9 @@ const HeatmapView = ({ weeklyBreakdown }) => {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 'var(--cell-gap)' }}>
-            {goalLabels.map((goal) => (
+            {goalLabels.map((goal) => {
+              const label = aprilFoolsGoalTitle(goal.title, goal.goalId);
+              return (
               <Typography
                 key={goal.goalId}
                 variant="caption"
@@ -135,11 +138,12 @@ const HeatmapView = ({ weeklyBreakdown }) => {
                   color: 'text.secondary',
                   fontWeight: 500,
                 }}
-                title={goal.title}
+                title={label}
               >
-                {goal.title.length > 12 ? goal.title.substring(0, 12) + '...' : goal.title}
+                {label.length > 12 ? label.substring(0, 12) + '...' : label}
               </Typography>
-            ))}
+            );
+            })}
           </Box>
         </Box>
 
@@ -174,11 +178,12 @@ const HeatmapView = ({ weeklyBreakdown }) => {
                 const weekEnd = new Date(week.weekEnd);
                 const isInactive = goalCreatedAt && weekEnd <= goalCreatedAt;
                 const color = isInactive ? '#e0e0e0' : getColor(completionData);
+                const displayTitle = aprilFoolsGoalTitle(goal.title, goal.goalId);
                 const tooltipTitle = isInactive
-                  ? `${goal.title} - ${week.weekLabelFull}: N/A (not active yet)`
+                  ? `${displayTitle} - ${week.weekLabelFull}: N/A (not active yet)`
                   : completionData
-                    ? `${goal.title} - ${week.weekLabelFull}: ${completionData.completionPercentage.toFixed(1)}% ${completionData.completed ? '✓ Completed' : '✗ Missed'}`
-                    : `${goal.title} - ${week.weekLabelFull}: No data`;
+                    ? `${displayTitle} - ${week.weekLabelFull}: ${completionData.completionPercentage.toFixed(1)}% ${completionData.completed ? '✓ Completed' : '✗ Missed'}`
+                    : `${displayTitle} - ${week.weekLabelFull}: No data`;
 
                 return (
                   <MUITooltip key={goal.goalId} title={tooltipTitle} arrow>

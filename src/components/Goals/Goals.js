@@ -38,6 +38,7 @@ import {
   getProgressInfo,
   getProgressBarValue,
 } from 'utils/goalHelpers';
+import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
 const CLUB_TAB_INDEX = 2;
 
@@ -278,7 +279,7 @@ const Goals = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="subtitle1" sx={{ fontWeight: goal.completed ? 'normal' : 'bold' }}>
-                          {goal.title}
+                          {aprilFoolsGoalTitle(goal.title, goal.id)}
                         </Typography>
                       </TableCell>
                       <TableCell>
