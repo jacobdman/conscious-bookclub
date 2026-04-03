@@ -87,6 +87,25 @@ export const getLeaderboardReport = async (clubId, userId, startDate, endDate) =
 };
 
 /**
+ * Weekly completion trend per member (club report chart).
+ * @param {number} clubId - Club ID
+ * @param {string} userId - User ID (for membership verification)
+ * @param {Date} startDate - Start date (optional)
+ * @param {Date} endDate - End date (optional)
+ * @returns {Promise<{ weeklyTrendByMember: Array }>}
+ */
+export const getWeeklyTrendByMemberReport = async (clubId, userId, startDate, endDate) => {
+  const params = new URLSearchParams({ clubId: clubId.toString(), userId });
+  if (startDate) {
+    params.append('startDate', startDate.toISOString());
+  }
+  if (endDate) {
+    params.append('endDate', endDate.toISOString());
+  }
+  return apiCall(`/v1/reports/weekly-trend-by-member?${params}`);
+};
+
+/**
  * Get goal type distribution report
  * @param {string} userId - User ID (optional if forClub is true)
  * @param {number} clubId - Club ID

@@ -4,6 +4,7 @@ const habitStreakReport = require("./habitStreak.report");
 const leaderboardReport = require("./leaderboard.report");
 const goalTypeDistributionReport = require("./goalTypeDistribution.report");
 const weeklyGoalsBreakdownReport = require("./weeklyGoalsBreakdown.report");
+const weeklyTrendByMemberReport = require("./weeklyTrendByMember.report");
 
 module.exports = {
   habitConsistencyReport,
@@ -12,5 +13,6 @@ module.exports = {
   leaderboardReport,
   goalTypeDistributionReport,
   weeklyGoalsBreakdownReport,
+  weeklyTrendByMemberReport,
 };
 

@@ -20,6 +20,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import { getClubGoalsReport } from 'services/clubs/goalsReport.service';
+import { getWeeklyTrendByMemberReport } from 'services/reports/reports.service';
 import HabitConsistencyLeaderboard from 'components/HabitConsistencyLeaderboard';
 import HabitStreaksLeaderboard from 'components/HabitStreaksLeaderboard';
 import WeeklyCompletionTrendByMember from './WeeklyCompletionTrendByMember';
@@ -78,8 +79,7 @@ const ClubGoalsReport = () => {
   const [weeklyTrendLoading, setWeeklyTrendLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-  const weeklyTrendRef = React.useRef(null);
-  
+
   // Date range state - default to current quarter
   const [dateRangePeriod, setDateRangePeriod] = useState('currentQuarter');
   const [startDate, setStartDate] = useState(() => {
@@ -133,52 +133,50 @@ const ClubGoalsReport = () => {
     fetchReport();
   }, [user, currentClub, startDate, endDate]);
 
-  // Reset analytics and weekly trend data when date range changes
+  // Reset analytics when date range changes (weekly trend refetched via effect below)
   useEffect(() => {
     setAnalyticsData(null);
     setWeeklyTrendData(null);
   }, [startDate, endDate]);
 
-  // Lazy load weekly trend when section comes into view
+  // Fetch weekly trend after the main report has loaded for the selected range.
+  // IntersectionObserver was unreliable here: changing the date sets loading=true and
+  // unmounts this section, so the observer detached and never re-fired when loading finished.
   useEffect(() => {
-    const currentRef = weeklyTrendRef.current;
-    if (!currentRef || weeklyTrendData || !user || !currentClub) return;
+    if (!user || !currentClub || loading || !reportData) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !weeklyTrendData && !weeklyTrendLoading) {
-          const fetchWeeklyTrend = async () => {
-            try {
-              setWeeklyTrendLoading(true);
-              const data = await getClubGoalsReport(
-                currentClub.id,
-                user.uid,
-                startDate,
-                endDate,
-                false, // Don't include analytics
-                true // Include weekly trend
-              );
-              setWeeklyTrendData(data.weeklyTrendByMember);
-            } catch (err) {
-              console.error('Error fetching weekly trend:', err);
-            } finally {
-              setWeeklyTrendLoading(false);
-            }
-          };
-          fetchWeeklyTrend();
+    let cancelled = false;
+
+    const fetchWeeklyTrend = async () => {
+      try {
+        setWeeklyTrendLoading(true);
+        const data = await getWeeklyTrendByMemberReport(
+          currentClub.id,
+          user.uid,
+          startDate,
+          endDate,
+        );
+        if (!cancelled) {
+          setWeeklyTrendData(data?.weeklyTrendByMember ?? null);
         }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(currentRef);
-
-    return () => {
-      if (currentRef) {
-        observer.unobserve(currentRef);
+      } catch (err) {
+        console.error('Error fetching weekly trend:', err);
+        if (!cancelled) {
+          setWeeklyTrendData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setWeeklyTrendLoading(false);
+        }
       }
     };
-  }, [weeklyTrendData, weeklyTrendLoading, user, currentClub, startDate, endDate]);
+
+    fetchWeeklyTrend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, currentClub, loading, reportData, startDate, endDate]);
 
   // Fetch analytics data only when analytics tab is active
   useEffect(() => {
@@ -349,7 +347,7 @@ const ClubGoalsReport = () => {
             </Box>
 
             {/* Weekly Completion Trend by Member */}
-            <Box sx={{ mb: 4 }} ref={weeklyTrendRef}>
+            <Box sx={{ mb: 4 }}>
               <Card 
                 elevation={2}
                 sx={{ 

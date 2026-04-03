@@ -5,6 +5,7 @@ const {
   leaderboardReport,
   goalTypeDistributionReport,
   weeklyGoalsBreakdownReport,
+  weeklyTrendByMemberReport,
 } = require("../../../services/reports");
 
 // GET /v1/reports/habit-consistency?userId=xxx&clubId=xxx&startDate=xxx&endDate=xxx
@@ -116,6 +117,38 @@ const getLeaderboard = async (req, res, next) => {
   }
 };
 
+// GET /v1/reports/weekly-trend-by-member?clubId=xxx&userId=xxx&startDate=xxx&endDate=xxx
+const getWeeklyTrendByMember = async (req, res, next) => {
+  try {
+    const clubId = req.query.clubId;
+    const userId = req.query.userId;
+    const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const weeklyTrendByMember = await weeklyTrendByMemberReport(
+        clubId,
+        userId,
+        startDate,
+        endDate,
+    );
+    res.json({weeklyTrendByMember});
+  } catch (e) {
+    next(e);
+  }
+};
+
 // GET /v1/reports/goal-type-distribution?userId=xxx&clubId=xxx&forClub=true
 const getGoalTypeDistribution = async (req, res, next) => {
   try {
@@ -174,6 +207,7 @@ module.exports = {
   getWeeklyTrend,
   getHabitStreak,
   getLeaderboard,
+  getWeeklyTrendByMember,
   getGoalTypeDistribution,
   getWeeklyGoalsBreakdown,
 };

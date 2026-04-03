@@ -4,6 +4,7 @@ const {
   getWeeklyTrend,
   getHabitStreak,
   getLeaderboard,
+  getWeeklyTrendByMember,
   getGoalTypeDistribution,
   getWeeklyGoalsBreakdown,
 } = require("./reports.ctrl");
@@ -15,6 +16,7 @@ router
     .get("/weekly-trend", getWeeklyTrend)
     .get("/habit-streak", getHabitStreak)
     .get("/leaderboard", getLeaderboard)
+    .get("/weekly-trend-by-member", getWeeklyTrendByMember)
     .get("/goal-type-distribution", getGoalTypeDistribution)
     .get("/weekly-goals-breakdown", getWeeklyGoalsBreakdown);
 
