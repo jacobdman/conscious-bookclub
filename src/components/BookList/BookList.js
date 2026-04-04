@@ -58,6 +58,13 @@ import { setOpenLibraryCoverSize, OL_COVER_SIZE } from 'services/openLibraryServ
 
 const CLUB_TAB_INDEX = 1;
 
+/** Primary list categories (maps to API listScope). */
+const CATEGORY_TABS = [
+  { scope: 'chosen', label: 'Reading/Read' },
+  { scope: 'backlog', label: 'Up Next' },
+  { scope: 'suggested', label: 'Discover' },
+];
+
 const BookList = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -154,17 +161,20 @@ const BookList = () => {
 
   const booksListSummaryLine = useMemo(() => {
     const viewLabels = {
-      backlog: 'Bookclub Backlog',
-      suggested: 'All Suggested',
-      bookmarked: 'Bookmarked',
+      chosen: 'Reading/Read',
+      backlog: 'Up Next',
+      suggested: 'Discover',
     };
     const scope = filters.listScope ?? 'backlog';
     const viewLabel = viewLabels[scope] ?? viewLabels.backlog;
 
     const hasExtraFilters =
       (themesEnabled && filters.theme !== 'all') ||
-      filters.status !== 'all' ||
       filters.suggestedBy !== 'all' ||
+      Boolean(filters.readByMe) ||
+      Boolean(filters.suggestedByMe) ||
+      Boolean(filters.likedByMe) ||
+      Boolean(filters.bookmarkedOnly) ||
       Boolean(search?.trim());
 
     const base = `Showing ${books.length} of ${totalCount} books — ${viewLabel}`;
@@ -174,8 +184,11 @@ const BookList = () => {
     totalCount,
     filters.listScope,
     filters.theme,
-    filters.status,
     filters.suggestedBy,
+    filters.readByMe,
+    filters.suggestedByMe,
+    filters.likedByMe,
+    filters.bookmarkedOnly,
     themesEnabled,
     search,
   ]);
@@ -195,17 +208,24 @@ const BookList = () => {
     setFilters({ theme: event.target.value });
   };
 
-  const handleFilterChange = (event) => {
-    setFilters({ status: event.target.value });
-  };
-
   const handleSuggestedByChange = (event) => {
     setFilters({ suggestedBy: event.target.value });
   };
 
-  const handleListScopeChange = (event) => {
-    setFilters({ listScope: event.target.value });
+  const handleCategoryTabChange = (e, newIndex) => {
+    const tab = CATEGORY_TABS[newIndex];
+    if (!tab) return;
+    setFilters({
+      listScope: tab.scope,
+      bookmarkedOnly: tab.scope === 'suggested' ? filters.bookmarkedOnly : false,
+    });
   };
+
+  const categoryTabIndex = useMemo(() => {
+    const scope = filters.listScope ?? 'backlog';
+    const i = CATEGORY_TABS.findIndex((t) => t.scope === scope);
+    return i === -1 ? 1 : i;
+  }, [filters.listScope]);
 
   const handlePageSizeChange = (event) => {
     setPageSize(parseInt(event.target.value, 10));
@@ -414,7 +434,7 @@ const BookList = () => {
           aria-label="books view tabs"
         >
           <Tab label="Book List" />
-          <Tab label="Club" />
+          <Tab label="Reporting" />
         </Tabs>
       </Box>
       <Box
@@ -476,6 +496,75 @@ const BookList = () => {
             >
               Add Book
             </Button>
+          </Box>
+        </Box>
+
+        {/* Primary categories + quick filters */}
+        <Box sx={{ mb: 1.5 }}>
+          <Tabs
+            value={categoryTabIndex}
+            onChange={handleCategoryTabChange}
+            aria-label="book list categories"
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 40 }}
+          >
+            {CATEGORY_TABS.map((t) => (
+              <Tab key={t.scope} label={t.label} sx={{ textTransform: 'none', fontWeight: 600 }} />
+            ))}
+          </Tabs>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 1,
+              mt: 1.5,
+              alignItems: 'center',
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ alignSelf: 'center', fontWeight: 600, letterSpacing: '0.02em' }}
+            >
+              Refine
+            </Typography>
+            <Chip
+              label="I've read"
+              size="small"
+              color={filters.readByMe ? 'primary' : 'default'}
+              variant={filters.readByMe ? 'filled' : 'outlined'}
+              onClick={() => setFilters({ readByMe: !filters.readByMe })}
+            />
+            <Chip
+              label="I suggested"
+              size="small"
+              color={filters.suggestedByMe ? 'primary' : 'default'}
+              variant={filters.suggestedByMe ? 'filled' : 'outlined'}
+              onClick={() =>
+                setFilters(
+                  filters.suggestedByMe
+                    ? { suggestedByMe: false }
+                    : { suggestedByMe: true, suggestedBy: 'all' },
+                )
+              }
+            />
+            <Chip
+              label="I like"
+              size="small"
+              color={filters.likedByMe ? 'primary' : 'default'}
+              variant={filters.likedByMe ? 'filled' : 'outlined'}
+              onClick={() => setFilters({ likedByMe: !filters.likedByMe })}
+            />
+            {(filters.listScope ?? 'backlog') === 'suggested' && (
+              <Chip
+                label="Bookmarked"
+                size="small"
+                color={filters.bookmarkedOnly ? 'primary' : 'default'}
+                variant={filters.bookmarkedOnly ? 'filled' : 'outlined'}
+                onClick={() => setFilters({ bookmarkedOnly: !filters.bookmarkedOnly })}
+              />
+            )}
           </Box>
         </Box>
 
@@ -554,7 +643,18 @@ const BookList = () => {
                     startIcon={<FilterListIcon />}
                     endIcon={showFilters ? <CloseIcon fontSize="small" /> : null}
                     onClick={toggleFilters}
-                    color={showFilters || filters.theme !== 'all' || filters.status !== 'all' || filters.suggestedBy !== 'all' || (filters.listScope ?? 'backlog') !== 'backlog' ? "primary" : "inherit"}
+                    color={
+                      showFilters ||
+                      filters.theme !== 'all' ||
+                      filters.suggestedBy !== 'all' ||
+                      filters.readByMe ||
+                      filters.suggestedByMe ||
+                      filters.likedByMe ||
+                      filters.bookmarkedOnly ||
+                      (filters.listScope ?? 'backlog') !== 'backlog'
+                        ? 'primary'
+                        : 'inherit'
+                    }
                     data-tour="books-filter"
                     sx={{ 
                         textTransform: 'none',
@@ -592,20 +692,6 @@ const BookList = () => {
                 }}
             >
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <FormControl sx={{ minWidth: 200 }} size="small">
-                        <InputLabel id="book-list-view-label">View</InputLabel>
-                        <Select
-                            labelId="book-list-view-label"
-                            value={filters.listScope ?? 'backlog'}
-                            onChange={handleListScopeChange}
-                            label="View"
-                            sx={{ borderRadius: 2 }}
-                        >
-                            <MenuItem value="backlog">Bookclub Backlog</MenuItem>
-                            <MenuItem value="suggested">All Suggested</MenuItem>
-                            <MenuItem value="bookmarked">Bookmarked</MenuItem>
-                        </Select>
-                    </FormControl>
                     {themesEnabled && (
                         <FormControl sx={{ minWidth: 200 }} size="small">
                             <InputLabel>Theme Filter</InputLabel>
@@ -625,20 +711,6 @@ const BookList = () => {
                             </Select>
                         </FormControl>
                     )}
-                
-                    <FormControl sx={{ minWidth: 250 }} size="small">
-                        <InputLabel>Book Filter</InputLabel>
-                        <Select
-                            value={filters.status}
-                            onChange={handleFilterChange}
-                            label="Book Filter"
-                            sx={{ borderRadius: 2 }}
-                        >
-                            <MenuItem value="all">All Books</MenuItem>
-                            <MenuItem value="scheduled">Books Scheduled for Meetings</MenuItem>
-                            <MenuItem value="read">Books I've Read</MenuItem>
-                        </Select>
-                    </FormControl>
 
                     <FormControl sx={{ minWidth: 220 }} size="small">
                         <InputLabel>Suggested By</InputLabel>
@@ -646,6 +718,7 @@ const BookList = () => {
                             value={filters.suggestedBy || 'all'}
                             onChange={handleSuggestedByChange}
                             label="Suggested By"
+                            disabled={filters.suggestedByMe}
                             sx={{ borderRadius: 2 }}
                         >
                             <MenuItem value="all">All members</MenuItem>

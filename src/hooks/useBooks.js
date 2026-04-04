@@ -3,117 +3,38 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getBooksPage,
   getBooksPageFiltered,
-  getAllDiscussedBooks,
   addBook,
   updateBook as updateBookService,
   deleteBook as deleteBookService,
 } from 'services/books/books.service';
-import { getUserBookProgress } from 'services/progress/progress.service';
-
-const sortList = (list, sort) => {
-  const directionFactor = sort.direction === 'asc' ? 1 : -1;
-  if (sort.field === 'likes') {
-    return [...list].sort((a, b) => ((a.likesCount || 0) - (b.likesCount || 0)) * directionFactor);
-  }
-  if (sort.field === 'createdAt') {
-    return [...list].sort((a, b) => {
-      const aDate = a.createdAt || a.created_at;
-      const bDate = b.createdAt || b.created_at;
-      const aTime = aDate ? new Date(aDate).getTime() : 0;
-      const bTime = bDate ? new Date(bDate).getTime() : 0;
-      return (aTime - bTime) * directionFactor;
-    });
-  }
-  if (sort.field === 'discussionDate') {
-    return [...list].sort((a, b) => {
-      const aDate = a.discussionDate || a.discussion_date;
-      const bDate = b.discussionDate || b.discussion_date;
-      const aTime = aDate ? new Date(aDate).getTime() : 0;
-      const bTime = bDate ? new Date(bDate).getTime() : 0;
-      return (aTime - bTime) * directionFactor;
-    });
-  }
-  if (sort.field === 'title' || sort.field === 'author') {
-    return [...list].sort((a, b) => {
-      const aValue = (a[sort.field] || '').toString().toLowerCase();
-      const bValue = (b[sort.field] || '').toString().toLowerCase();
-      if (aValue < bValue) return -1 * directionFactor;
-      if (aValue > bValue) return 1 * directionFactor;
-      return 0;
-    });
-  }
-  return list;
-};
 
 const fetchBooks = async (clubId, userId, options = {}) => {
   const {
     page = 1,
     pageSize = 10,
-    filters = { theme: 'all', status: 'all', suggestedBy: 'all', listScope: 'backlog' },
+    filters = {},
     search = '',
     sort = { field: 'createdAt', direction: 'desc' },
   } = options;
 
-  const { theme, status, suggestedBy, listScope: listScopeRaw } = filters;
+  const {
+    theme = 'all',
+    suggestedBy = 'all',
+    listScope: listScopeRaw = 'backlog',
+    readByMe = false,
+    suggestedByMe = false,
+    likedByMe = false,
+    bookmarkedOnly = false,
+  } = filters;
+
   const listScope = listScopeRaw ?? 'backlog';
-  const readStatus = status === 'read' ? 'finished' : null;
-  const uploadedByFilter = suggestedBy && suggestedBy !== 'all' ? suggestedBy : null;
-
-  if (status === 'scheduled') {
-    let allScheduledBooks = await getAllDiscussedBooks(clubId, userId, listScope);
-
-    if (theme !== 'all') {
-      if (theme === 'no-theme') {
-        allScheduledBooks = allScheduledBooks.filter(book => !book.theme || book.theme.length === 0);
-      } else {
-        allScheduledBooks = allScheduledBooks.filter(book => {
-          const bookThemes = Array.isArray(book.theme) ? book.theme : [book.theme];
-          return bookThemes.includes(theme);
-        });
-      }
-    }
-
-    if (search) {
-      const lowerSearch = search.toLowerCase();
-      allScheduledBooks = allScheduledBooks.filter(book =>
-        book.title.toLowerCase().includes(lowerSearch) ||
-        book.author.toLowerCase().includes(lowerSearch),
-      );
-    }
-
-    if (uploadedByFilter) {
-      allScheduledBooks = allScheduledBooks.filter(
-        (book) => (book.uploadedBy || book.uploaded_by) === uploadedByFilter,
-      );
-    }
-
-    allScheduledBooks = sortList(allScheduledBooks, sort);
-
-    const startIdx = (page - 1) * pageSize;
-    const endIdx = startIdx + pageSize;
-    const paginatedBooks = allScheduledBooks.slice(startIdx, endIdx);
-
-    if (userId && paginatedBooks.length > 0) {
-      const booksWithProgress = await Promise.all(paginatedBooks.map(async (book) => {
-        try {
-          const progress = await getUserBookProgress(userId, book.id);
-          return { ...book, progress };
-        } catch (error) {
-          return book;
-        }
-      }));
-
-      return {
-        books: booksWithProgress,
-        totalCount: allScheduledBooks.length,
-      };
-    }
-
-    return {
-      books: paginatedBooks,
-      totalCount: allScheduledBooks.length,
-    };
+  const readStatus = readByMe ? 'finished' : null;
+  let uploadedByFilter = suggestedBy && suggestedBy !== 'all' ? suggestedBy : null;
+  if (suggestedByMe && userId) {
+    uploadedByFilter = userId;
   }
+  const likedByMeParam = Boolean(likedByMe);
+  const bookmarkedOnlyParam = listScope === 'suggested' && Boolean(bookmarkedOnly);
 
   if (theme !== 'all') {
     return await getBooksPageFiltered(
@@ -128,6 +49,8 @@ const fetchBooks = async (clubId, userId, options = {}) => {
       search,
       uploadedByFilter,
       listScope,
+      likedByMeParam,
+      bookmarkedOnlyParam,
     );
   }
 
@@ -142,6 +65,8 @@ const fetchBooks = async (clubId, userId, options = {}) => {
     search,
     uploadedByFilter,
     listScope,
+    likedByMeParam,
+    bookmarkedOnlyParam,
   );
 };
 

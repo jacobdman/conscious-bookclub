@@ -54,12 +54,76 @@ const parseListScope = (raw) => {
     return null;
   }
   const s = String(raw).trim();
-  if (!["backlog", "suggested", "bookmarked"].includes(s)) {
+  if (!["backlog", "suggested", "bookmarked", "chosen"].includes(s)) {
     const err = new Error("Invalid listScope");
     err.status = 400;
     throw err;
   }
   return s;
+};
+
+/**
+ * @param {*} raw Query value
+ * @return {boolean}
+ */
+const parseBoolQuery = (raw) => raw === true || raw === "true" || raw === "1";
+
+/**
+ * EXISTS subquery for user interaction (avoids duplicate rows / distinct issues).
+ * @param {string} userId User id
+ * @param {string} action book_interactions.action
+ * @return {object} Sequelize literal
+ */
+const existsInteractionLiteral = (userId, action) => db.sequelize.literal(
+    `EXISTS (SELECT 1 FROM book_interactions bi WHERE bi.book_id = "Book".id AND bi.user_id = ` +
+    `${db.sequelize.escape(userId)} AND bi.action = ${db.sequelize.escape(action)})`,
+);
+
+/**
+ * AND-merge Sequelize where clause with literal fragments.
+ * @param {object} whereClause Sequelize where object
+ * @param {...object} literals Additional AND conditions
+ * @return {object}
+ */
+const mergeWhereAnd = (whereClause, ...literals) => {
+  if (!literals.length) {
+    return whereClause;
+  }
+  return {[db.Op.and]: [whereClause, ...literals]};
+};
+
+/**
+ * Applies primary list scope: chosen / backlog / suggested / legacy bookmarked view.
+ * @param {object} whereClause Sequelize where object (e.g. clubId)
+ * @param {string|null} listScope backlog | suggested | chosen | bookmarked
+ * @return {object}
+ */
+const applyBooksListScopeWhere = (whereClause, listScope) => {
+  if (!listScope) {
+    return whereClause;
+  }
+  if (listScope === "chosen") {
+    return {...whereClause, chosenForBookclub: true};
+  }
+  if (listScope === "backlog") {
+    return {
+      ...whereClause,
+      pool: "backlog",
+      chosenForBookclub: {
+        [db.Op.or]: [false, null],
+      },
+    };
+  }
+  if (listScope === "suggested" || listScope === "bookmarked") {
+    return {
+      ...whereClause,
+      pool: "suggested",
+      chosenForBookclub: {
+        [db.Op.or]: [false, null],
+      },
+    };
+  }
+  return whereClause;
 };
 
 // Helper function to get books page
@@ -74,6 +138,8 @@ const getBooksPage = async (
     search,
     filterUploadedBy,
     listScope,
+    likedByMe,
+    bookmarkedOnly,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
 
@@ -81,9 +147,7 @@ const getBooksPage = async (
   if (clubId) {
     whereClause.clubId = parseInt(clubId);
   }
-  if (listScope === "backlog" || listScope === "suggested") {
-    whereClause.pool = listScope;
-  }
+  whereClause = applyBooksListScopeWhere(whereClause, listScope);
 
   // Add search filter
   if (search) {
@@ -107,6 +171,25 @@ const getBooksPage = async (
 
   if (filterUploadedBy) {
     whereClause = {...whereClause, uploadedBy: filterUploadedBy};
+  }
+
+  const interactionLiterals = [];
+  if (likedByMe && userId) {
+    interactionLiterals.push(existsInteractionLiteral(userId, "like"));
+  }
+  const bookmarkFilter =
+    listScope === "bookmarked" ||
+    (bookmarkedOnly && listScope === "suggested");
+  if (bookmarkFilter) {
+    if (!userId) {
+      const err = new Error("userId is required for bookmarked books");
+      err.status = 400;
+      throw err;
+    }
+    interactionLiterals.push(existsInteractionLiteral(userId, "bookmark"));
+  }
+  if (interactionLiterals.length) {
+    whereClause = mergeWhereAnd(whereClause, ...interactionLiterals);
   }
 
   const includeOptions = [
@@ -142,28 +225,11 @@ const getBooksPage = async (
     });
   }
 
-  if (listScope === "bookmarked") {
-    if (!userId) {
-      const err = new Error("userId is required when listScope is bookmarked");
-      err.status = 400;
-      throw err;
-    }
-    includeOptions.push({
-      model: db.BookInteraction,
-      as: "bookInteractions",
-      where: {userId, action: "bookmark"},
-      required: true,
-      attributes: ["id"],
-    });
-  }
-
   const queryOptions = {
     where: whereClause,
     order: buildOrderClause(orderByField, orderDirection),
     limit: pageSize,
     offset,
-    distinct: listScope === "bookmarked",
-    col: listScope === "bookmarked" ? "id" : undefined,
   };
 
   if (includeOptions.length > 0) {
@@ -208,6 +274,8 @@ const getBooksPageFiltered = async (
     search,
     filterUploadedBy,
     listScope,
+    likedByMe,
+    bookmarkedOnly,
 ) => {
   const offset = (pageNumber - 1) * pageSize;
   let whereClause = {};
@@ -215,9 +283,7 @@ const getBooksPageFiltered = async (
   if (clubId) {
     whereClause.clubId = parseInt(clubId);
   }
-  if (listScope === "backlog" || listScope === "suggested") {
-    whereClause.pool = listScope;
-  }
+  whereClause = applyBooksListScopeWhere(whereClause, listScope);
 
   if (theme === "no-theme") {
     whereClause = {
@@ -275,6 +341,25 @@ const getBooksPageFiltered = async (
     whereClause = {...whereClause, uploadedBy: filterUploadedBy};
   }
 
+  const interactionLiterals = [];
+  if (likedByMe && userId) {
+    interactionLiterals.push(existsInteractionLiteral(userId, "like"));
+  }
+  const bookmarkFilterFiltered =
+    listScope === "bookmarked" ||
+    (bookmarkedOnly && listScope === "suggested");
+  if (bookmarkFilterFiltered) {
+    if (!userId) {
+      const err = new Error("userId is required for bookmarked books");
+      err.status = 400;
+      throw err;
+    }
+    interactionLiterals.push(existsInteractionLiteral(userId, "bookmark"));
+  }
+  if (interactionLiterals.length) {
+    whereClause = mergeWhereAnd(whereClause, ...interactionLiterals);
+  }
+
   const includeOptions = [
     {
       model: db.User,
@@ -308,28 +393,11 @@ const getBooksPageFiltered = async (
     });
   }
 
-  if (listScope === "bookmarked") {
-    if (!userId) {
-      const err = new Error("userId is required when listScope is bookmarked");
-      err.status = 400;
-      throw err;
-    }
-    includeOptions.push({
-      model: db.BookInteraction,
-      as: "bookInteractions",
-      where: {userId, action: "bookmark"},
-      required: true,
-      attributes: ["id"],
-    });
-  }
-
   const queryOptions = {
     where: whereClause,
     order: buildOrderClause(orderByField, orderDirection),
     limit: pageSize,
     offset,
-    distinct: listScope === "bookmarked",
-    col: listScope === "bookmarked" ? "id" : undefined,
   };
 
   if (includeOptions.length > 0) {
@@ -375,6 +443,8 @@ const getBooks = async (req, res, next) => {
       search,
       uploadedBy,
       listScope: rawListScope,
+      likedByMe: rawLikedByMe,
+      bookmarkedOnly: rawBookmarkedOnly,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -384,6 +454,8 @@ const getBooks = async (req, res, next) => {
     const mappedOrderBy = mapOrderByField(orderBy);
     const filterUploadedBy = normalizeUploadedByFilter(uploadedBy);
     const listScope = parseListScope(rawListScope);
+    const likedByMe = parseBoolQuery(rawLikedByMe);
+    const bookmarkedOnly = parseBoolQuery(rawBookmarkedOnly);
     const result = await getBooksPage(
         parseInt(page),
         parseInt(pageSize),
@@ -395,6 +467,8 @@ const getBooks = async (req, res, next) => {
         search,
         filterUploadedBy,
         listScope,
+        likedByMe,
+        bookmarkedOnly,
     );
     res.json(result);
   } catch (e) {
@@ -418,14 +492,15 @@ const getDiscussedBooks = async (req, res, next) => {
       throw err;
     }
 
-    const where = {
+    let where = {
       clubId: parseInt(clubId),
       discussionDate: {
         [db.Op.ne]: null,
       },
     };
-    if (listScope === "backlog" || listScope === "suggested") {
-      where.pool = listScope;
+    where = applyBooksListScopeWhere(where, listScope);
+    if (listScope === "bookmarked" && userId) {
+      where = mergeWhereAnd(where, existsInteractionLiteral(userId, "bookmark"));
     }
 
     const include = [
@@ -436,15 +511,6 @@ const getDiscussedBooks = async (req, res, next) => {
         required: false,
       },
     ];
-    if (listScope === "bookmarked") {
-      include.push({
-        model: db.BookInteraction,
-        as: "bookInteractions",
-        where: {userId, action: "bookmark"},
-        required: true,
-        attributes: ["id"],
-      });
-    }
 
     const books = await db.Book.findAll({
       where,
@@ -486,6 +552,8 @@ const getFilteredBooks = async (req, res, next) => {
       search,
       uploadedBy,
       listScope: rawListScope,
+      likedByMe: rawLikedByMe,
+      bookmarkedOnly: rawBookmarkedOnly,
     } = req.query;
     if (!clubId) {
       const error = new Error("clubId is required");
@@ -495,6 +563,8 @@ const getFilteredBooks = async (req, res, next) => {
     const mappedOrderBy = mapOrderByField(orderBy);
     const filterUploadedBy = normalizeUploadedByFilter(uploadedBy);
     const listScope = parseListScope(rawListScope);
+    const likedByMe = parseBoolQuery(rawLikedByMe);
+    const bookmarkedOnly = parseBoolQuery(rawBookmarkedOnly);
     const result = await getBooksPageFiltered(
         theme,
         parseInt(page),
@@ -507,6 +577,8 @@ const getFilteredBooks = async (req, res, next) => {
         search,
         filterUploadedBy,
         listScope,
+        likedByMe,
+        bookmarkedOnly,
     );
     res.json(result);
   } catch (e) {

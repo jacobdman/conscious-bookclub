@@ -24,7 +24,7 @@ const ROUTE_TITLES = {
   '/': 'Dashboard',
   '/feed': 'Feed',
   '/books': 'Books',
-  '/books/club': 'Books',
+  '/books/club': 'Reporting',
   '/goals': 'Goals',
   '/goals/club': 'Goals',
   '/calendar': 'Calendar',

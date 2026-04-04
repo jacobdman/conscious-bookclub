@@ -13,6 +13,47 @@ import { useBooks, useCreateBook, useUpdateBook, useDeleteBook } from 'hooks/use
 
 const BOOKS_VIEW_STORAGE_KEY_PREFIX = 'books-view';
 
+const DEFAULT_BOOK_FILTERS = {
+  theme: 'all',
+  suggestedBy: 'all',
+  listScope: 'backlog',
+  readByMe: false,
+  suggestedByMe: false,
+  likedByMe: false,
+  bookmarkedOnly: false,
+};
+
+/** Normalize persisted filters (handles legacy listScope bookmarked + status read). */
+const normalizeStoredFilters = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return { ...DEFAULT_BOOK_FILTERS };
+  }
+  const lsRaw = String(raw.listScope ?? 'backlog').trim();
+  let listScope = ['chosen', 'backlog', 'suggested'].includes(lsRaw) ? lsRaw : 'backlog';
+  let bookmarkedOnly = Boolean(raw.bookmarkedOnly);
+  if (lsRaw === 'bookmarked') {
+    listScope = 'suggested';
+    bookmarkedOnly = true;
+  }
+  const legacyStatus = String(raw.status ?? 'all');
+  let readByMe = Boolean(raw.readByMe);
+  if (legacyStatus === 'read') {
+    readByMe = true;
+  }
+  if (bookmarkedOnly && listScope !== 'suggested') {
+    listScope = 'suggested';
+  }
+  return {
+    theme: String(raw.theme ?? 'all'),
+    suggestedBy: String(raw.suggestedBy ?? 'all'),
+    listScope,
+    readByMe,
+    suggestedByMe: Boolean(raw.suggestedByMe),
+    likedByMe: Boolean(raw.likedByMe),
+    bookmarkedOnly,
+  };
+};
+
 const getStoredBooksViewState = (clubId) => {
   if (typeof window === 'undefined' || !clubId) return null;
   try {
@@ -24,18 +65,7 @@ const getStoredBooksViewState = (clubId) => {
       pagination: parsed.pagination && typeof parsed.pagination.page === 'number' && parsed.pagination.page >= 1
         ? { page: parsed.pagination.page, pageSize: Number(parsed.pagination.pageSize) || 10 }
         : { page: 1, pageSize: 10 },
-      filters: parsed.filters && typeof parsed.filters === 'object'
-        ? {
-          theme: String(parsed.filters.theme ?? 'all'),
-          status: String(parsed.filters.status ?? 'all'),
-          suggestedBy: String(parsed.filters.suggestedBy ?? 'all'),
-          listScope: ['backlog', 'suggested', 'bookmarked'].includes(
-              String(parsed.filters.listScope ?? '').trim(),
-          )
-            ? String(parsed.filters.listScope).trim()
-            : 'backlog',
-        }
-        : { theme: 'all', status: 'all', suggestedBy: 'all', listScope: 'backlog' },
+      filters: normalizeStoredFilters(parsed.filters),
       search: typeof parsed.search === 'string' ? parsed.search : '',
       sort: parsed.sort && typeof parsed.sort === 'object'
         ? { field: String(parsed.sort.field ?? 'createdAt'), direction: String(parsed.sort.direction ?? 'desc') }
@@ -119,12 +149,7 @@ const BooksProvider = ({ children }) => {
 
   // New state for filters and pagination (restored from sessionStorage when club is set)
   const [pagination, setPaginationState] = useState({ page: 1, pageSize: 10 });
-  const [filters, setFiltersState] = useState({
-    theme: 'all',
-    status: 'all',
-    suggestedBy: 'all',
-    listScope: 'backlog',
-  });
+  const [filters, setFiltersState] = useState({ ...DEFAULT_BOOK_FILTERS });
   const [search, setSearchState] = useState('');
   const [sort, setSortState] = useState({ field: 'createdAt', direction: 'desc' });
 
