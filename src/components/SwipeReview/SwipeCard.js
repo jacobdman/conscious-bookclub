@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Box, Typography, Avatar, IconButton } from '@mui/material';
+import { Box, Typography, Avatar, IconButton, Chip } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { getSwipeQueueMeta } from 'constants/swipeQueues';
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion';
@@ -62,6 +62,11 @@ const SwipeCard = ({ book, activeQueue, isBacklogReview, onCommit, stackIndex = 
     } else {
       dir = ly < 0 ? 'up' : 'down';
       mag = Math.min(1, ay / 160);
+    }
+    if (isBacklogReview && (dir === 'up' || dir === 'down')) {
+      setOverlayDir('');
+      setOverlayStrength(0);
+      return;
     }
     if (dir === 'up' && book.pool === 'backlog' && !isBacklogReview) {
       setOverlayDir('');
@@ -176,6 +181,16 @@ const SwipeCard = ({ book, activeQueue, isBacklogReview, onCommit, stackIndex = 
         <Typography variant="h6" align="center" fontWeight={700}>
           {book.title}
         </Typography>
+        {(book.isSuperLiked || book.isLiked) && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 0.75, mb: 0.25 }}>
+            <Chip
+              size="small"
+              label={book.isSuperLiked ? 'You super-liked' : 'You liked'}
+              color={book.isSuperLiked ? 'error' : 'success'}
+              variant="outlined"
+            />
+          </Box>
+        )}
         <Typography variant="body2" color="text.secondary" align="center">
           {book.author || 'Unknown author'}
         </Typography>
@@ -281,7 +296,11 @@ const SwipeCard = ({ book, activeQueue, isBacklogReview, onCommit, stackIndex = 
               <InfoOutlinedIcon />
             </IconButton>
           </Box>
-          <SwipeOverlay direction={overlayDir} strength={overlayStrength} />
+          <SwipeOverlay
+            direction={overlayDir}
+            strength={overlayStrength}
+            isBacklogReview={isBacklogReview}
+          />
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={flipped ? 'back' : 'front'}

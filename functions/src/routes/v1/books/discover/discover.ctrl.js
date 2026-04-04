@@ -1,6 +1,10 @@
 const db = require("../../../../../db/models/index");
 const {Op, QueryTypes} = db.Sequelize;
-const {loadMergedLikeMemberListsByBookId} = require("../likeHelpers");
+const {
+  loadMergedLikeMemberListsByBookId,
+  buildLikesSummary,
+  buildSuperLikeSummary,
+} = require("../likeHelpers");
 
 const ACTIVE_USER_DAYS = 30;
 const DEFAULT_MIN_THRESHOLD = 3;
@@ -717,8 +721,10 @@ const getDiscoverQueue = async (req, res, next) => {
     const bookIds = books.map((b) => b.id);
     const superByBookId = new Map();
     let memberListsByBookId = new Map();
+    let likedBookIds = new Set();
+    let superLikedBookIds = new Set();
     if (bookIds.length) {
-      const [superCounts, memberLists] = await Promise.all([
+      const [superCounts, memberLists, likesSummary, superSummary] = await Promise.all([
         db.BookInteraction.findAll({
           attributes: [
             "bookId",
@@ -729,11 +735,15 @@ const getDiscoverQueue = async (req, res, next) => {
           raw: true,
         }),
         loadMergedLikeMemberListsByBookId(bookIds),
+        buildLikesSummary(bookIds, userId),
+        buildSuperLikeSummary(bookIds, userId),
       ]);
       superCounts.forEach((row) => {
         superByBookId.set(row.bookId, parseInt(row.cnt, 10));
       });
       memberListsByBookId = memberLists;
+      likedBookIds = likesSummary.likedBookIds;
+      superLikedBookIds = superSummary.superLikedBookIds;
     }
 
     const usedSuper = await countUserSuperLikesInClub(userId, clubId);
@@ -762,6 +772,8 @@ const getDiscoverQueue = async (req, res, next) => {
         superLikeUsers: members.superLikeUsers,
         likeUsersTruncated: members.likeUsersTruncated,
         superLikeUsersTruncated: members.superLikeUsersTruncated,
+        isLiked: likedBookIds.has(book.id),
+        isSuperLiked: superLikedBookIds.has(book.id),
       };
     });
 
