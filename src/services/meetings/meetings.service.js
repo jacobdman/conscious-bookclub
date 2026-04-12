@@ -49,3 +49,14 @@ export const updateMeeting = async (userId, clubId, meetingId, meetingData) => {
   return meeting;
 };
 
+export const setMeetingRsvp = async (userId, clubId, meetingId, status) => {
+  const params = new URLSearchParams({
+    userId,
+    clubId: clubId.toString(),
+  });
+  return apiCall(`/v1/meetings/${meetingId}/rsvp?${params}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+};
+

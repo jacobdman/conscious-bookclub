@@ -1,3 +1,4 @@
+const {QueryTypes} = require("sequelize");
 const db = require("../../../../db/models/index");
 const moment = require("moment-timezone");
 const {emitToClub, postIncludes, buildPostResponse} = require("../posts/posts.ctrl");
@@ -55,6 +56,93 @@ const verifyMeetingAccess = async (clubId, userId) => {
     },
   });
   return membership;
+};
+
+const RSVP_STATUSES = new Set(["going", "not_going", "maybe"]);
+
+const emptyRsvpSummary = () => ({
+  going: 0,
+  notGoing: 0,
+  maybe: 0,
+});
+
+const verifyClubMembership = async (clubId, userId) => {
+  const membership = await db.ClubMember.findOne({
+    where: {clubId, userId},
+  });
+  return membership;
+};
+
+/**
+ * @param {number[]} meetingIds
+ * @param {string|null|undefined} userId
+ * @return {Promise<{summaryById: Map<number, object>, myRsvpById: Map<number, string>}>}
+ */
+const loadRsvpForMeetings = async (meetingIds, userId) => {
+  const summaryById = new Map();
+  if (!meetingIds.length) {
+    return {summaryById, myRsvpById: new Map()};
+  }
+
+  const aggRows = await db.sequelize.query(
+      `SELECT meeting_id AS "meetingId", status, COUNT(*)::int AS count
+       FROM meeting_rsvps
+       WHERE meeting_id IN (:ids)
+       GROUP BY meeting_id, status`,
+      {
+        replacements: {ids: meetingIds},
+        type: QueryTypes.SELECT,
+      },
+  );
+
+  for (const row of aggRows) {
+    const mid = row.meetingId;
+    if (!summaryById.has(mid)) {
+      summaryById.set(mid, emptyRsvpSummary());
+    }
+    const s = summaryById.get(mid);
+    const c = parseInt(row.count, 10) || 0;
+    if (row.status === "going") s.going = c;
+    else if (row.status === "not_going") s.notGoing = c;
+    else if (row.status === "maybe") s.maybe = c;
+  }
+
+  const myRsvpById = new Map();
+  if (userId) {
+    const mine = await db.MeetingRsvp.findAll({
+      where: {
+        userId,
+        meetingId: {[db.Op.in]: meetingIds},
+      },
+      attributes: ["meetingId", "status"],
+    });
+    for (const r of mine) {
+      myRsvpById.set(r.meetingId, r.status);
+    }
+  }
+
+  return {summaryById, myRsvpById};
+};
+
+const getRsvpSummaryForMeetingId = async (meetingId) => {
+  const rows = await db.sequelize.query(
+      `SELECT status, COUNT(*)::int AS count
+       FROM meeting_rsvps
+       WHERE meeting_id = :meetingId
+       GROUP BY status`,
+      {
+        replacements: {meetingId},
+        type: QueryTypes.SELECT,
+      },
+  );
+  const summary = emptyRsvpSummary();
+  for (const row of rows) {
+    const c = parseInt(row.count, 10) || 0;
+    if (row.status === "going") summary.going = c;
+    else if (row.status === "not_going") summary.notGoing = c;
+    else if (row.status === "maybe") summary.maybe = c;
+  }
+  return summary;
 };
 
 // GET /v1/meetings - Get all meetings
@@ -181,6 +269,9 @@ const getMeetings = async (req, res, next) => {
         userId,
     );
 
+    const meetingIdsForRsvp = meetings.map((m) => m.id);
+    const {summaryById, myRsvpById} = await loadRsvpForMeetings(meetingIdsForRsvp, userId);
+
     // Transform the response to nest progress in book.progress
     const transformedMeetings = meetings.map((meeting) => {
       const meetingJson = meeting.toJSON();
@@ -204,6 +295,8 @@ const getMeetings = async (req, res, next) => {
         meetingJson.book.superLikesCount = superLikesByBookId.get(bid) || 0;
         meetingJson.book.isSuperLiked = superLikedBookIds.has(bid);
       }
+      meetingJson.rsvpSummary = summaryById.get(meeting.id) || emptyRsvpSummary();
+      meetingJson.myRsvp = myRsvpById.get(meeting.id) ?? null;
       return {id: meeting.id, ...meetingJson};
     });
 
@@ -515,10 +608,80 @@ const getMeetingsICal = async (req, res, next) => {
   }
 };
 
+// PATCH /v1/meetings/:meetingId/rsvp — club members only
+const setMeetingRsvp = async (req, res, next) => {
+  try {
+    const {meetingId} = req.params;
+    const {clubId} = req.query;
+    const userId = req.query.userId;
+    const status = req.body && req.body.status;
+
+    if (!clubId) {
+      const error = new Error("clubId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    if (!userId) {
+      const error = new Error("userId is required");
+      error.status = 400;
+      throw error;
+    }
+
+    if (!RSVP_STATUSES.has(status)) {
+      const error = new Error("status must be one of: going, not_going, maybe");
+      error.status = 400;
+      throw error;
+    }
+
+    const numericClubId = parseInt(clubId, 10);
+    const membership = await verifyClubMembership(numericClubId, userId);
+    if (!membership) {
+      const error = new Error("You must be a club member to RSVP");
+      error.status = 403;
+      throw error;
+    }
+
+    const meeting = await db.Meeting.findByPk(meetingId);
+    if (!meeting) {
+      const error = new Error("Meeting not found");
+      error.status = 404;
+      throw error;
+    }
+
+    if (meeting.clubId !== numericClubId) {
+      const error = new Error("Meeting does not belong to this club");
+      error.status = 403;
+      throw error;
+    }
+
+    const mid = parseInt(meetingId, 10);
+    const [row, created] = await db.MeetingRsvp.findOrCreate({
+      where: {meetingId: mid, userId},
+      defaults: {status},
+    });
+
+    if (!created && row.status !== status) {
+      row.status = status;
+      await row.save();
+    }
+
+    const rsvpSummary = await getRsvpSummaryForMeetingId(mid);
+
+    res.json({
+      myRsvp: status,
+      rsvpSummary,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   getMeetings,
   createMeeting,
   updateMeeting,
   getMeetingsICal,
+  setMeetingRsvp,
 };
 
