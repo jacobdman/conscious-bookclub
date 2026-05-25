@@ -92,10 +92,19 @@ export const AuthProvider = (props) => {
         });
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    let loadingFinished = false;
+    const finishLoading = () => {
+      if (!loadingFinished) {
+        loadingFinished = true;
+        setLoading(false);
+      }
+    };
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
         try {
-          const createdUser = await createUserDocument(user);
+          const createdUser = await createUserDocument(firebaseUser);
           setUserProfile(createdUser);
         } catch (error) {
           // Error creating user document
@@ -103,15 +112,14 @@ export const AuthProvider = (props) => {
       } else {
         setUserProfile(null);
       }
-      setUser(user);
-      setLoading(false);
     });
 
-    // Safety: if onAuthStateChanged never fires (e.g. CORS blocks Firebase on native),
-    // stop loading after 5s so the app shows login instead of spinning forever.
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
+    // Wait until persisted auth state is restored before routing (avoids false sign-out flash).
+    auth.authStateReady().then(finishLoading).catch(finishLoading);
+
+    // Safety: if authStateReady never resolves (e.g. CORS blocks Firebase on native),
+    // stop loading so the app shows sign-in instead of spinning forever.
+    const timeoutId = setTimeout(finishLoading, 10000);
 
     return () => {
       unsubscribe();
