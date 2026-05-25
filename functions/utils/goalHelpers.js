@@ -58,6 +58,82 @@ const getPeriodBoundaries = (cadence, timestamp = null, timezone = null) => {
   return {start: start.toDate(), end: end.toDate()};
 };
 
+const CADENCE_RANK = {
+  day: 1,
+  week: 2,
+  month: 3,
+  quarter: 4,
+};
+
+/**
+ * Whole units of innerCadence that fit in one outerPeriod window (current period).
+ * @param {string} innerCadence day | week | month | quarter
+ * @param {string} outerPeriod day | week | month | quarter
+ * @param {string|null} timezone IANA timezone
+ * @return {number} At least 1
+ */
+const periodsBetween = (innerCadence, outerPeriod, timezone = null) => {
+  if (!innerCadence || !outerPeriod) {
+    return 1;
+  }
+  if (innerCadence === outerPeriod) {
+    return 1;
+  }
+  const inner = getPeriodBoundaries(innerCadence, null, timezone);
+  const outer = getPeriodBoundaries(outerPeriod, null, timezone);
+  const innerStart = timezone ? moment(inner.start).tz(timezone) : moment(inner.start).utc();
+  const innerEnd = timezone ? moment(inner.end).tz(timezone) : moment(inner.end).utc();
+  const outerStart = timezone ? moment(outer.start).tz(timezone) : moment(outer.start).utc();
+  const outerEnd = timezone ? moment(outer.end).tz(timezone) : moment(outer.end).utc();
+  const innerMs = innerEnd.diff(innerStart);
+  const outerMs = outerEnd.diff(outerStart);
+  if (!innerMs || innerMs <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.round(outerMs / innerMs));
+};
+
+/**
+ * Reporting window used for club aggregates (reportingPeriod or cadence).
+ * @param {object} clubGoal Club goal row
+ * @return {string}
+ */
+const getClubGoalReportingPeriod = (clubGoal) =>
+  clubGoal.reportingPeriod || clubGoal.cadence;
+
+/**
+ * True when cadence is shorter than the club reporting period (target should scale).
+ * @param {object} clubGoal Club goal row
+ * @return {boolean}
+ */
+const shouldScaleClubGoalTarget = (clubGoal) => {
+  const cadence = clubGoal.cadence;
+  const period = getClubGoalReportingPeriod(clubGoal);
+  if (!cadence || !period) {
+    return false;
+  }
+  return (CADENCE_RANK[cadence] || 0) < (CADENCE_RANK[period] || 0);
+};
+
+/**
+ * Effective cap for metric club goals (scales stored per-cadence target across reporting period).
+ * @param {object} clubGoal Club goal row
+ * @param {number} memberCount Active member goals count
+ * @param {string|null} timezone IANA timezone
+ * @return {{ effectiveTarget: number, storedTarget: number, multiplier: number }}
+ */
+const getEffectiveClubTarget = (clubGoal, memberCount, timezone = null) => {
+  const storedTarget = parseFloat(clubGoal.targetQuantity) || 0;
+  const multiplier = shouldScaleClubGoalTarget(clubGoal) ?
+    periodsBetween(clubGoal.cadence, getClubGoalReportingPeriod(clubGoal), timezone) :
+    1;
+  let effectiveTarget = storedTarget * multiplier;
+  if (clubGoal.contributionMode === "individual_target") {
+    effectiveTarget = storedTarget * Math.max(memberCount, 1) * multiplier;
+  }
+  return {effectiveTarget, storedTarget, multiplier};
+};
+
 // Helper to get previous period boundaries
 const getPreviousPeriodBoundaries = (cadence, currentStart, timezone = null) => {
   const base = timezone ? moment.tz(currentStart, timezone) : moment(currentStart).utc();
@@ -316,6 +392,10 @@ const calculateHabitConsistency = async (
 module.exports = {
   getGoalEntries,
   getPeriodBoundaries,
+  periodsBetween,
+  getClubGoalReportingPeriod,
+  shouldScaleClubGoalTarget,
+  getEffectiveClubTarget,
   getPreviousPeriodBoundaries,
   calculateHabitWeight,
   getGoalStartDate,

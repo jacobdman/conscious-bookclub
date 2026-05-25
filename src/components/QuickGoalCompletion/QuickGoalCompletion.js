@@ -25,6 +25,7 @@ import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
 import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import GoalTypeChip from 'components/GoalTypeChip';
+import ClubGoalChip from 'components/ClubGoalChip';
 import PausedGoalChip from 'components/PausedGoalChip';
 import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
 import IOSConfirmDialog from 'components/IOSConfirmDialog';
@@ -43,6 +44,7 @@ import {
   formatMilestoneDisplay,
   normalizeGoalType,
   getGoalStreakValue,
+  isClubLinkedGoal,
 } from 'utils/goalHelpers';
 import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
@@ -603,6 +605,7 @@ const QuickGoalCompletion = () => {
                       {isNextIncomplete && (
                         <>
                           <GoalTypeChip goal={latestGoal} />
+                          {isClubLinkedGoal(latestGoal) && <ClubGoalChip />}
                           {isUpdating && <CircularProgress size={16} />}
                         </>
                       )}
@@ -680,6 +683,7 @@ const QuickGoalCompletion = () => {
                       )}
                     </Typography>
                     <GoalTypeChip goal={latestGoal} />
+                    {isClubLinkedGoal(latestGoal) && <ClubGoalChip />}
                     {isPaused && <PausedGoalChip />}
                     {isUpdating && <CircularProgress size={16} />}
                     <IconButton
@@ -766,6 +770,7 @@ const QuickGoalCompletion = () => {
                       )}
                     </Typography>
                     <GoalTypeChip goal={latestGoal} />
+                    {isClubLinkedGoal(latestGoal) && <ClubGoalChip />}
                     {isUpdating && <CircularProgress size={16} />}
                     <IconButton
                       size="small"

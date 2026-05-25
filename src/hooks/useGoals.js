@@ -30,6 +30,8 @@ const normalizeGoal = (goalData, docId = null, preserveEntries = false) => {
   const normalized = {
     id: docId || goalData.id,
     ...goalData,
+    clubGoalId: goalData.clubGoalId ?? goalData.club_goal_id ?? null,
+    progressDirection: goalData.progressDirection ?? goalData.progress_direction ?? 'increase',
   };
 
   if (!preserveEntries) {

@@ -62,12 +62,31 @@ module.exports = function(sequelize, DataTypes) {
           field: "club_id",
           allowNull: false,
         },
+        clubGoalId: {
+          type: DataTypes.INTEGER,
+          field: "club_goal_id",
+          allowNull: true,
+        },
+        progressDirection: {
+          type: DataTypes.STRING(50),
+          field: "progress_direction",
+          allowNull: true,
+          defaultValue: "increase",
+        },
+        goalScope: {
+          type: DataTypes.VIRTUAL,
+          get() {
+            return this.getDataValue("clubGoalId") ? "club" : "personal";
+          },
+        },
       },
       {
         tableName: "goals",
+        paranoid: true,
         timestamps: true,
         createdAt: "created_at",
         updatedAt: false,
+        deletedAt: "deleted_at",
       },
   );
 
@@ -79,6 +98,10 @@ module.exports = function(sequelize, DataTypes) {
     Goal.belongsTo(models.Club, {
       foreignKey: "club_id",
       as: "club",
+    });
+    Goal.belongsTo(models.ClubGoal, {
+      foreignKey: "club_goal_id",
+      as: "clubGoal",
     });
     Goal.hasMany(models.GoalCompletion, {
       foreignKey: "goal_id",

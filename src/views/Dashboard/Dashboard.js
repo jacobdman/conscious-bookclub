@@ -8,6 +8,7 @@ import Layout from 'components/Layout';
 import NextMeetingCard from 'components/NextMeetingCard';
 import CurrentBooksSection from 'components/CurrentBooksSection';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
+import DashboardClubGoals from 'components/DashboardClubGoals';
 import FeedPreview from 'components/FeedPreview';
 import PWAInstallPrompt from 'components/PWAInstallPrompt';
 import NotificationPrompt from 'components/NotificationPrompt';
@@ -156,6 +157,12 @@ const Dashboard = () => {
                         />
                       </Box>
                     );
+                  case 'clubGoals':
+                    return currentClub ? (
+                      <Box key={sectionId}>
+                        <DashboardClubGoals />
+                      </Box>
+                    ) : null;
                   case 'quickGoals':
                     return (
                       <Box

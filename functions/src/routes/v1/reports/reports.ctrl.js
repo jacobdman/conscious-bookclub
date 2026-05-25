@@ -6,6 +6,10 @@ const {
   goalTypeDistributionReport,
   weeklyGoalsBreakdownReport,
   weeklyTrendByMemberReport,
+  clubGoalProgressReport,
+  clubGoalMemberBreakdownReport,
+  clubGoalOverviewReport,
+  clubGoalEntriesReport,
 } = require("../../../services/reports");
 
 // GET /v1/reports/habit-consistency?userId=xxx&clubId=xxx&startDate=xxx&endDate=xxx
@@ -202,6 +206,98 @@ const getWeeklyGoalsBreakdown = async (req, res, next) => {
   }
 };
 
+// GET /v1/reports/club-goal-progress?clubGoalId=&clubId=&userId=&timezone=
+const getClubGoalProgress = async (req, res, next) => {
+  try {
+    const clubGoalId = req.query.clubGoalId;
+    const clubId = req.query.clubId;
+    const userId = req.query.userId;
+    const timezone = req.query.timezone || null;
+
+    if (!clubGoalId || !clubId || !userId) {
+      const error = new Error("clubGoalId, clubId, and userId are required");
+      error.status = 400;
+      throw error;
+    }
+
+    const result = await clubGoalProgressReport(clubGoalId, clubId, userId, timezone);
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /v1/reports/club-goal-member-breakdown?clubGoalId=&clubId=&userId=&timezone=
+const getClubGoalMemberBreakdown = async (req, res, next) => {
+  try {
+    const clubGoalId = req.query.clubGoalId;
+    const clubId = req.query.clubId;
+    const userId = req.query.userId;
+    const timezone = req.query.timezone || null;
+
+    if (!clubGoalId || !clubId || !userId) {
+      const error = new Error("clubGoalId, clubId, and userId are required");
+      error.status = 400;
+      throw error;
+    }
+
+    const result = await clubGoalMemberBreakdownReport(clubGoalId, clubId, userId, timezone);
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /v1/reports/club-goal-overview?clubId=&userId=&timezone=
+const getClubGoalOverview = async (req, res, next) => {
+  try {
+    const clubId = req.query.clubId;
+    const userId = req.query.userId;
+    const timezone = req.query.timezone || null;
+
+    if (!clubId || !userId) {
+      const error = new Error("clubId and userId are required");
+      error.status = 400;
+      throw error;
+    }
+
+    const result = await clubGoalOverviewReport(clubId, userId, timezone);
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// GET /v1/reports/club-goal-entries?clubGoalId=&clubId=&userId=&timezone=&limit=&offset=
+const getClubGoalEntries = async (req, res, next) => {
+  try {
+    const clubGoalId = req.query.clubGoalId;
+    const clubId = req.query.clubId;
+    const userId = req.query.userId;
+    const timezone = req.query.timezone || null;
+    const limit = req.query.limit;
+    const offset = req.query.offset;
+
+    if (!clubGoalId || !clubId || !userId) {
+      const error = new Error("clubGoalId, clubId, and userId are required");
+      error.status = 400;
+      throw error;
+    }
+
+    const result = await clubGoalEntriesReport(
+        clubGoalId,
+        clubId,
+        userId,
+        timezone,
+        limit,
+        offset,
+    );
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+};
+
 module.exports = {
   getHabitConsistency,
   getWeeklyTrend,
@@ -210,5 +306,9 @@ module.exports = {
   getWeeklyTrendByMember,
   getGoalTypeDistribution,
   getWeeklyGoalsBreakdown,
+  getClubGoalProgress,
+  getClubGoalMemberBreakdown,
+  getClubGoalOverview,
+  getClubGoalEntries,
 };
 

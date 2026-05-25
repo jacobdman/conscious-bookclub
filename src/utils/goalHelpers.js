@@ -22,6 +22,10 @@ export const normalizeGoalType = (type) => {
  */
 export const goalIsPaused = (goal) => Boolean(goal?.isPaused);
 
+/** True when the goal is synced from a club template (member copy of a club goal). */
+export const isClubLinkedGoal = (goal) =>
+  Boolean(goal?.clubGoalId ?? goal?.club_goal_id);
+
 /**
  * True when a pause interval fully covers [periodStart, periodEnd) (matches server reporting).
  * @param {Date} periodStart
@@ -498,6 +502,7 @@ export const filterGoalsForQuickCompletion = (goals) => {
   return goals.filter(goal => {
     // Skip archived goals (but allow completed goals - they'll be handled per type)
     if (goal.archived) return false;
+    if (isClubLinkedGoal(goal)) return false;
     
     // Normalize goal type for consistent matching
     const goalType = normalizeGoalType(goal.type);

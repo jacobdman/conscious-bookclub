@@ -20,6 +20,8 @@ import {
   LinearProgress,
   Tabs,
   Tab,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { Edit, Add, ChevronRight } from '@mui/icons-material';
 import { useAuth } from 'AuthContext';
@@ -28,19 +30,23 @@ import GoalFormModal from 'components/Goals/GoalFormModal';
 import QuickGoalCompletion from 'components/QuickGoalCompletion';
 import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import PausedGoalChip from 'components/PausedGoalChip';
+import ClubGoalChip from 'components/ClubGoalChip';
 import PersonalGoalsReport from 'components/PersonalGoalsReport';
 import ClubGoalsReport from 'components/ClubGoalsReport';
+import ClubGoalsList from 'components/ClubGoalsList';
 import Layout from 'components/Layout';
 import GoalsTour from 'components/Tours/GoalsTour';
-import { 
+import {
   getGoalTypeLabel,
   getGoalTypeColor,
   getProgressInfo,
   getProgressBarValue,
+  isClubLinkedGoal,
 } from 'utils/goalHelpers';
 import { aprilFoolsGoalTitle } from 'utils/aprilFools2026';
 
-const CLUB_TAB_INDEX = 2;
+const CLUB_GOALS_TAB_INDEX = 1;
+const REPORTS_TAB_INDEX = 2;
 
 const Goals = () => {
   const { user } = useAuth();
@@ -54,19 +60,21 @@ const Goals = () => {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
+  /** 0 = personal report, 1 = club report (only used when main tab is Reports) */
+  const [reportsSubTab, setReportsSubTab] = useState(0);
 
   const isClubTabFromUrl = location.pathname === '/goals/club';
-  const effectiveTab = isClubTabFromUrl ? CLUB_TAB_INDEX : currentTab;
+  const effectiveTab = isClubTabFromUrl ? CLUB_GOALS_TAB_INDEX : currentTab;
 
   useEffect(() => {
-    if (isClubTabFromUrl && currentTab !== CLUB_TAB_INDEX) {
-      setCurrentTab(CLUB_TAB_INDEX);
+    if (isClubTabFromUrl && currentTab !== CLUB_GOALS_TAB_INDEX) {
+      setCurrentTab(CLUB_GOALS_TAB_INDEX);
     }
   }, [isClubTabFromUrl, currentTab]);
 
   const handleTabChange = (e, newValue) => {
     setCurrentTab(newValue);
-    if (newValue === CLUB_TAB_INDEX) {
+    if (newValue === CLUB_GOALS_TAB_INDEX) {
       navigate('/goals/club', { replace: true });
     } else {
       navigate('/goals', { replace: true });
@@ -137,7 +145,9 @@ const Goals = () => {
     return 0;
   };
 
-  const filteredGoals = goals.filter(goal => {
+  const filteredGoals = goals
+    .filter((goal) => {
+    if (goal.archived) return false;
     if (showCompleted) return true;
     return !goal.completed;
   }).sort((a, b) => {
@@ -188,7 +198,7 @@ const Goals = () => {
               onClick={handleCreateGoal}
               data-tour="goals-create"
             >
-              Create Goal
+              Create goal
             </Button>
           )}
         </Box>
@@ -199,18 +209,40 @@ const Goals = () => {
           sx={{ mb: 3 }}
           data-tour="goals-tabs"
         >
-          <Tab label="Goals" />
-          <Tab label="Goals Report" />
-          <Tab label="Club" />
+          <Tab label="My goals" />
+          <Tab label="Club goals" />
+          <Tab label="Reports" />
         </Tabs>
 
-        {effectiveTab === 1 && (
-          <PersonalGoalsReport />
+        {effectiveTab === REPORTS_TAB_INDEX && (
+          <Box data-tour="goals-reports">
+            <ToggleButtonGroup
+              exclusive
+              value={reportsSubTab}
+              onChange={(_, v) => v !== null && setReportsSubTab(v)}
+              aria-label="Report scope"
+              size="small"
+              color="primary"
+              sx={{
+                mb: 2,
+                '& .MuiToggleButton-root': {
+                  px: 2,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                },
+              }}
+            >
+              <ToggleButton value={0}>Personal</ToggleButton>
+              <ToggleButton value={1}>Club</ToggleButton>
+            </ToggleButtonGroup>
+            <Box sx={{ pt: 0.5 }}>
+              {reportsSubTab === 0 && <PersonalGoalsReport />}
+              {reportsSubTab === 1 && <ClubGoalsReport />}
+            </Box>
+          </Box>
         )}
 
-        {effectiveTab === CLUB_TAB_INDEX && (
-          <ClubGoalsReport />
-        )}
+        {effectiveTab === CLUB_GOALS_TAB_INDEX && <ClubGoalsList />}
 
         {effectiveTab === 0 && (
           <>
@@ -289,6 +321,7 @@ const Goals = () => {
                             color={getGoalTypeColor(goal.type)}
                             size="small"
                           />
+                          {isClubLinkedGoal(goal) && <ClubGoalChip />}
                           {goal.isPaused && <PausedGoalChip />}
                         </Box>
                       </TableCell>

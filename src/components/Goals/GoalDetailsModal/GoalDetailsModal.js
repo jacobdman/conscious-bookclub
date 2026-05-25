@@ -12,6 +12,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Paper,
@@ -25,13 +26,21 @@ import {
 } from '@mui/material';
 // UI
 import FullscreenDialog from 'UI/FullscreenDialog';
-import { Close, Add, Edit, Delete, DragIndicator, ExpandMore } from '@mui/icons-material';
+import { Close, Add, Edit, Delete, DragIndicator, ExpandMore, Check } from '@mui/icons-material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from 'AuthContext';
 import useClubContext from 'contexts/Club';
 import useGoalsContext from 'contexts/Goals';
+import ClubGoalMembersAccordion from 'components/ClubGoalMembersAccordion';
+import ClubGoalChip from 'components/ClubGoalChip';
+import {
+  getClubGoalEntriesReport,
+  getClubGoalProgressReport,
+} from 'services/reports/reports.service';
+import ClubGoalDashboardSummary from 'components/DashboardClubGoals/ClubGoalDashboardSummary';
 import GoalCompletionShareDialog from 'components/GoalCompletionShareDialog';
 import IOSConfirmDialog from 'components/IOSConfirmDialog';
 import GoalEntryDialog from 'components/Goals/GoalEntryDialog';
@@ -49,12 +58,17 @@ import {
   getGoalStreakSummary,
   getGoalStreakValue,
   isGoalPauseCoveringPeriod,
+  isClubLinkedGoal,
+  getTodayEntries,
 } from 'utils/goalHelpers';
 import { formatLocalDate } from 'utils/dateHelpers';
+
+const CLUB_ENTRIES_LIMIT = 20;
 
 const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const { user } = useAuth();
   const { currentClub } = useClubContext();
+  const queryClient = useQueryClient();
   const { 
     goals, 
     updateGoal,
@@ -99,6 +113,11 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [pauseConfirmOpen, setPauseConfirmOpen] = useState(false);
   const [pauseResumeLoading, setPauseResumeLoading] = useState(false);
+  const [clubEntriesList, setClubEntriesList] = useState([]);
+  const [clubEntriesHasMore, setClubEntriesHasMore] = useState(false);
+  const [clubEntriesOffset, setClubEntriesOffset] = useState(0);
+  const [clubEntriesLoading, setClubEntriesLoading] = useState(false);
+  const [clubEntriesLoadingMore, setClubEntriesLoadingMore] = useState(false);
   const observerTarget = useRef(null);
   const initialEntriesLoaded = useRef({});
   const INITIAL_LIMIT = 20;
@@ -107,33 +126,102 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   // Get the current goal from the provider context to ensure we have the latest version
   // This ensures the UI updates when milestones are toggled
   const goal = goalProp?.id ? goals.find(g => g.id === goalProp.id) || goalProp : goalProp;
-  
+  const isClubGoal = isClubLinkedGoal(goal);
+  const clubGoalId = goal?.clubGoalId ?? goal?.club_goal_id;
+
   // Get entries and pagination from goal
   const entries = goal?.entries || [];
+  const displayEntries = isClubGoal ? clubEntriesList : entries;
   const entriesPagination = useMemo(() => {
     return goal?.entriesPagination || { hasMore: true, offset: 0, limit: INITIAL_LIMIT };
   }, [goal?.entriesPagination]);
-  const hasMore = entriesPagination.hasMore;
+  const hasMore = isClubGoal ? clubEntriesHasMore : entriesPagination.hasMore;
+
+  const clubEntriesOffsetRef = useRef(0);
+
+  const loadClubEntries = useCallback(
+    async (append = false) => {
+      if (!isClubGoal || !clubGoalId || !currentClub?.id || !user?.uid) return;
+      const offset = append ? clubEntriesOffsetRef.current : 0;
+      try {
+        if (append) {
+          setClubEntriesLoadingMore(true);
+        } else {
+          setClubEntriesLoading(true);
+        }
+        const data = await getClubGoalEntriesReport(clubGoalId, currentClub.id, user.uid, {
+          limit: CLUB_ENTRIES_LIMIT,
+          offset,
+        });
+        const nextEntries = data?.entries || [];
+        setClubEntriesList((prev) => (append ? [...prev, ...nextEntries] : nextEntries));
+        setClubEntriesHasMore(Boolean(data?.hasMore));
+        const nextOffset = offset + nextEntries.length;
+        clubEntriesOffsetRef.current = nextOffset;
+        setClubEntriesOffset(nextOffset);
+      } catch (err) {
+        console.error('Failed to load club goal entries:', err);
+      } finally {
+        setClubEntriesLoading(false);
+        setClubEntriesLoadingMore(false);
+      }
+    },
+    [isClubGoal, clubGoalId, currentClub?.id, user?.uid],
+  );
+
+  const refreshClubEntries = useCallback(() => {
+    clubEntriesOffsetRef.current = 0;
+    setClubEntriesOffset(0);
+    loadClubEntries(false);
+    queryClient.invalidateQueries({ queryKey: ['clubGoalEntries'] });
+    queryClient.invalidateQueries({ queryKey: ['clubGoalBreakdown'] });
+    queryClient.invalidateQueries({ queryKey: ['clubGoalOverview'] });
+    queryClient.invalidateQueries({ queryKey: ['clubGoalProgress'] });
+  }, [loadClubEntries, queryClient]);
+
+  useEffect(() => {
+    if (!open) {
+      setClubEntriesList([]);
+      clubEntriesOffsetRef.current = 0;
+      setClubEntriesOffset(0);
+      setClubEntriesHasMore(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !isClubGoal || !clubGoalId) return;
+    loadClubEntries(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset list when goal/club changes
+  }, [open, isClubGoal, clubGoalId, currentClub?.id, user?.uid]);
 
   // Load more entries when scrolling to bottom
   useEffect(() => {
     if (!open || !goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
 
     const observer = new IntersectionObserver(
-      async (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+      async (observerEntries) => {
+        if (!observerEntries[0].isIntersecting) return;
+        if (isClubGoal) {
+          if (!clubEntriesHasMore || clubEntriesLoadingMore || clubEntriesLoading) return;
           try {
-            setLoadingMore(true);
-            const currentOffset = entriesPagination.offset || 0;
-            await fetchGoalEntries(goal.id, LOAD_MORE_LIMIT, currentOffset, true);
+            await loadClubEntries(true);
           } catch (err) {
-            console.error('Failed to load more entries:', err);
-          } finally {
-            setLoadingMore(false);
+            console.error('Failed to load more club entries:', err);
           }
+          return;
+        }
+        if (!hasMore || loadingMore) return;
+        try {
+          setLoadingMore(true);
+          const currentOffset = entriesPagination.offset || 0;
+          await fetchGoalEntries(goal.id, LOAD_MORE_LIMIT, currentOffset, true);
+        } catch (err) {
+          console.error('Failed to load more entries:', err);
+        } finally {
+          setLoadingMore(false);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     const currentTarget = observerTarget.current;
@@ -146,17 +234,30 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         observer.unobserve(currentTarget);
       }
     };
-  }, [open, goal, hasMore, loadingMore, entriesPagination, fetchGoalEntries]);
+  }, [
+    open,
+    goal,
+    isClubGoal,
+    hasMore,
+    loadingMore,
+    entriesPagination,
+    fetchGoalEntries,
+    clubEntriesHasMore,
+    clubEntriesLoadingMore,
+    clubEntriesLoading,
+    loadClubEntries,
+  ]);
 
-  // Fetch initial entries when modal opens or goal changes
+  // Fetch initial personal entries when modal opens (non-club history)
   useEffect(() => {
     if (!open || !goal || (goal.type !== 'habit' && goal.type !== 'metric')) return;
+    if (isClubGoal) return;
 
     if (!initialEntriesLoaded.current[goal.id]) {
       initialEntriesLoaded.current[goal.id] = true;
       fetchGoalEntries(goal.id, INITIAL_LIMIT, 0, false);
     }
-  }, [open, goal, fetchGoalEntries]);
+  }, [open, goal, isClubGoal, fetchGoalEntries]);
 
   useEffect(() => {
     if (!open && goal?.id) {
@@ -320,11 +421,6 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const isHabitOrMetric = goal?.type === 'habit' || goal?.type === 'metric';
   const isGoalPaused = Boolean(goal?.isPaused && isHabitOrMetric);
 
-  const handleAddEntry = () => {
-    if (isGoalPaused) return;
-    setEntryDialog({ open: true, entry: null, saving: false, error: null, initialDate: null });
-  };
-
   const handleEditEntry = (entry) => {
     if (isGoalPaused) return;
     setEntryDialog({ open: true, entry, saving: false, error: null, initialDate: null });
@@ -362,6 +458,9 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
       await loadMonthEntries();
       await loadWeekEntriesPool();
       await loadAllEntries();
+      if (isClubGoal) {
+        refreshClubEntries();
+      }
     } catch (err) {
       console.error('Failed to delete entry:', err);
     }
@@ -386,7 +485,10 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
       await loadMonthEntries();
       await loadWeekEntriesPool();
       await loadAllEntries();
-      
+      if (isClubGoal) {
+        refreshClubEntries();
+      }
+
       setEntryDialog({ open: false, entry: null, saving: false, error: null, initialDate: null });
     } catch (err) {
       setEntryDialog(prev => ({ 
@@ -648,6 +750,26 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
   const progress = goal?.progress;
   const hasProgress = progress && (goal?.type === 'habit' || goal?.type === 'metric');
 
+  const { data: clubProgressData, isLoading: clubProgressLoading } = useQuery({
+    queryKey: ['clubGoalProgress', 'modal', clubGoalId, currentClub?.id, user?.uid],
+    queryFn: () => getClubGoalProgressReport(clubGoalId, currentClub.id, user.uid),
+    enabled:
+      open &&
+      isClubGoal &&
+      Boolean(clubGoalId) &&
+      Boolean(currentClub?.id) &&
+      Boolean(user?.uid),
+  });
+
+  const clubGoalForSummary = clubProgressData?.clubGoal;
+  const clubSnapshot = clubProgressData?.aggregate;
+
+  const userTodayActualClub = useMemo(() => {
+    if (!goal || goal.type !== 'metric') return 0;
+    const todayEntries = getTodayEntries(goal.entries || []);
+    return todayEntries.reduce((s, e) => s + (parseFloat(e.quantity) || 0), 0);
+  }, [goal]);
+
   const targetValue = useMemo(() => getGoalTargetValue(goal), [goal]);
 
   const getPercentForEntries = useCallback((entriesForPeriod) => {
@@ -731,14 +853,19 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 2 }}>
-          <Typography variant="h5" component="div">{goal.title}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
+            <Typography variant="h5" component="div" sx={{ minWidth: 0 }}>
+              {goal.title}
+            </Typography>
+            {isClubGoal && <ClubGoalChip />}
+          </Box>
           <IconButton onClick={onClose} size="small">
             <Close />
           </IconButton>
         </DialogTitle>
 
-        <DialogContent>
-          <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
+        <DialogContent sx={{ overflowX: 'hidden' }}>
+          <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%', minWidth: 0 }}>
             {/* Goal Info */}
             <Paper sx={{ p: 3, mb: 3 }}>
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
@@ -765,17 +892,49 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                 </Typography>
               )}
 
-              {/* Progress for habit/metric goals */}
-              {hasProgress && (
+              {/* Club rollup or personal progress */}
+              {isClubGoal && clubProgressLoading && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2, mb: 2 }}>
+                  <CircularProgress size={28} />
+                </Box>
+              )}
+              {isClubGoal && clubGoalForSummary && clubSnapshot && !clubProgressLoading && (
                 <Box sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                    <Typography variant="body1" sx={{ minWidth: 200 }}>
+                  <Typography variant="overline" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                    Club progress
+                  </Typography>
+                  <ClubGoalDashboardSummary
+                    clubGoal={clubGoalForSummary}
+                    snapshot={clubSnapshot}
+                    userId={user?.uid}
+                    clubId={currentClub?.id}
+                    userTodayActual={userTodayActualClub}
+                    personalActual={progress?.actual ?? 0}
+                    personalTarget={targetValue}
+                    showTitle={false}
+                    collapsed={false}
+                  />
+                </Box>
+              )}
+              {!isClubGoal && hasProgress && (
+                <Box sx={{ mb: 2 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 1,
+                      mb: 1,
+                    }}
+                  >
+                    <Typography variant="body1" sx={{ flex: '1 1 auto', minWidth: 0 }}>
                       {getProgressText(goal, progress)}
                     </Typography>
                     <Chip
                       label={progress.completed ? 'Completed' : 'In Progress'}
                       color={progress.completed ? 'success' : 'default'}
                       size="small"
+                      sx={{ flexShrink: 0 }}
                     />
                   </Box>
                   <LinearProgress
@@ -918,39 +1077,52 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
 
               {/* One-time goal completion */}
               {goal.type === 'one_time' && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Checkbox
-                    checked={goal.completed || false}
-                    onChange={handleToggleOneTimeGoal}
-                    size="small"
-                  />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ textDecoration: goal.completed ? 'line-through' : 'none', opacity: goal.completed ? 0.6 : 1 }}>
-                      {goal.completed ? 'Completed' : 'Not completed'}
+                <Box sx={{ mt: 2 }}>
+                  <Button
+                    fullWidth
+                    variant={goal.completed ? 'outlined' : 'contained'}
+                    color={goal.completed ? 'success' : 'primary'}
+                    size="large"
+                    startIcon={goal.completed ? <Check /> : null}
+                    onClick={handleToggleOneTimeGoal}
+                    sx={{ py: 1.5, fontWeight: 600 }}
+                  >
+                    {goal.completed ? 'Completed — tap to undo' : 'Mark as complete'}
+                  </Button>
+                  {goal.completed && goal.completedAt && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', textAlign: 'center', mt: 1 }}
+                    >
+                      Completed {formatDate(goal.completedAt)}
                     </Typography>
-                    {goal.completedAt && (
-                      <Typography variant="caption" color="text.secondary">
-                        Completed: {formatDate(goal.completedAt)}
-                      </Typography>
-                    )}
-                  </Box>
+                  )}
                 </Box>
               )}
             </Paper>
 
+            {isClubGoal && clubGoalId && (
+              <ClubGoalMembersAccordion
+                clubGoalId={clubGoalId}
+                clubId={currentClub?.id}
+                userId={user?.uid}
+                enabled={open}
+              />
+            )}
+
             {/* Entries Section (for habit/metric goals) */}
             {(goal.type === 'habit' || goal.type === 'metric') && (
               <>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={handleAddEntry}
-                    disabled={isGoalPaused}
-                  >
-                    Add Entry
-                  </Button>
-                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1.5, textAlign: 'center' }}
+                >
+                  {isClubGoal
+                    ? 'Your entries — tap a date to add or remove'
+                    : 'Tap a date to add or remove an entry'}
+                </Typography>
 
                 <MonthlyStreakGrid
                   entries={monthEntriesPool}
@@ -966,69 +1138,109 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                   isGoalPaused={isGoalPaused}
                 />
 
-                <Accordion defaultExpanded={false} sx={{ boxShadow: 1 }}>
-                  <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Typography variant="h6">Entry History</Typography>
+                <Accordion
+                  defaultExpanded={false}
+                  sx={{ boxShadow: 1, width: '100%', minWidth: 0, overflow: 'hidden' }}
+                >
+                  <AccordionSummary
+                    expandIcon={<ExpandMore />}
+                    sx={{ '& .MuiAccordionSummary-content': { minWidth: 0 } }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="h6">Entry History</Typography>
+                      {isClubGoal && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          All club members&apos; entries
+                        </Typography>
+                      )}
+                    </Box>
                   </AccordionSummary>
-                  <AccordionDetails>
-                    {monthEntriesLoading && entries.length === 0 ? (
+                  <AccordionDetails sx={{ minWidth: 0, overflow: 'hidden', px: { xs: 1, sm: 2 } }}>
+                    {(isClubGoal ? clubEntriesLoading : monthEntriesLoading) &&
+                    displayEntries.length === 0 ? (
                       <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
                         <CircularProgress size={24} />
                       </Box>
-                    ) : entries.length === 0 ? (
+                    ) : displayEntries.length === 0 ? (
                       <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
                         No entries yet
                       </Typography>
                     ) : (
                       <>
-                        <Table>
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Date & Time</TableCell>
-                              {goal.type === 'metric' && <TableCell>Quantity</TableCell>}
-                              <TableCell align="right">Actions</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {entries.map((entry) => (
-                              <TableRow key={entry.id}>
-                                <TableCell>{formatDateTime(entry.occurred_at || entry.occurredAt)}</TableCell>
+                        <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
+                          <Table size="small" sx={{ minWidth: isClubGoal ? 520 : 360 }}>
+                            <TableHead>
+                              <TableRow>
+                                {isClubGoal && <TableCell>Member</TableCell>}
                                 {goal.type === 'metric' && (
-                                  <TableCell>
-                                    <Chip
-                                      label={`${parseFloat(entry.quantity || 0).toFixed(1)} ${goal.unit || ''}`}
-                                      size="small"
-                                      variant="outlined"
-                                    />
-                                  </TableCell>
+                                  <TableCell sx={{ minWidth: 120 }}>Quantity</TableCell>
                                 )}
-                                <TableCell align="right">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleEditEntry(entry)}
-                                    color="primary"
-                                    disabled={isGoalPaused}
-                                  >
-                                    <Edit fontSize="small" />
-                                  </IconButton>
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleDeleteEntry(entry)}
-                                    color="error"
-                                    disabled={isGoalPaused}
-                                  >
-                                    <Delete fontSize="small" />
-                                  </IconButton>
-                                </TableCell>
+                                <TableCell>Date & Time</TableCell>
+                                <TableCell align="right">Actions</TableCell>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHead>
+                            <TableBody>
+                              {displayEntries.map((entry) => {
+                                const entryUserId = entry.userId ?? entry.user_id;
+                                const canEditEntry =
+                                  !isClubGoal || entryUserId === user?.uid;
+                                return (
+                                  <TableRow key={entry.id}>
+                                    {isClubGoal && (
+                                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                        {entry.user?.displayName || 'Member'}
+                                      </TableCell>
+                                    )}
+                                    {goal.type === 'metric' && (
+                                      <TableCell sx={{ minWidth: 120, whiteSpace: 'nowrap' }}>
+                                        <Chip
+                                          label={`${parseFloat(entry.quantity || 0).toFixed(1)} ${goal.unit || ''}`}
+                                          size="small"
+                                          variant="outlined"
+                                        />
+                                      </TableCell>
+                                    )}
+                                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                      {formatDateTime(entry.occurred_at || entry.occurredAt)}
+                                    </TableCell>
+                                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                      {canEditEntry ? (
+                                        <>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => handleEditEntry(entry)}
+                                            color="primary"
+                                            disabled={isGoalPaused}
+                                          >
+                                            <Edit fontSize="small" />
+                                          </IconButton>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => handleDeleteEntry(entry)}
+                                            color="error"
+                                            disabled={isGoalPaused}
+                                          >
+                                            <Delete fontSize="small" />
+                                          </IconButton>
+                                        </>
+                                      ) : (
+                                        <Typography variant="caption" color="text.secondary">
+                                          —
+                                        </Typography>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
 
-                        {/* Infinite scroll trigger */}
                         <Box ref={observerTarget} sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                          {loadingMore && <CircularProgress size={24} />}
-                          {!hasMore && entries.length > 0 && (
+                          {(isClubGoal ? clubEntriesLoadingMore : loadingMore) && (
+                            <CircularProgress size={24} />
+                          )}
+                          {!hasMore && displayEntries.length > 0 && (
                             <Typography variant="body2" color="text.secondary">
                               No more entries
                             </Typography>
@@ -1040,35 +1252,46 @@ const GoalDetailsModal = ({ open, onClose, goal: goalProp }) => {
                 </Accordion>
               </>
             )}
+
+            {isClubGoal && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', textAlign: 'center', mt: 3, mb: 1 }}
+              >
+                This goal is managed by your club. Contact an admin to change or remove it.
+              </Typography>
+            )}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 3, flexWrap: 'wrap', gap: 1 }}>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Button onClick={handleDeleteGoal} color="error">
-              Delete Goal
-            </Button>
-            {isHabitOrMetric && !isGoalPaused && (
-              <Button
-                onClick={() => setPauseConfirmOpen(true)}
-                color="warning"
-                variant="outlined"
-              >
-                Pause goal
+        {!isClubGoal && (
+          <DialogActions sx={{ justifyContent: 'flex-start', px: 3, pb: 3, flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Button onClick={handleDeleteGoal} color="error">
+                Delete Goal
               </Button>
-            )}
-            {isHabitOrMetric && isGoalPaused && (
-              <Button
-                onClick={handleResumeFromModal}
-                color="success"
-                variant="contained"
-                disabled={pauseResumeLoading}
-              >
-                {pauseResumeLoading ? 'Resuming…' : 'Resume goal'}
-              </Button>
-            )}
-          </Box>
-          <Button onClick={onClose}>Close</Button>
-        </DialogActions>
+              {isHabitOrMetric && !isGoalPaused && (
+                <Button
+                  onClick={() => setPauseConfirmOpen(true)}
+                  color="warning"
+                  variant="outlined"
+                >
+                  Pause goal
+                </Button>
+              )}
+              {isHabitOrMetric && isGoalPaused && (
+                <Button
+                  onClick={handleResumeFromModal}
+                  color="success"
+                  variant="contained"
+                  disabled={pauseResumeLoading}
+                >
+                  {pauseResumeLoading ? 'Resuming…' : 'Resume goal'}
+                </Button>
+              )}
+            </Box>
+          </DialogActions>
+        )}
       </FullscreenDialog>
 
       <GoalEntryDialog

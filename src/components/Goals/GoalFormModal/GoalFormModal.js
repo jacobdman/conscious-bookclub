@@ -41,6 +41,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
     dueAt: null,
     milestones: [],
     completed: false,
+    progressDirection: 'increase',
   });
 
   const [newMilestone, setNewMilestone] = useState({ title: '' });
@@ -84,6 +85,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         dueAt: parseDate(editingGoal.dueAt || editingGoal.due_at),
         milestones: milestones,
         completed: editingGoal.completed || false,
+        progressDirection: editingGoal.progressDirection || editingGoal.progress_direction || 'increase',
       });
     } else {
       setFormData({
@@ -97,6 +99,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
         dueAt: null,
         milestones: [],
         completed: false,
+        progressDirection: 'increase',
       });
     }
     if (!open) {
@@ -165,6 +168,7 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
       goalData.cadence = formData.cadence;
       goalData.targetQuantity = parseFloat(formData.targetQuantity);
       goalData.unit = formData.unit.trim();
+      goalData.progressDirection = formData.progressDirection || 'increase';
       if (!goalData.targetQuantity || !goalData.unit || !goalData.cadence) {
         showSnackbar('Metric goals require cadence, target quantity, and unit');
         return;
@@ -246,6 +250,20 @@ const GoalFormModal = ({ open, onClose, onSave, onArchive, editingGoal = null })
       case 'metric':
         return (
           <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Progress direction</InputLabel>
+                <Select
+                  value={formData.progressDirection || 'increase'}
+                  onChange={(e) => handleInputChange('progressDirection', e.target.value)}
+                  label="Progress direction"
+                >
+                  <MenuItem value="increase">Increase toward target</MenuItem>
+                  <MenuItem value="decrease">Decrease remaining</MenuItem>
+                  <MenuItem value="stay_under">Stay under (budget)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
             <Grid item xs={4}>
               <FormControl fullWidth>
                 <InputLabel>Cadence</InputLabel>

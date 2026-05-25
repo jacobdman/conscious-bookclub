@@ -257,8 +257,8 @@ const getGoals = async (req, res, next) => {
       throw error;
     }
 
-    // Build where clause
-    const whereClause = {userId, clubId: parseInt(clubId)};
+    // Exclude archived rows; paranoid mode excludes soft-deleted (deleted_at) goals
+    const whereClause = {userId, clubId: parseInt(clubId), archived: false};
 
     // Apply filters
     if (req.query.type) {
@@ -512,6 +512,7 @@ const updateGoal = async (req, res, next) => {
     delete goalUpdates.goalPauses;
     delete goalUpdates.isPaused;
     delete goalUpdates.pausedAt;
+    delete goalUpdates.clubGoalId;
 
     const isMilestoneGoal = updates.type === "milestone" || goal.type === "milestone";
 
@@ -729,8 +730,7 @@ const deleteGoal = async (req, res, next) => {
       throw error;
     }
 
-    // Cascade delete will handle entries and milestones
-    await db.Goal.destroy({where: {id: goalId, userId, clubId: parseInt(clubId)}});
+    await goal.destroy();
     res.sendStatus(204);
   } catch (e) {
     next(e);

@@ -20,4 +20,5 @@ export default React.createContext({
   deleteMilestone: async () => {},
   updateMilestone: async () => {},
   bulkUpdateMilestones: async () => {},
+  syncClubGoalCaches: () => {},
 });
