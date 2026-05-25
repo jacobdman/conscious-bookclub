@@ -6,16 +6,40 @@ import {
   CircularProgress,
   Alert,
   IconButton,
+  ButtonBase,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { LocationOn, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
-import { useTheme, useMediaQuery } from '@mui/material';
+// Components
+import MeetingDetailsModal from 'components/MeetingDetailsModal';
+// Utils
 import { formatMeetingDisplay } from 'utils/meetingTime';
+
+const formatRsvpCaption = (summary) => {
+  if (!summary) return null;
+  const going = summary.going || 0;
+  const notGoing = summary.notGoing || 0;
+  const maybe = summary.maybe || 0;
+  if (!going && !notGoing && !maybe) return 'No RSVPs yet — tap to respond';
+  const parts = [];
+  if (going) parts.push(`${going} going`);
+  if (notGoing) parts.push(`${notGoing} can't make it`);
+  if (maybe) parts.push(`${maybe} not sure`);
+  return parts.join(' · ');
+};
 
 const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
   const scrollRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [detailMeetingId, setDetailMeetingId] = useState(null);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
+
+  const detailMeeting = useMemo(
+    () => meetings.find((m) => m.id === detailMeetingId) ?? null,
+    [meetings, detailMeetingId],
+  );
 
   const upcomingEvents = useMemo(() => {
     const getMeetingTitle = (meeting) => {
@@ -49,6 +73,7 @@ const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
         viewerTime: display.viewerTime,
         hasStartTime: !!meeting.startTime,
         showViewerTime,
+        rsvpSummary: meeting.rsvpSummary || { going: 0, notGoing: 0, maybe: 0 },
       };
     });
   }, [meetings]);
@@ -141,6 +166,11 @@ const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
 
   return (
     <Box sx={{ py: 1 }}>
+      <MeetingDetailsModal
+        open={Boolean(detailMeeting)}
+        onClose={() => setDetailMeetingId(null)}
+        meeting={detailMeeting}
+      />
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="h6">Next Meetings</Typography>
         {isDesktop && upcomingEvents.length > 1 && (
@@ -175,52 +205,69 @@ const NextMeetingCard = ({ meetings = [], loading = false, error = null }) => {
             sx={{
               flex: '0 0 100%',
               scrollSnapAlign: 'start',
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 1,
-              p: 2,
-              backgroundColor: 'background.paper',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography variant="subtitle1" fontWeight="medium">
-                {event.title}
-              </Typography>
-              {event.hasStartTime && (
-                <Chip
-                  label={`${event.hostTime || ''} ${event.hostLabel ? `(${event.hostLabel})` : ''}`.trim()}
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                />
-              )}
-            </Box>
+            <ButtonBase
+              onClick={() => setDetailMeetingId(event.id)}
+              aria-label={`Meeting details: ${event.title}`}
+              focusRipple
+              sx={{
+                width: '100%',
+                display: 'block',
+                textAlign: 'left',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                p: 2,
+                backgroundColor: 'background.paper',
+              }}
+            >
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    {event.title}
+                  </Typography>
+                  {event.hasStartTime && (
+                    <Chip
+                      label={`${event.hostTime || ''} ${event.hostLabel ? `(${event.hostLabel})` : ''}`.trim()}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                    />
+                  )}
+                </Box>
 
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {event.hostDate}
-            </Typography>
-
-            {event.showViewerTime && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Your time: {event.viewerDate} · {event.viewerTime}
-              </Typography>
-            )}
-
-            {event.location && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-                <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary">
-                  {event.location}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  {event.hostDate}
                 </Typography>
-              </Box>
-            )}
 
-            {event.description && (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                {event.description.replace(/\n/g, ' ').substring(0, 100)}
-                {event.description.length > 100 && '...'}
-              </Typography>
-            )}
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  {formatRsvpCaption(event.rsvpSummary)}
+                </Typography>
+
+                {event.showViewerTime && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Your time: {event.viewerDate} · {event.viewerTime}
+                  </Typography>
+                )}
+
+                {event.location && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <Typography variant="caption" color="text.secondary">
+                      {event.location}
+                    </Typography>
+                  </Box>
+                )}
+
+                {event.description && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    {event.description.replace(/\n/g, ' ').substring(0, 100)}
+                    {event.description.length > 100 && '...'}
+                  </Typography>
+                )}
+              </Box>
+            </ButtonBase>
           </Box>
         ))}
       </Box>

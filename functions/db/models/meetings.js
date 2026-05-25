@@ -65,6 +65,10 @@ module.exports = function(sequelize, DataTypes) {
       foreignKey: "club_id",
       as: "club",
     });
+    Meeting.hasMany(models.MeetingRsvp, {
+      foreignKey: "meeting_id",
+      as: "meetingRsvps",
+    });
   };
 
   return Meeting;

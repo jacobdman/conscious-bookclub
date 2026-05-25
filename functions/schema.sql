@@ -61,7 +61,8 @@ CREATE TABLE goals (
     archived BOOLEAN DEFAULT FALSE,
     completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    completed_at TIMESTAMP WITH TIME ZONE
+    completed_at TIMESTAMP WITH TIME ZONE,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Goal entries table - stores individual datapoints for habit/metric goals
@@ -116,6 +117,7 @@ CREATE INDEX idx_posts_author_id ON posts(author_id);
 CREATE INDEX idx_posts_created_at ON posts(created_at);
 CREATE INDEX idx_goals_user_id ON goals(user_id);
 CREATE INDEX idx_goals_archived ON goals(archived);
+CREATE INDEX idx_goals_deleted_at ON goals(deleted_at);
 CREATE INDEX idx_goals_completed ON goals(completed);
 CREATE INDEX idx_goals_type ON goals(type);
 CREATE INDEX idx_goal_entry_goal_id ON goal_entry(goal_id);

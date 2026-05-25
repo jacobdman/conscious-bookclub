@@ -39,6 +39,12 @@ const DashboardTour = () => {
         disableBeacon: true,
       },
       {
+        target: '[data-tour="dashboard-club-goals"]',
+        content:
+          'Club goals show everyone’s progress toward shared targets. Swipe between goals and tap a card to log your contribution.',
+        disableBeacon: true,
+      },
+      {
         target: '[data-tour="dashboard-books-title"]',
         content: 'Review upcoming books and update your reading progress.',
         placement: 'bottom',

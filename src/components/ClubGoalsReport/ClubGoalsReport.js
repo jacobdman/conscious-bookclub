@@ -11,8 +11,12 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tabs,
-  Tab,
+  ToggleButton,
+  ToggleButtonGroup,
+  Paper,
+  List,
+  ListItemButton,
+  ListItemText,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -288,24 +292,76 @@ const ClubGoalsReport = () => {
           </Typography>
         </Box>
 
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
-          <Tabs
+        <Box
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            mb: 2,
+          }}
+        >
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
             value={activeTab}
-            onChange={(e, newValue) => setActiveTab(newValue)}
+            onChange={(e, v) => v !== null && setActiveTab(v)}
+            aria-label="Club report section"
+            size="small"
+            color="primary"
             sx={{
-              '& .MuiTab-root': {
+              '& .MuiToggleButton-root': {
                 textTransform: 'none',
-                fontSize: '1rem',
-                fontWeight: 500,
-                minHeight: 48,
+                fontWeight: 600,
+                flex: 1,
               },
             }}
           >
-            <Tab label="Competitive Goals" />
-            <Tab label="Insights & Analytics" />
-          </Tabs>
+            <ToggleButton value={0}>Competitive</ToggleButton>
+            <ToggleButton value={1}>Insights</ToggleButton>
+          </ToggleButtonGroup>
         </Box>
 
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: { xs: 0, md: 3 },
+            alignItems: 'flex-start',
+          }}
+        >
+          <Paper
+            elevation={0}
+            variant="outlined"
+            sx={{
+              display: { xs: 'none', md: 'block' },
+              minWidth: 240,
+              maxWidth: 280,
+              borderRadius: 2,
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}
+          >
+            <List component="nav" dense disablePadding aria-label="Club report sections">
+              <ListItemButton selected={activeTab === 0} onClick={() => setActiveTab(0)}>
+                <ListItemText
+                  primary="Competitive goals"
+                  secondary="Leaderboards & trends"
+                  primaryTypographyProps={{
+                    fontWeight: activeTab === 0 ? 700 : 500,
+                  }}
+                />
+              </ListItemButton>
+              <ListItemButton selected={activeTab === 1} onClick={() => setActiveTab(1)}>
+                <ListItemText
+                  primary="Insights & analytics"
+                  secondary="Charts & participation"
+                  primaryTypographyProps={{
+                    fontWeight: activeTab === 1 ? 700 : 500,
+                  }}
+                />
+              </ListItemButton>
+            </List>
+          </Paper>
+
+          <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
         {activeTab === 0 && (
           <Box>
             <Box sx={{ mb: 5 }}>
@@ -464,6 +520,8 @@ const ClubGoalsReport = () => {
             )}
           </Box>
         )}
+          </Box>
+        </Box>
       </Box>
     </LocalizationProvider>
   );

@@ -142,3 +142,53 @@ export const getWeeklyGoalsBreakdownReport = async (userId, clubId, startDate, e
   return apiCall(`/v1/reports/weekly-goals-breakdown?${params}`);
 };
 
+export const getClubGoalProgressReport = async (clubGoalId, clubId, userId) => {
+  const params = new URLSearchParams({
+    clubGoalId: String(clubGoalId),
+    clubId: clubId.toString(),
+    userId,
+  });
+  const tz = getClientTimezone();
+  if (tz) params.append('timezone', tz);
+  return apiCall(`/v1/reports/club-goal-progress?${params}`);
+};
+
+export const getClubGoalMemberBreakdownReport = async (clubGoalId, clubId, userId) => {
+  const params = new URLSearchParams({
+    clubGoalId: String(clubGoalId),
+    clubId: clubId.toString(),
+    userId,
+  });
+  const tz = getClientTimezone();
+  if (tz) params.append('timezone', tz);
+  return apiCall(`/v1/reports/club-goal-member-breakdown?${params}`);
+};
+
+export const getClubGoalOverviewReport = async (clubId, userId) => {
+  const params = new URLSearchParams({
+    clubId: clubId.toString(),
+    userId,
+  });
+  const tz = getClientTimezone();
+  if (tz) params.append('timezone', tz);
+  return apiCall(`/v1/reports/club-goal-overview?${params}`);
+};
+
+export const getClubGoalEntriesReport = async (
+  clubGoalId,
+  clubId,
+  userId,
+  { limit = 20, offset = 0 } = {},
+) => {
+  const params = new URLSearchParams({
+    clubGoalId: String(clubGoalId),
+    clubId: clubId.toString(),
+    userId,
+    limit: String(limit),
+    offset: String(offset),
+  });
+  const tz = getClientTimezone();
+  if (tz) params.append('timezone', tz);
+  return apiCall(`/v1/reports/club-goal-entries?${params}`);
+};
+

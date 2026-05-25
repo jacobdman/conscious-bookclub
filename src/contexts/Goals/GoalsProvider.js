@@ -46,7 +46,9 @@ const normalizeGoal = (goalData, docId = null, preserveEntries = false) => {
   
   const normalized = {
     id: docId || goalData.id,
-    ...goalData
+    ...goalData,
+    clubGoalId: goalData.clubGoalId ?? goalData.club_goal_id ?? null,
+    progressDirection: goalData.progressDirection ?? goalData.progress_direction ?? 'increase',
   };
   
   // Preserve entries and pagination if they exist and preserveEntries is true
@@ -111,6 +113,7 @@ const GoalsProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const goalEntriesCacheRef = useRef({});
+  const goalsRef = useRef(goals);
 
   const {
     data: goalsData,
@@ -143,6 +146,10 @@ const GoalsProvider = ({ children }) => {
   }, [goalsData]);
 
   useEffect(() => {
+    goalsRef.current = goals;
+  }, [goals]);
+
+  useEffect(() => {
     setLoading(isLoading);
   }, [isLoading]);
 
@@ -171,6 +178,95 @@ const GoalsProvider = ({ children }) => {
 
   useEffect(() => () => { _goalsRestoreCache = null }, []);
 
+  // ******************UTILITY FUNCTIONS**********************
+
+  /**
+   * Centralized cache sync for club-linked goal mutations. Optimistically
+   * patches the React Query caches that hold club-goal snapshots so every
+   * surface (dashboard card, detail modal, breakdown) updates from a single
+   * mutation without waiting for a network refetch. A background invalidation
+   * runs after for eventual consistency with the server.
+   *
+   * @param {object} params
+   * @param {number|string} params.clubGoalId Club goal id this mutation affected.
+   * @param {number} [params.actualDelta] Signed change to aggregate.actual (metric goals).
+   * @param {number} [params.completedMembersDelta] Signed change to completedMembers (one_time / habit).
+   * @param {number} [params.milestonesDoneDelta] Signed change to milestones done (milestone goals).
+   */
+  const syncClubGoalCaches = useCallback(
+    ({
+      clubGoalId,
+      actualDelta = 0,
+      completedMembersDelta = 0,
+      milestonesDoneDelta = 0,
+    }) => {
+      if (!clubGoalId) return;
+
+      const patchSnapshot = (snap) => {
+        if (!snap) return snap;
+        const next = { ...snap };
+        const target = Number(next.target) || 0;
+
+        if (actualDelta && (next.label === 'remaining_budget' || next.label === 'sum_quantity')) {
+          next.actual = Math.max(0, (Number(next.actual) || 0) + actualDelta);
+          if (next.label === 'remaining_budget') {
+            next.percent =
+              target > 0 ? Math.min(100, ((target - next.actual) / target) * 100) : 0;
+          } else {
+            next.percent = target > 0 ? Math.min(100, (next.actual / target) * 100) : 0;
+          }
+        }
+
+        if (
+          completedMembersDelta &&
+          (next.label === 'members_completed' || next.label === 'members_completed_period')
+        ) {
+          const totalMembers = Number(next.totalMembers) || 0;
+          next.actual = Math.max(0, (Number(next.actual) || 0) + completedMembersDelta);
+          next.completedMembers = next.actual;
+          next.percent = totalMembers > 0 ? (next.actual / totalMembers) * 100 : 0;
+        }
+
+        if (milestonesDoneDelta && next.label === 'milestones_done') {
+          next.actual = Math.max(0, (Number(next.actual) || 0) + milestonesDoneDelta);
+          next.percent = target > 0 ? (next.actual / target) * 100 : 0;
+        }
+
+        return next;
+      };
+
+      queryClient.setQueriesData(
+        { queryKey: ['clubGoalOverview'] },
+        (oldData) => {
+          if (!oldData?.clubGoals) return oldData;
+          return {
+            ...oldData,
+            clubGoals: oldData.clubGoals.map((cg) =>
+              Number(cg.id) === Number(clubGoalId)
+                ? { ...cg, snapshot: patchSnapshot(cg.snapshot) }
+                : cg,
+            ),
+          };
+        },
+      );
+
+      queryClient.setQueriesData(
+        { queryKey: ['clubGoalProgress'] },
+        (oldData) => {
+          if (!oldData?.aggregate) return oldData;
+          if (Number(oldData?.clubGoal?.id) !== Number(clubGoalId)) return oldData;
+          return { ...oldData, aggregate: patchSnapshot(oldData.aggregate) };
+        },
+      );
+
+      queryClient.invalidateQueries({ queryKey: ['clubGoalOverview'] });
+      queryClient.invalidateQueries({ queryKey: ['clubGoalProgress'] });
+      queryClient.invalidateQueries({ queryKey: ['clubGoalBreakdown'] });
+      queryClient.invalidateQueries({ queryKey: ['clubGoalEntries'] });
+    },
+    [queryClient],
+  );
+
   // ******************SETTERS**********************
   // Add a new goal (mutations invalidate goals query so cache and remounts stay in sync)
   const handleAddGoal = useCallback(async (goalData) => {
@@ -194,6 +290,8 @@ const GoalsProvider = ({ children }) => {
 
     try {
       setError(null);
+      const priorGoal = goalsRef.current.find((g) => g.id === goalId);
+      const priorCompleted = !!priorGoal?.completed;
       const result = await updateGoalMutation.mutateAsync({ goalId, updates });
       const updatedGoal = normalizeGoal(result, result.id, true);
       // Preserve entries and pagination when updating (they're cached separately)
@@ -213,13 +311,27 @@ const GoalsProvider = ({ children }) => {
         }
         return goal;
       }));
+
+      const clubGoalId = priorGoal?.clubGoalId ?? updatedGoal?.clubGoalId;
+      if (clubGoalId && priorGoal?.type === 'one_time') {
+        const nextCompleted = updates?.completed != null
+          ? !!updates.completed
+          : !!updatedGoal?.completed;
+        if (nextCompleted !== priorCompleted) {
+          syncClubGoalCaches({
+            clubGoalId,
+            completedMembersDelta: nextCompleted ? 1 : -1,
+          });
+        }
+      }
+
       return updatedGoalResult || updatedGoal;
     } catch (err) {
       setError('Failed to update goal');
       console.error('Error updating goal:', err);
       throw err;
     }
-  }, [user, currentClub, updateGoalMutation]);
+  }, [user, currentClub, updateGoalMutation, syncClubGoalCaches]);
 
   // Delete a goal
   const handleDeleteGoal = useCallback(async (goalId) => {
@@ -526,18 +638,37 @@ const GoalsProvider = ({ children }) => {
 
       clearGoalEntriesCache(goalId);
       refreshClubMembers(currentClub.id, true);
+
+      // Keep club-goal caches in lock-step with the goals store so all
+      // surfaces (dashboard card, detail modal, breakdown) re-render from a
+      // single mutation without a refetch.
+      const sourceGoal = goalsRef.current.find((g) => g.id === goalId);
+      const clubGoalId = sourceGoal?.clubGoalId;
+      if (clubGoalId) {
+        const quantity = Number(entryData?.quantity) || 0;
+        const isMetric = sourceGoal?.type === 'metric';
+        syncClubGoalCaches({
+          clubGoalId,
+          actualDelta: isMetric ? quantity : 0,
+        });
+      }
+
       return { entry: normalizedEntry, goal: updatedGoal };
     } catch (err) {
       console.error('Error creating entry:', err);
       throw err;
     }
-  }, [user, currentClub, refreshClubMembers]);
+  }, [user, currentClub, refreshClubMembers, syncClubGoalCaches]);
 
   // Update an existing entry
   const handleUpdateEntry = useCallback(async (goalId, entryId, updates) => {
     if (!user || !currentClub || !goalId || !entryId) return;
 
     try {
+      const priorGoal = goalsRef.current.find((g) => g.id === goalId);
+      const priorEntry = priorGoal?.entries?.find((e) => e.id === entryId);
+      const priorQty = Number(priorEntry?.quantity) || 0;
+
       const result = await updateGoalEntry(user.uid, goalId, entryId, updates);
       const savedEntry = result.entry || result;
       const updatedGoal = result.goal;
@@ -572,18 +703,33 @@ const GoalsProvider = ({ children }) => {
       }));
 
       clearGoalEntriesCache(goalId);
+
+      const clubGoalId = priorGoal?.clubGoalId;
+      if (clubGoalId) {
+        const nextQty = Number(updates?.quantity ?? savedEntry?.quantity ?? priorQty) || 0;
+        const isMetric = priorGoal?.type === 'metric';
+        syncClubGoalCaches({
+          clubGoalId,
+          actualDelta: isMetric ? nextQty - priorQty : 0,
+        });
+      }
+
       return { entry: savedEntry, goal: updatedGoal };
     } catch (err) {
       console.error('Error updating entry:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, syncClubGoalCaches]);
 
   // Delete an entry
   const handleDeleteEntry = useCallback(async (goalId, entryId) => {
     if (!user || !currentClub || !goalId || !entryId) return;
 
     try {
+      const priorGoal = goalsRef.current.find((g) => g.id === goalId);
+      const priorEntry = priorGoal?.entries?.find((e) => e.id === entryId);
+      const priorQty = Number(priorEntry?.quantity) || 0;
+
       // DELETE endpoint returns 204 (no content), so we handle it optimistically
       await deleteGoalEntry(user.uid, goalId, entryId);
 
@@ -618,12 +764,22 @@ const GoalsProvider = ({ children }) => {
       }));
 
       clearGoalEntriesCache(goalId);
+
+      const clubGoalId = priorGoal?.clubGoalId;
+      if (clubGoalId) {
+        const isMetric = priorGoal?.type === 'metric';
+        syncClubGoalCaches({
+          clubGoalId,
+          actualDelta: isMetric ? -priorQty : 0,
+        });
+      }
+
       return updatedGoalResult;
     } catch (err) {
       console.error('Error deleting entry:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, syncClubGoalCaches]);
 
   // ******************MILESTONE OPERATIONS**********************
   // Create a new milestone
@@ -668,18 +824,33 @@ const GoalsProvider = ({ children }) => {
         return goal;
       }));
 
+      const priorGoal = goalsRef.current.find((g) => g.id === goalId);
+      if (priorGoal?.clubGoalId) {
+        syncClubGoalCaches({ clubGoalId: priorGoal.clubGoalId });
+      }
+
       return createdMilestone;
     } catch (err) {
       console.error('Error creating milestone:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, syncClubGoalCaches]);
 
   // Delete a milestone
   const handleDeleteMilestone = useCallback(async (goalId, milestoneId) => {
     if (!user || !currentClub || !goalId || !milestoneId) return;
 
     try {
+      const priorGoal = goalsRef.current.find((g) => g.id === goalId);
+      const milestoneIdNumForLookup =
+        typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+      const priorMilestone = (priorGoal?.milestones || []).find((m) => {
+        const mId = m.id || m.ID;
+        const mIdNum = typeof mId === 'string' ? parseInt(mId, 10) : mId;
+        return mIdNum === milestoneIdNumForLookup;
+      });
+      const priorDoneRemoved = !!priorMilestone?.done;
+
       await deleteMilestone(user.uid, goalId, milestoneId);
 
       setGoals(prev => prev.map(goal => {
@@ -709,17 +880,37 @@ const GoalsProvider = ({ children }) => {
         }
         return goal;
       }));
+
+      const clubGoalId = priorGoal?.clubGoalId;
+      if (clubGoalId && priorDoneRemoved) {
+        syncClubGoalCaches({
+          clubGoalId,
+          milestonesDoneDelta: -1,
+        });
+      } else if (clubGoalId) {
+        syncClubGoalCaches({ clubGoalId });
+      }
     } catch (err) {
       console.error('Error deleting milestone:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, syncClubGoalCaches]);
 
   // Update a single milestone
   const handleUpdateMilestone = useCallback(async (goalId, milestoneId, updates) => {
     if (!user || !currentClub || !goalId || !milestoneId) return;
 
     try {
+      const priorGoal = goalsRef.current.find((g) => g.id === goalId);
+      const milestoneIdNumForLookup =
+        typeof milestoneId === 'string' ? parseInt(milestoneId, 10) : milestoneId;
+      const priorMilestone = (priorGoal?.milestones || []).find((m) => {
+        const mId = m.id || m.ID;
+        const mIdNum = typeof mId === 'string' ? parseInt(mId, 10) : mId;
+        return mIdNum === milestoneIdNumForLookup;
+      });
+      const priorDone = !!priorMilestone?.done;
+
       const updatedMilestone = await updateMilestone(user.uid, goalId, milestoneId, updates);
       
       // Update milestone in goal's milestones array and calculate progress locally
@@ -764,12 +955,23 @@ const GoalsProvider = ({ children }) => {
         return goal;
       }));
 
+      const clubGoalId = priorGoal?.clubGoalId;
+      if (clubGoalId) {
+        const nextDone = !!updatedMilestone?.done;
+        if (nextDone !== priorDone) {
+          syncClubGoalCaches({
+            clubGoalId,
+            milestonesDoneDelta: nextDone ? 1 : -1,
+          });
+        }
+      }
+
       return updatedGoalResult;
     } catch (err) {
       console.error('Error updating milestone:', err);
       throw err;
     }
-  }, [user, currentClub]);
+  }, [user, currentClub, syncClubGoalCaches]);
 
   // Bulk update milestones (for reordering)
   const handleBulkUpdateMilestones = useCallback(async (goalId, milestones) => {
@@ -807,6 +1009,7 @@ const GoalsProvider = ({ children }) => {
         deleteMilestone: handleDeleteMilestone,
         updateMilestone: handleUpdateMilestone,
         bulkUpdateMilestones: handleBulkUpdateMilestones,
+        syncClubGoalCaches,
       }}
     >
       {children}
