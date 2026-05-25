@@ -5,6 +5,10 @@ const {
   buildLikesSummary,
   buildSuperLikeSummary,
 } = require("../likeHelpers");
+const {
+  notifyBookPromotedToBacklog,
+  notifyBookSuperLiked,
+} = require("../../../../utils/discoverEngagementNotifications");
 
 const ACTIVE_USER_DAYS = 30;
 const DEFAULT_MIN_THRESHOLD = 3;
@@ -75,10 +79,15 @@ const getPromotionThreshold = async (clubId, club) => {
  * revalidation pass (updated_at >= revalidation_requested_at) is a negative
  * survival signal (see evaluateRevalidationSurvival).
  */
+/**
+ * @param {number} bookId
+ * @param {number|string} clubId
+ * @return {Promise<boolean>} True when pool transitioned suggested → backlog
+ */
 const checkAndPromoteBook = async (bookId, clubId) => {
   const book = await db.Book.findByPk(bookId);
   if (!book || book.pool !== "suggested") {
-    return;
+    return false;
   }
   const club = await db.Club.findByPk(parseInt(clubId, 10));
   const threshold = await getPromotionThreshold(clubId, club);
@@ -93,7 +102,9 @@ const checkAndPromoteBook = async (bookId, clubId) => {
         {pool: "backlog", promotedAt: new Date()},
         {where: {id: bookId}},
     );
+    return true;
   }
+  return false;
 };
 
 const checkSuperLikeRemovalSurvival = async (bookId, clubId) => {
@@ -905,13 +916,29 @@ const postDiscoverInteract = async (req, res, next) => {
           {pool: "backlog", promotedAt: new Date()},
           {where: {id: book.id}},
       );
+      const actor = await db.User.findByPk(userId, {attributes: ["displayName"]});
+      await notifyBookSuperLiked({
+        book,
+        clubId,
+        actorUserId: userId,
+        actorDisplayName: actor?.displayName,
+      });
     } else if (action === "like") {
       const isRevalidation = book.pool === "backlog" && book.revalidationRequestedAt;
       await upsertInteraction(book.id, userId, "like", now);
       if (isRevalidation) {
         await evaluateRevalidationSurvival(book.id, clubId);
       } else if (book.pool === "suggested") {
-        await checkAndPromoteBook(book.id, clubId);
+        const promoted = await checkAndPromoteBook(book.id, clubId);
+        if (promoted) {
+          const actor = await db.User.findByPk(userId, {attributes: ["displayName"]});
+          await notifyBookPromotedToBacklog({
+            book,
+            clubId,
+            actorUserId: userId,
+            actorDisplayName: actor?.displayName,
+          });
+        }
       }
     } else if (action === "pass") {
       const isRevalidation = book.pool === "backlog" && book.revalidationRequestedAt;

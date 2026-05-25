@@ -255,7 +255,7 @@ self.addEventListener('notificationclick', (event) => {
   const clubId = notificationData.clubId;
   let targetRoute = route;
 
-  if (clubId && route.startsWith('/feed')) {
+  if (clubId && (route.startsWith('/feed') || route.startsWith('/books/discover'))) {
     const separator = route.includes('?') ? '&' : '?';
     targetRoute = `${route}${separator}clubId=${encodeURIComponent(clubId)}`;
   }

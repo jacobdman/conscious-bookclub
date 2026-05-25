@@ -2,11 +2,28 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const db = require("../../../db/models/index");
 const {sendNotificationsToUser} = require("../../utils/pushSender");
 const {goalsNotificationsEnabled} = require("../../utils/defaultNotificationSettings");
+const {
+  isUserLocalHour,
+  isUserGoalReminderUtcHour,
+  getGoalNotificationHourFromUser,
+} = require("../../utils/userLocalTime");
+const {userHasDailyHabitStreakAtRisk} = require("../../utils/habitStreakAtRisk");
 
 const GOALS_NOTIFICATION_ICON =
   "https://firebasestorage.googleapis.com/v0/b/conscious-bookclub-87073-9eb71" +
   ".firebasestorage.app/o/app-icons%2Fgoals-notification-icon.jpg?alt=media" +
   "&token=278fbb7f-022f-4794-8808-9a46b218fa21";
+
+const STREAK_COPY = {
+  20: {
+    title: "Goals · Streak",
+    body: "🔥 Update your goals now to keep your streak going!",
+  },
+  22: {
+    title: "Goals · Last chance",
+    body: "⏰ Last chance to keep your streak tonight!",
+  },
+};
 
 // Helper function to check if goal needs a reminder
 const goalNeedsReminder = async (userId, goal) => {
@@ -36,15 +53,19 @@ const goalNeedsReminder = async (userId, goal) => {
   }
 
   // For weekly goals, always remind (they need daily tracking)
-  // Optionally, we could check if they're behind on weekly target
   if (goal.cadence === "week") {
-    // Always remind for weekly goals since they need daily tracking
-    // You could add logic here to check if they're behind on weekly target
     return true;
   }
 
-  // For other cadences, don't remind (or add logic as needed)
   return false;
+};
+
+const userHasPushTargets = async (userId) => {
+  const [webN, nativeN] = await Promise.all([
+    db.PushSubscription.count({where: {userId}}),
+    db.NativePushToken.count({where: {userId}}),
+  ]);
+  return webN > 0 || nativeN > 0;
 };
 
 // Scheduled function to send daily goal reminders
@@ -52,17 +73,15 @@ exports.dailyGoalReminder = onSchedule(
     {
       schedule: "0 * * * *", // Every hour
       timeZone: "UTC",
-      // Optimize for faster deployments and better performance
       region: "us-central1",
-      maxInstances: 1, // Only one instance needed for scheduled tasks
-      memory: "512MiB", // Sufficient for database queries and notifications
-      timeoutSeconds: 540, // 9 minutes (max for scheduled functions)
+      maxInstances: 1,
+      memory: "512MiB",
+      timeoutSeconds: 540,
     },
     async (event) => {
       console.log("Daily goal reminder function triggered");
 
       try {
-        // Get all users with notifications enabled
         const users = await db.User.findAll({
           where: {
             dailyGoalNotificationsEnabled: true,
@@ -84,6 +103,7 @@ exports.dailyGoalReminder = onSchedule(
           noSubscriptions: 0,
           noGoals: 0,
           allGoalsComplete: 0,
+          streakNotAtRisk: 0,
         };
 
         for (const user of users) {
@@ -96,83 +116,85 @@ exports.dailyGoalReminder = onSchedule(
             continue;
           }
 
-          // Check if it's time to send notification for this user
-          if (!user.dailyGoalNotificationTime) {
-            console.log(`  Skipping user ${user.uid}: no dailyGoalNotificationTime set`);
-            skipReasons.noTimeSet++;
-            usersSkipped++;
-            continue;
-          }
-
-          // Parse notification time (format: "HH:MM:SS" or "HH:MM")
-          const [hours, minutes = 0] = user.dailyGoalNotificationTime.split(":").map(Number);
-
-          // Get user's timezone or default to UTC
-          const userTimezone = user.timezone || "UTC";
-
-          // Convert user's local notification time to UTC hour
-          // Strategy: Calculate the timezone offset by comparing a known UTC time
-          // to what it shows in the user's timezone, then apply that offset
-
-          const today = new Date();
-          const year = today.getUTCFullYear();
-          const month = today.getUTCMonth();
-          const day = today.getUTCDate();
-
-          // Use a test UTC time (noon) and see what time it is in user's timezone
-          // This tells us the offset
-          const testUTC = new Date(Date.UTC(year, month, day, 12, 0, 0)); // Noon UTC
-          const testInUserTz = new Intl.DateTimeFormat("en-US", {
-            timeZone: userTimezone,
-            hour: "2-digit",
-            hour12: false,
-          }).format(testUTC);
-          const [testHour] = testInUserTz.split(":").map(Number);
-
-          // Calculate offset: if 12:00 UTC shows as 5:00 in user's timezone,
-          // then user's timezone is 7 hours behind UTC (offset = -7)
-          // So: offset = testUTC - testInUserTz = 12 - 5 = 7 (but we need negative)
-          // Actually: if 12 UTC = 5 local, then local is 7 hours behind, so offset = -7
-          // Formula: offset = testInUserTz - testUTC (but in hours behind/ahead)
-          // If testUTC is 12 and testInUserTz is 5, then offset = 5 - 12 = -7 ✓
-          const tzOffset = testHour - 12;
-
-          // Convert user's local notification time to UTC
-          // If user wants 8 AM local and offset is -7, then UTC = 8 - (-7) = 15
-          // Formula: UTC = local - offset
-          const targetHourUTC = (hours - tzOffset + 24) % 24;
-
-          // Check if current hour matches user's notification hour (converted to UTC)
-          if (currentHour !== targetHourUTC) {
-            const timeStr = `${hours}:${String(minutes).padStart(2, "0")}`;
-            console.log(
-                `  Skipping user ${user.uid}: hour mismatch ` +
-                `(current UTC: ${currentHour}, target UTC: ${targetHourUTC} ` +
-                `[${timeStr} ${userTimezone}], offset: ${tzOffset}h)`,
-            );
-            skipReasons.hourMismatch++;
-            usersSkipped++;
-            continue;
-          }
-
-          const [webN, nativeN] = await Promise.all([
-            db.PushSubscription.count({where: {userId: user.uid}}),
-            db.NativePushToken.count({where: {userId: user.uid}}),
-          ]);
-
-          if (webN === 0 && nativeN === 0) {
+          const hasTargets = await userHasPushTargets(user.uid);
+          if (!hasTargets) {
             console.log(`  Skipping user ${user.uid}: no web or native push targets`);
             skipReasons.noSubscriptions++;
             usersSkipped++;
             continue;
           }
 
-          console.log(
-              `  User ${user.uid} has ${webN} web subscription(s), ` +
-              `${nativeN} native token(s)`,
-          );
+          let localHour = null;
+          if (isUserLocalHour(user, 20, now)) {
+            localHour = 20;
+          } else if (isUserLocalHour(user, 22, now)) {
+            localHour = 22;
+          }
 
-          // Get user's goals that need daily reminders (daily and weekly cadence)
+          if (localHour === 20 || localHour === 22) {
+            const atRisk = await userHasDailyHabitStreakAtRisk(user.uid);
+            if (atRisk) {
+              const copy = STREAK_COPY[localHour];
+              const {web, native} = await sendNotificationsToUser(
+                  user.uid,
+                  copy.title,
+                  copy.body,
+                  {route: "/goals", type: "goal"},
+                  {icon: GOALS_NOTIFICATION_ICON, badge: GOALS_NOTIFICATION_ICON},
+              );
+              const sent =
+                web.filter((r) => r.success).length +
+                native.filter((r) => r.success).length;
+              notificationsSent += sent;
+              console.log(
+                  `  Sent ${sent} streak reminder(s) to user ${user.uid} ` +
+                  `at local hour ${localHour}`,
+              );
+              continue;
+            }
+            console.log(`  Skipping user ${user.uid}: no daily habit streak at risk`);
+            skipReasons.streakNotAtRisk++;
+            usersSkipped++;
+            continue;
+          }
+
+          if (getGoalNotificationHourFromUser(user) == null) {
+            console.log(`  Skipping user ${user.uid}: no goal notification time set`);
+            skipReasons.noTimeSet++;
+            usersSkipped++;
+            continue;
+          }
+
+          if (!isUserGoalReminderUtcHour(user, now, currentHour)) {
+            console.log(`  Skipping user ${user.uid}: not their daily reminder UTC hour`);
+            skipReasons.hourMismatch++;
+            usersSkipped++;
+            continue;
+          }
+
+          const reminderLocalHour = getGoalNotificationHourFromUser(user);
+          if (reminderLocalHour === 20 || reminderLocalHour === 22) {
+            const atRisk = await userHasDailyHabitStreakAtRisk(user.uid);
+            if (atRisk) {
+              const copy = STREAK_COPY[reminderLocalHour];
+              const {web, native} = await sendNotificationsToUser(
+                  user.uid,
+                  copy.title,
+                  copy.body,
+                  {route: "/goals", type: "goal"},
+                  {icon: GOALS_NOTIFICATION_ICON, badge: GOALS_NOTIFICATION_ICON},
+              );
+              const sent =
+                web.filter((r) => r.success).length +
+                native.filter((r) => r.success).length;
+              notificationsSent += sent;
+              console.log(
+                  `  Sent ${sent} streak-only reminder(s) (configured hour ${reminderLocalHour})`,
+              );
+              continue;
+            }
+          }
+
           const goalsToCheck = await db.Goal.findAll({
             where: {
               userId: user.uid,
@@ -191,14 +213,6 @@ exports.dailyGoalReminder = onSchedule(
             continue;
           }
 
-          const dailyCount = goalsToCheck.filter((g) => g.cadence === "day").length;
-          const weeklyCount = goalsToCheck.filter((g) => g.cadence === "week").length;
-          console.log(
-              `  User ${user.uid} has ${goalsToCheck.length} goal(s) ` +
-              `(${dailyCount} daily, ${weeklyCount} weekly)`,
-          );
-
-          // Check which goals need reminders
           const goalsNeedingReminder = [];
           for (const goal of goalsToCheck) {
             const needsReminder = await goalNeedsReminder(user.uid, goal);
@@ -214,20 +228,6 @@ exports.dailyGoalReminder = onSchedule(
             continue;
           }
 
-          const dailyNeedingReminder = goalsNeedingReminder.filter(
-              (g) => g.cadence === "day",
-          ).length;
-          const weeklyNeedingReminder = goalsNeedingReminder.filter(
-              (g) => g.cadence === "week",
-          ).length;
-
-          console.log(
-              `  User ${user.uid} has ${goalsNeedingReminder.length} goal(s) needing reminder ` +
-              `(${dailyNeedingReminder} daily, ${weeklyNeedingReminder} weekly) ` +
-              `out of ${goalsToCheck.length} total`,
-          );
-
-          // Send notification to all subscriptions
           const title = "Goals · Daily reminder";
           const goalText = goalsNeedingReminder.length > 1 ? "s" : "";
           const body =
@@ -246,8 +246,7 @@ exports.dailyGoalReminder = onSchedule(
           notificationsSent += userNotificationsSent;
 
           console.log(
-              `  Sent ${userNotificationsSent} notification(s) to user ${user.uid} ` +
-              `for ${goalsNeedingReminder.length} goal(s) needing reminder`,
+              `  Sent ${userNotificationsSent} daily reminder(s) to user ${user.uid}`,
           );
         }
 
@@ -261,4 +260,3 @@ exports.dailyGoalReminder = onSchedule(
       }
     },
 );
-
