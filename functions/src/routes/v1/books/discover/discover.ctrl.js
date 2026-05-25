@@ -469,7 +469,7 @@ const loadChampionQueueBooks = async (clubId, userId, limitNum) => {
          SELECT bi.book_id AS book_id, MAX(bi.updated_at) AS mx
          FROM book_interactions bi
          INNER JOIN books b ON b.id = bi.book_id
-         WHERE b.club_id = :clubId AND b.pool = 'suggested'
+         WHERE b.club_id = :clubId
          AND b.chosen_for_bookclub = false AND bi.action = 'super_like'
          GROUP BY bi.book_id
          ORDER BY mx DESC
@@ -912,6 +912,7 @@ const postDiscoverInteract = async (req, res, next) => {
         });
       }
       await upsertInteraction(book.id, userId, "super_like", now);
+      await upsertInteraction(book.id, userId, "like", now);
       await db.Book.update(
           {pool: "backlog", promotedAt: new Date()},
           {where: {id: book.id}},
