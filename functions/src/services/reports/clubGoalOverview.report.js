@@ -15,6 +15,10 @@ const verifyMembership = async (clubId, userId) => {
 
 /**
  * Summary row per active club goal for list + spotlight (calls progress per goal).
+ * @param {number|string} clubId Club id
+ * @param {string} userId Caller user id (membership check)
+ * @param {string|null} timezone Optional IANA timezone
+ * @return {Promise<{clubGoals: Array<object>}>}
  */
 const getClubGoalOverviewReport = async (clubId, userId, timezone = null) => {
   await verifyMembership(clubId, userId);

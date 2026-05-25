@@ -1,5 +1,11 @@
 const express = require("express");
-const {getMeetings, createMeeting, updateMeeting, getMeetingsICal, setMeetingRsvp} = require("./meetings.ctrl");
+const {
+  getMeetings,
+  createMeeting,
+  updateMeeting,
+  getMeetingsICal,
+  setMeetingRsvp,
+} = require("./meetings.ctrl");
 
 const router = express.Router(); // eslint-disable-line new-cap
 

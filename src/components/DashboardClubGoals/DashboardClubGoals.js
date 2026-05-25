@@ -17,6 +17,7 @@ import { updateUserProfile } from 'services/users/users.service';
 import { getTodayEntries, getGoalTargetValue } from 'utils/goalHelpers';
 import GoalDetailsModal from 'components/Goals/GoalDetailsModal';
 import ClubGoalDashboardSummary from './ClubGoalDashboardSummary';
+import ClubGoalSummaryTitle from './ClubGoalSummaryTitle';
 
 const DashboardClubGoals = () => {
   const { user, userProfile, setUserProfile } = useAuth();
@@ -151,20 +152,29 @@ const DashboardClubGoals = () => {
         </Typography>
 
         <Box
-          ref={scrollRef}
           sx={{
-            display: 'flex',
-            alignItems: 'stretch',
-            gap: 2,
-            overflowX: 'auto',
-            scrollSnapType: 'x mandatory',
-            scrollBehavior: 'smooth',
-            WebkitOverflowScrolling: 'touch',
+            overflow: 'visible',
+            pb: 0.5,
+            mx: -0.5,
             px: 0.5,
-            scrollbarWidth: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
           }}
         >
+          <Box
+            ref={scrollRef}
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 2,
+              overflowX: 'auto',
+              overflowY: 'visible',
+              scrollSnapType: 'x mandatory',
+              scrollBehavior: 'smooth',
+              WebkitOverflowScrolling: 'touch',
+              py: 0.25,
+              scrollbarWidth: 'none',
+              '&::-webkit-scrollbar': { display: 'none' },
+            }}
+          >
           {clubGoals.map((cg) => {
             const linked = goals.find(
               (g) => Number(g.clubGoalId) === Number(cg.id) && !g.archived,
@@ -191,19 +201,24 @@ const DashboardClubGoals = () => {
                   scrollSnapAlign: 'start',
                   minWidth: 0,
                   display: 'flex',
+                  overflow: 'visible',
                 }}
               >
                 <Paper
                   elevation={2}
                   onClick={() => handleCardClick(cg)}
                   sx={{
-                    p: 2,
+                    px: 2,
+                    pt: 2,
+                    pb: 2.5,
                     cursor: canLog ? 'pointer' : 'default',
                     borderRadius: 2,
                     minWidth: 0,
                     width: '100%',
                     display: 'flex',
                     flexDirection: 'column',
+                    boxSizing: 'border-box',
+                    overflow: 'visible',
                     '&:hover': canLog
                       ? {
                           backgroundColor: 'action.hover',
@@ -211,29 +226,19 @@ const DashboardClubGoals = () => {
                       : undefined,
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 0.5,
+                      mb: isCollapsed ? 0.75 : 0,
+                    }}
+                  >
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <ClubGoalDashboardSummary
+                      <ClubGoalSummaryTitle
                         clubGoal={cg}
-                        snapshot={cg?.snapshot}
-                        userId={user?.uid}
-                        clubId={currentClub?.id}
-                        userTodayActual={todayActual}
-                        personalActual={personalActual}
-                        personalTarget={personalTarget}
                         collapsed={isCollapsed}
                       />
-                      {!isCollapsed && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: 'block', mt: 1.5 }}
-                        >
-                          {canLog
-                            ? 'Tap to log or view details'
-                            : 'Your club goal is not available yet'}
-                        </Typography>
-                      )}
                     </Box>
                     <IconButton
                       aria-label={isCollapsed ? 'Expand club goal' : 'Collapse club goal'}
@@ -250,10 +255,35 @@ const DashboardClubGoals = () => {
                       />
                     </IconButton>
                   </Box>
+                  <Box sx={{ width: '100%', minWidth: 0 }}>
+                    <ClubGoalDashboardSummary
+                      clubGoal={cg}
+                      snapshot={cg?.snapshot}
+                      userId={user?.uid}
+                      clubId={currentClub?.id}
+                      userTodayActual={todayActual}
+                      personalActual={personalActual}
+                      personalTarget={personalTarget}
+                      showTitle={false}
+                      collapsed={isCollapsed}
+                    />
+                    {!isCollapsed && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mt: 1.5, pb: 0.25 }}
+                      >
+                        {canLog
+                          ? 'Tap to log or view details'
+                          : 'Your club goal is not available yet'}
+                      </Typography>
+                    )}
+                  </Box>
                 </Paper>
               </Box>
             );
           })}
+          </Box>
         </Box>
 
         {clubGoals.length > 1 && (

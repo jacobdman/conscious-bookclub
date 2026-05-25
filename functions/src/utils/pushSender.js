@@ -1,6 +1,5 @@
 /**
  * Unified push delivery: web (VAPID / PushSubscription) and native (FCM via NativePushToken).
- * Temporary title prefixes [PWA] / [Native] for debugging; remove when no longer needed.
  */
 const db = require("../../db/models/index");
 const webpush = require("web-push");
@@ -153,7 +152,7 @@ const sendNativePush = async (nativeRow, title, body, data = {}) => {
 /**
  * Send to all web subscriptions and native tokens for a user.
  * @param {string} userId Firebase user uid.
- * @param {string} title Base title; [PWA]/[Native] tags applied per channel.
+ * @param {string} title Notification title.
  * @param {string} body Notification body.
  * @param {object} data Optional payload.
  * @param {object} options icon and badge URLs for web push.
@@ -163,15 +162,12 @@ const sendNotificationsToUser = async (userId, title, body, data = {}, options =
   const icon = options.icon != null ? options.icon : DEFAULT_APP_ICON;
   const badge = options.badge != null ? options.badge : icon;
 
-  const webTitle = `[PWA] ${title}`;
-  const nativeTitle = `[Native] ${title}`;
-
   const webResults = [];
   const subscriptions = await db.PushSubscription.findAll({where: {userId}});
   for (const sub of subscriptions) {
     const result = await sendWebPush(
         sub.subscriptionJson,
-        webTitle,
+        title,
         body,
         data,
         {icon, badge},
@@ -182,7 +178,7 @@ const sendNotificationsToUser = async (userId, title, body, data = {}, options =
   const nativeResults = [];
   const nativeTokens = await db.NativePushToken.findAll({where: {userId}});
   for (const nt of nativeTokens) {
-    const result = await sendNativePush(nt, nativeTitle, body, data);
+    const result = await sendNativePush(nt, title, body, data);
     nativeResults.push({
       nativeTokenId: nt.id,
       platform: nt.platform,

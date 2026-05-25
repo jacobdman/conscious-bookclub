@@ -7,7 +7,7 @@ const {
   deleteClubGoal,
 } = require("./clubGoals.ctrl");
 
-const router = express.Router({mergeParams: true});
+const router = express.Router({mergeParams: true}); // eslint-disable-line new-cap
 
 router
     .get("/", listClubGoals)

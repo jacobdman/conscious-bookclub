@@ -13,8 +13,8 @@ const DASHBOARD_SECTIONS = [
 const normalizeSectionId = (id) => (id === "clubGoalSpotlight" ? "clubGoals" : id);
 
 /**
- * @param {Array<{id: string, enabled?: boolean}>} config
- * @return {Array<{id: string, enabled: boolean}>}
+ * @param {Array<object>} config Dashboard section config items
+ * @return {Array<object>} Normalized section config
  */
 const normalizeArrayConfig = (config) => {
   const seen = new Set();
@@ -37,14 +37,14 @@ const normalizeArrayConfig = (config) => {
 /**
  * Insert clubGoals before quickGoals when missing; reorder when below quickGoals.
  * @param {Array<{id: string, enabled: boolean}>} config
- * @return {{config: Array<{id: string, enabled: boolean}>, changed: boolean}}
+ * @return {{config: Array<object>, changed: boolean}}
  */
 const ensureClubGoalsSection = (config) => {
   const items = normalizeArrayConfig(config);
   let changed = JSON.stringify(items) !== JSON.stringify(config);
 
   const quickIdx = items.findIndex((item) => item.id === "quickGoals");
-  let clubIdx = items.findIndex((item) => item.id === "clubGoals");
+  const clubIdx = items.findIndex((item) => item.id === "clubGoals");
 
   if (clubIdx === -1) {
     const clubGoals = {id: "clubGoals", enabled: true};
@@ -83,7 +83,7 @@ const ensureClubGoalsSectionLegacy = (config) => {
 
   const normalizedOrder = order.map((id) => normalizeSectionId(id));
   const quickIdx = normalizedOrder.indexOf("quickGoals");
-  let clubIdx = normalizedOrder.indexOf("clubGoals");
+  const clubIdx = normalizedOrder.indexOf("clubGoals");
 
   let changed =
     JSON.stringify(order) !== JSON.stringify(normalizedOrder) ||
@@ -94,7 +94,9 @@ const ensureClubGoalsSectionLegacy = (config) => {
       normalizedOrder.splice(quickIdx, 0, "clubGoals");
     } else {
       const nextMeetingIdx = normalizedOrder.indexOf("nextMeeting");
-      normalizedOrder.splice(nextMeetingIdx >= 0 ? nextMeetingIdx + 1 : normalizedOrder.length, 0, "clubGoals");
+      const insertAt =
+        nextMeetingIdx >= 0 ? nextMeetingIdx + 1 : normalizedOrder.length;
+      normalizedOrder.splice(insertAt, 0, "clubGoals");
     }
     if (typeof sections.clubGoals?.enabled !== "boolean") {
       sections.clubGoals = {enabled: true};
