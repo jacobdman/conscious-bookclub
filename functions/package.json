@@ -12,7 +12,8 @@
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "migrate:undo:last": "node scripts/undo-last-migration.js",
     "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
-    "migrate:status": "sequelize-cli db:migrate:status"
+    "migrate:status": "sequelize-cli db:migrate:status",
+    "test": "node --test test/**/*.test.js"
   },
   "engines": {
     "node": "22"

@@ -6,8 +6,12 @@ const {
   meetingsOneDayBeforeEnabled,
   meetingsOneWeekBeforeEnabled,
 } = require("../../utils/defaultNotificationSettings");
+const {
+  getMeetingStartInstant,
+  isReminderHourBeforeMeeting,
+} = require("../../utils/meetingStart");
+const {getUserTimezone} = require("../../utils/userLocalTime");
 
-// Helper function to format date
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString("en-US", {
     weekday: "long",
@@ -17,52 +21,47 @@ const formatDate = (date) => {
   });
 };
 
-// Scheduled function to send meeting reminders
+/**
+ * @param {number} clubId
+ * @return {Promise<string>} Owner timezone or UTC
+ */
+const getClubOwnerTimezone = async (clubId) => {
+  const ownerMember = await db.ClubMember.findOne({
+    where: {clubId, role: "owner"},
+    include: [
+      {
+        model: db.User,
+        as: "user",
+        attributes: ["timezone"],
+      },
+    ],
+  });
+  return getUserTimezone(ownerMember?.user);
+};
+
 exports.meetingReminder = onSchedule(
     {
-      schedule: "0 * * * *", // Every hour
+      schedule: "0 * * * *",
       timeZone: "UTC",
-      // Optimize for faster deployments and better performance
       region: "us-central1",
-      maxInstances: 1, // Only one instance needed for scheduled tasks
-      memory: "512MiB", // Sufficient for database queries and notifications
-      timeoutSeconds: 540, // 9 minutes (max for scheduled functions)
+      maxInstances: 1,
+      memory: "512MiB",
+      timeoutSeconds: 540,
     },
     async (event) => {
       console.log("Meeting reminder function triggered");
 
       try {
         const now = new Date();
-        // Calculate dates for 1 day and 7 days from now (at start of day)
-        const oneDayFromNow = new Date(now);
-        oneDayFromNow.setUTCDate(oneDayFromNow.getUTCDate() + 1);
-        oneDayFromNow.setUTCHours(0, 0, 0, 0);
-        const oneDayFromNowStr = oneDayFromNow.toISOString().split("T")[0]; // YYYY-MM-DD
+        const windowEnd = new Date(now.getTime() + 8 * 24 * 3600 * 1000);
+        const todayStr = now.toISOString().split("T")[0];
+        const windowEndStr = windowEnd.toISOString().split("T")[0];
 
-        const oneWeekFromNow = new Date(now);
-        oneWeekFromNow.setUTCDate(oneWeekFromNow.getUTCDate() + 7);
-        oneWeekFromNow.setUTCHours(0, 0, 0, 0);
-        const oneWeekFromNowStr = oneWeekFromNow.toISOString().split("T")[0]; // YYYY-MM-DD
-
-        // Get meetings with startTime that match the current hour
-        const meetingsWithTime = await db.Meeting.findAll({
+        const meetings = await db.Meeting.findAll({
           where: {
-            [db.Sequelize.Op.and]: [
-              {
-                date: {
-                  [db.Sequelize.Op.in]: [oneDayFromNowStr, oneWeekFromNowStr],
-                },
-              },
-              {
-                startTime: {
-                  [db.Sequelize.Op.ne]: null,
-                },
-              },
-              // Match the hour: meeting hour must equal current hour
-              db.Sequelize.literal(
-                  "EXTRACT(HOUR FROM start_time) = EXTRACT(HOUR FROM NOW())",
-              ),
-            ],
+            date: {
+              [db.Sequelize.Op.between]: [todayStr, windowEndStr],
+            },
           },
           include: [
             {
@@ -72,104 +71,51 @@ exports.meetingReminder = onSchedule(
           ],
         });
 
-        // Get meetings without startTime - we'll check if it's 9am in owner's timezone
-        const meetingsWithoutTime = await db.Meeting.findAll({
-          where: {
-            [db.Sequelize.Op.and]: [
-              {
-                date: {
-                  [db.Sequelize.Op.in]: [oneDayFromNowStr, oneWeekFromNowStr],
-                },
-              },
-              {
-                startTime: null,
-              },
-            ],
-          },
-          include: [
-            {
-              model: db.Book,
-              as: "book",
-            },
-          ],
-        });
+        console.log(`Found ${meetings.length} meeting(s) in the next 8 days`);
 
-        // Filter meetings without time to only those where it's 9am in owner's timezone
-        const validMeetingsWithoutTime = [];
-        for (const meeting of meetingsWithoutTime) {
-          // Get the club owner for this meeting
-          const ownerMember = await db.ClubMember.findOne({
-            where: {
-              clubId: meeting.clubId,
-              role: "owner",
-            },
-            include: [
-              {
-                model: db.User,
-                as: "user",
-                attributes: ["uid", "timezone"],
-              },
-            ],
-          });
-
-          if (!ownerMember || !ownerMember.user) {
-            continue;
-          }
-
-          const ownerTimezone = ownerMember.user.timezone || "UTC";
-
-          // Check if it's 9am in owner's timezone
-          // Convert current UTC time to owner's timezone and check if hour is 9
-          const currentTimeInOwnerTz = new Intl.DateTimeFormat("en-US", {
-            timeZone: ownerTimezone,
-            hour: "2-digit",
-            hour12: false,
-          }).format(now);
-          const [hourInOwnerTz] = currentTimeInOwnerTz.split(":").map(Number);
-
-          if (hourInOwnerTz === 9) {
-            validMeetingsWithoutTime.push(meeting);
-          }
-        }
-
-        // Combine both sets of meetings
-        const meetings = [...meetingsWithTime, ...validMeetingsWithoutTime];
-
-        console.log(
-            `Found ${meetings.length} meeting(s) at notification time ` +
-            `(${meetingsWithTime.length} with time, ` +
-            `${validMeetingsWithoutTime.length} without time at 9am)`);
+        const ownerTzCache = new Map();
 
         let meetingsProcessed = 0;
         let meetingsSkipped = 0;
         let notificationsSent = 0;
         const skipReasons = {
+          noReminderThisHour: 0,
           noUsersToNotify: 0,
           noSubscriptions: 0,
         };
 
         for (const meeting of meetings) {
-          meetingsProcessed++;
-          // Determine reminder type based on which target date the meeting matches
-          // Since SQL already filtered by date and hour, we can determine type from date string
-          // DATEONLY fields in Sequelize are returned as strings in YYYY-MM-DD format
-          const meetingDateStr = typeof meeting.date === "string" ?
-            meeting.date :
-            new Date(meeting.date).toISOString().split("T")[0];
-          const shouldNotifyOneDay = meetingDateStr === oneDayFromNowStr;
-          const reminderType = shouldNotifyOneDay ? "oneDayBefore" : "oneWeekBefore";
-          const daysText = shouldNotifyOneDay ? "1 day" : "1 week";
+          let fallbackTz = ownerTzCache.get(meeting.clubId);
+          if (!fallbackTz) {
+            fallbackTz = await getClubOwnerTimezone(meeting.clubId);
+            ownerTzCache.set(meeting.clubId, fallbackTz);
+          }
 
-          const timeInfo = meeting.startTime ?
-            `hour: ${meeting.startTime}` :
-            "no startTime (9am in owner timezone)";
+          const start = getMeetingStartInstant(meeting, fallbackTz);
+          if (start <= now) {
+            continue;
+          }
+
+          const notify24h = isReminderHourBeforeMeeting(start, now, 24);
+          const notify7d = isReminderHourBeforeMeeting(start, now, 24 * 7);
+
+          if (!notify24h && !notify7d) {
+            skipReasons.noReminderThisHour++;
+            continue;
+          }
+
+          meetingsProcessed++;
+
+          const reminderType = notify24h ? "oneDayBefore" : "oneWeekBefore";
+          const daysText = notify24h ? "1 day" : "1 week";
+
+          const leadHours = notify24h ? 24 : 168;
           console.log(
-              `Processing meeting ${meeting.id} (${meetingsProcessed}/${meetings.length}): ` +
+              `Processing meeting ${meeting.id}: ` +
               `"${meeting.book ? meeting.book.title : "Unknown"}" ` +
-              `(${daysText} away, ${timeInfo})`,
+              `(${daysText}, T-${leadHours}h)`,
           );
 
-          // Get club members; filter by meeting prefs (undefined = enabled per product defaults)
           const allMembers = await db.ClubMember.findAll({
             where: {clubId: meeting.clubId},
             include: [
@@ -191,26 +137,18 @@ exports.meetingReminder = onSchedule(
             return meetingsOneWeekBeforeEnabled(m);
           });
 
-          const memberCount = clubMembers.length;
-          console.log(
-              `  Meeting ${meeting.id} has ${memberCount} club member(s) ` +
-              "with notifications enabled",
-          );
-
-          if (memberCount === 0) {
-            console.log(
-                `  Skipping meeting ${meeting.id}: no users with meeting notifications enabled`,
-            );
+          if (clubMembers.length === 0) {
             skipReasons.noUsersToNotify++;
             meetingsSkipped++;
             continue;
           }
 
-          // Prepare notification message
           const bookTitle = meeting.book ? meeting.book.title : "your book club";
           const meetingDateFormatted = formatDate(meeting.date);
+          const notificationBody =
+            `Your book club meeting for "${bookTitle}" is in ${daysText} ` +
+            `on ${meetingDateFormatted}`;
 
-          // Send notifications to all filtered users
           let meetingNotificationsSent = 0;
           for (const member of clubMembers) {
             if (!member.user) continue;
@@ -221,52 +159,37 @@ exports.meetingReminder = onSchedule(
             ]);
 
             if (webN === 0 && nativeN === 0) {
-              console.log(`    User ${member.user.uid} has no web or native push targets`);
               skipReasons.noSubscriptions++;
               continue;
             }
 
-            console.log(
-                `    User ${member.user.uid} has ${webN} web + ${nativeN} native target(s)`,
-            );
-
-            // Send notification
-            const notificationBody =
-                `Your book club meeting for "${bookTitle}" is in ${daysText} ` +
-                `on ${meetingDateFormatted}`;
-            const notification = {
-              title: "Meetings · Reminder",
-              body: notificationBody,
-            };
-
             const {web, native} = await sendNotificationsToUser(
                 member.user.uid,
-                notification.title,
-                notification.body,
+                "Meetings · Reminder",
+                notificationBody,
                 {route: "/meetings", type: "meeting"},
                 {icon: DEFAULT_APP_ICON, badge: DEFAULT_APP_ICON},
             );
-            const sentOk =
+            meetingNotificationsSent +=
               web.filter((r) => r.success).length +
               native.filter((r) => r.success).length;
-            meetingNotificationsSent += sentOk;
-            notificationsSent += sentOk;
           }
 
+          notificationsSent += meetingNotificationsSent;
           console.log(
-              `  Sent ${meetingNotificationsSent} notification(s) for meeting ${meeting.id} ` +
-              `to ${clubMembers.length} user(s)`,
+              `  Sent ${meetingNotificationsSent} notification(s) for meeting ${meeting.id}`,
           );
         }
 
         console.log("Meeting reminder function completed");
-        console.log(`Summary: ${meetingsProcessed} meetings processed, ` +
-            `${notificationsSent} notifications sent, ${meetingsSkipped} meetings skipped`);
-        console.log(`Skip reasons:`, skipReasons);
+        console.log(
+            `Summary: ${meetingsProcessed} meetings processed, ` +
+            `${notificationsSent} notifications sent, ${meetingsSkipped} meetings skipped`,
+        );
+        console.log("Skip reasons:", skipReasons);
       } catch (error) {
         console.error("Error in meeting reminder function:", error);
         throw error;
       }
     },
 );
-

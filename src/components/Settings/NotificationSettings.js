@@ -386,6 +386,8 @@ const NotificationSettings = () => {
 
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               You will receive a reminder at the top of this hour if you have incomplete daily goals.
+              When you have a daily habit streak at risk, you will also get evening reminders at 8pm
+              and 10pm in your timezone.
             </Typography>
           </>
         )}
@@ -448,6 +450,8 @@ const NotificationSettings = () => {
               {feedNotificationMode === 'all'
                 ? 'You will receive notifications for all new posts in your book club.'
                 : 'You will receive notifications when someone replies to your posts or mentions you.'}
+              {' '}You will also be notified when your suggested books are super-liked or promoted
+              to the backlog.
             </Typography>
           </>
         )}
@@ -497,7 +501,10 @@ const NotificationSettings = () => {
             </Box>
 
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              You will receive reminders before upcoming book club meetings.
+              You will receive reminders before upcoming book club meetings (24 hours and 1 week
+              before the meeting start time). At 10am in your timezone, three days and one day before
+              a meeting, you may get a separate nudge to swipe discovery and like or pass books so
+              your club has a full queue to choose from.
             </Typography>
           </>
         )}

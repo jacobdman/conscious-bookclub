@@ -126,6 +126,24 @@ const TEST_PRESETS = {
     data: {route: "/meetings", type: "meeting"},
     icon: DEFAULT_APP_ICON,
   },
+  discovery: {
+    title: "Meetings · Discover",
+    body: "Swipe discovery and like or pass books so your club has a full queue!",
+    data: {route: "/books/discover", type: "discovery"},
+    icon: DEFAULT_APP_ICON,
+  },
+  discover_backlog: {
+    title: "Discover · Backlog",
+    body: "🎉 \"Sample Book\" made it to your club's backlog!",
+    data: {route: "/books/discover", type: "discovery"},
+    icon: FEED_NOTIFICATION_ICON,
+  },
+  discover_super_like: {
+    title: "Discover · Super like",
+    body: "⭐ Alex super-liked \"Sample Book\" — it's on the backlog now!",
+    data: {route: "/books/discover", type: "discovery"},
+    icon: FEED_NOTIFICATION_ICON,
+  },
 };
 
 // POST /v1/notifications/test - Send a test push notification to user
