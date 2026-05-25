@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -20,12 +20,9 @@ import Profile from './views/Profile';
 import Meetings from './views/Meetings';
 import NoClub from './views/NoClub';
 import ClubSetup from './views/ClubSetup';
-import Landing from './views/Landing';
-import Theory from './views/Theory';
-import Themes from './views/Themes';
+import SignIn from 'views/SignIn';
 import Quotes from './views/Quotes';
 import Dev from './views/Dev';
-import Login from './Login';
 import UpdatePrompt from 'components/UpdatePrompt';
 import AprilFools2026 from 'components/AprilFools2026';
 import BackButtonHandler from 'components/BackButtonHandler';
@@ -35,6 +32,13 @@ import KeyboardProvider from 'contexts/Keyboard';
 import { CircularProgress, Box } from '@mui/material';
 import { queryClient, persistOptions } from './queryClient';
 import { initCapacitorNative } from 'utils/capacitorNative';
+
+const RedirectWithSearch = ({ to = '/' }) => {
+  const location = useLocation();
+  return <Navigate to={{ pathname: to, search: location.search }} replace />;
+};
+
+const AuthenticatedHomeRedirect = () => <Navigate to="/" replace />;
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -73,31 +77,12 @@ function AppContent() {
         {user ? <AprilFools2026 /> : null}
         <BackButtonHandler />
         <Routes>
-        {/* Public routes */}
-        <Route
-          path="/landing"
-          element={<Landing />}
-        />
-        <Route
-          path="/theory"
-          element={<Theory />}
-        />
-        <Route
-          path="/themes"
-          element={<Themes />}
-        />
-        <Route
-          path="/dev"
-          element={<Dev />}
-        />
-        <Route
-          path="/login"
-          element={user ? <Navigate to="/" replace /> : <Login />}
-        />
-        
-        {/* Authenticated routes */}
         {user ? (
           <>
+            <Route path="/login" element={<AuthenticatedHomeRedirect />} />
+            <Route path="/landing" element={<AuthenticatedHomeRedirect />} />
+            <Route path="/theory" element={<AuthenticatedHomeRedirect />} />
+            <Route path="/themes" element={<AuthenticatedHomeRedirect />} />
             <Route
               path="/join-club"
               element={
@@ -220,10 +205,19 @@ function AppContent() {
                 }
               />
             </Route>
+            <Route path="/dev" element={<Dev />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
-          <Route path="*" element={<Navigate to="/landing" replace />} />
+          <>
+            <Route path="/" element={<SignIn />} />
+            <Route path="/login" element={<RedirectWithSearch />} />
+            <Route path="/landing" element={<RedirectWithSearch />} />
+            <Route path="/theory" element={<RedirectWithSearch />} />
+            <Route path="/themes" element={<RedirectWithSearch />} />
+            <Route path="/dev" element={<Dev />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
         )}
       </Routes>
       </Router>

@@ -395,28 +395,6 @@ const NavigationContent = ({ onClose, onLogout, isMobile = false, menuOpen = fal
           </>
         )}
 
-        <List {...(isIosMobileDrawer ? iosGroupedListProps : { sx: { py: 0 } })}>
-          <ListItem 
-            button 
-            onClick={() => handleNavigation('/landing')}
-            secondaryAction={iosChevron}
-            sx={
-              isIosMobileDrawer
-                ? {
-                    py: 1.1,
-                    px: 1.5,
-                    borderRadius: 0,
-                    pr: iosChevron ? 1 : undefined,
-                  }
-                : undefined
-            }
-          >
-            <ListItemText 
-              primary="Landing Page" 
-              sx={{ color: 'text.secondary' }} 
-            />
-          </ListItem>
-        </List>
       </Box>
 
       {/* Sticky bottom section */}
